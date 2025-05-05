@@ -1,10 +1,7 @@
 // RecipeCard component implementation will go here
-import React, { useRef, useEffect } from 'react';
-import { View, Text, Dimensions, StyleSheet } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
-import Reanimated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
-
-const { height: windowHeight, width: windowWidth } = Dimensions.get('window');
+import React, { useRef, useEffect, useState } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 
 // Define the expected item structure
 interface RecipeItem {
@@ -17,43 +14,75 @@ interface RecipeItem {
 // Define props for the component
 interface RecipeCardProps {
   item: RecipeItem;
-  // TODO: Add isVisible prop later for autoplay
+  isActive: boolean;
+  containerHeight: number;
 }
 
-export default function RecipeCard({ item }: RecipeCardProps) {
+export default function RecipeCard({ item, isActive, containerHeight }: RecipeCardProps) {
   const videoRef = useRef<Video>(null);
-  // TODO: Autoplay logic will depend on visibility from FlashList
-  // const isPlaying = useSharedValue(false); 
 
-  // useEffect(() => {
-  //   isPlaying.value
-  //     ? videoRef.current?.playAsync()
-  //     : videoRef.current?.pauseAsync();
-  // }, [isPlaying.value]);
+  // State to track if video is loaded and ready
+  const [isLoaded, setIsLoaded] = useState(false);
 
-  // Style to make the card take full window height
-  // Note: FlashList optimization might affect exact height calculations,
-  // using Dimensions.get('window') might be problematic if status/nav bars change.
-  // Consider using onLayout or alternative methods if precision is needed.
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (!videoElement) {
+      return;
+    }
+    // Restore original play/pause logic
+    if (isActive && isLoaded) {
+      console.log(`RecipeCard ${item.id}: isActive & Loaded, attempting to play...`);
+      videoElement.playAsync().catch(e => console.error(`Play error for ${item.id}:`, e));
+    } else {
+      console.log(`RecipeCard ${item.id}: isActive=${isActive}, isLoaded=${isLoaded}. Pausing.`);
+      videoElement.pauseAsync().catch(e => console.error(`Pause error for ${item.id}:`, e));
+    }
+    return () => {
+      const currentVideoElement = videoRef.current;
+      if (currentVideoElement) {
+        currentVideoElement.pauseAsync().catch(e => console.error(`Cleanup pause error for ${item.id}:`, e));
+      }
+    };
+  }, [isActive, isLoaded, item.id]);
+
+  const handleLoad = (status: AVPlaybackStatus) => {
+    // Restore original load handling
+    if (status.isLoaded) {
+        setIsLoaded(true);
+        if (isActive) {
+            videoRef.current?.playAsync().catch(e => console.error(`Play error on load for ${item.id}:`, e));
+        }
+    } else if (status.error) {
+        console.error(`RecipeCard ${item.id}: Video load error:`, status.error);
+    }
+  };
+
+  // Use passed prop for height
   const containerStyle = {
-    width: windowWidth,
-    height: windowHeight,
-    backgroundColor: 'black', // Added background for clarity
+    height: containerHeight,
+    // backgroundColor: 'blue', // Remove debug background
+  };
+
+  // Overlay positioned relative to container bottom
+  const overlayStyle = {
+    bottom: 20,
   };
 
   return (
-    <View style={containerStyle}>
+    <View
+      style={[styles.container, containerStyle]}
+    >
+      {/* Restore Video and Overlay */}
       <Video
         ref={videoRef}
         source={{ uri: item.video }}
         resizeMode={ResizeMode.COVER}
         style={StyleSheet.absoluteFill}
         isLooping
-        shouldPlay={false}
+        onLoad={handleLoad}
         onError={(error) => console.error('Video Error:', error)}
       />
-      {/* Ensure no stray text/whitespace between Video and overlay View */}
-      <View style={styles.overlayContainer}>
+      <View style={[styles.overlayContainer, overlayStyle]}>
         <Text style={styles.title}>{item.title}</Text>
         {item.pantryMatchPct !== undefined && (
           <Text style={styles.pantryMatch}>
@@ -61,19 +90,25 @@ export default function RecipeCard({ item }: RecipeCardProps) {
           </Text>
         )}
       </View>
-      {/* Comment removed as a precaution */}
     </View>
   );
 }
 
-// Basic styling for the overlay
+// Basic styling
 const styles = StyleSheet.create({
+  container: {
+    width: '100%',
+    backgroundColor: 'black', // Restore background color
+    // Remove debug border
+    // borderBottomWidth: 1,
+    // borderBottomColor: 'red',
+  },
   overlayContainer: {
     position: 'absolute',
-    bottom: 80, // Adjust as needed (consider tab bar height)
     left: 16,
     right: 16,
-    backgroundColor: 'rgba(0,0,0,0.3)', // Semi-transparent background
+    bottom: 20,
+    backgroundColor: 'rgba(0,0,0,0.3)',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,

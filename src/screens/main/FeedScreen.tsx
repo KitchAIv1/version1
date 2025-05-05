@@ -1,10 +1,10 @@
-import React from 'react';
-import { View, ActivityIndicator, Text } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
+import React, { useState, useRef, useCallback } from 'react';
+import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
+import { FlashList, ViewToken } from '@shopify/flash-list';
 import { useFeed } from '../../hooks/useFeed';
 import RecipeCard from '../../components/RecipeCard';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { RecipeItem } from '../../types';
+import type { InfiniteData } from '@tanstack/react-query';
 
 export default function FeedScreen() {
   const {
@@ -15,55 +15,104 @@ export default function FeedScreen() {
     isFetchingNextPage,
   } = useFeed();
 
-  // Flatten the pages array from react-query into a single list
-  const items: RecipeItem[] = data?.pages.flat() || [];
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [containerHeight, setContainerHeight] = useState<number | null>(null);
 
-  // Render Footer for loading indicator
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: Array<ViewToken> }) => {
+      if (viewableItems.length > 0 && viewableItems[0].index !== null) {
+        const newIndex = viewableItems[0].index;
+        setCurrentIndex(newIndex);
+      }
+    },
+    []
+  );
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 80,
+  }).current;
+
+  const itemHeight = containerHeight ? Math.floor(containerHeight) : 0;
+
+  const items: RecipeItem[] = (data as InfiniteData<RecipeItem[], number> | undefined)?.pages.flat() || [];
+
+  const handleContainerLayout = (event: any) => {
+    const { height } = event.nativeEvent.layout;
+    if (height > 0 && containerHeight === null) {
+      setContainerHeight(height);
+    }
+  };
+
   const renderListFooter = () => {
     if (!isFetchingNextPage) return null;
     return (
-      <View style={{ paddingVertical: 20 }}>
+      <View style={styles.container}>
         <ActivityIndicator animating size="large" />
       </View>
     );
   };
 
-  // Show loading indicator on initial fetch
   if (isLoading && items.length === 0) {
     return (
-      <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'black' }}>
+      <View style={styles.container} onLayout={handleContainerLayout}>
         <ActivityIndicator size="large" color="#FFFFFF" />
-      </SafeAreaView>
+      </View>
     );
   }
 
-  // Show message if no items found (after loading)
+  if (containerHeight === null) {
+    return (
+      <View style={styles.container} onLayout={handleContainerLayout}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
+
   if (!isLoading && items.length === 0) {
     return (
-      <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'black' }}>
-        <Text style={{ color: 'white' }}>No recipes found.</Text>
-      </SafeAreaView>
+      <View style={styles.container} onLayout={handleContainerLayout}>
+        <Text style={styles.container}>No recipes found.</Text>
+      </View>
     );
   }
 
   return (
-    // Use SafeAreaView to avoid notches/status bars
-    <SafeAreaView style={{ flex: 1, backgroundColor: 'black' }}>
-      <FlashList<RecipeItem>
-        data={items}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <RecipeCard item={item} />}
-        estimatedItemSize={800}
-        pagingEnabled
-        showsVerticalScrollIndicator={false}
-        onEndReached={() => {
-          if (hasNextPage && !isFetchingNextPage) {
-            fetchNextPage();
-          }
-        }}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={renderListFooter}
-      />
-    </SafeAreaView>
+    <View style={styles.container} onLayout={handleContainerLayout}>
+      {itemHeight > 0 && (
+        <FlashList<RecipeItem>
+          data={items}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item, index }) => (
+            <RecipeCard
+              item={item}
+              isActive={index === currentIndex}
+              containerHeight={itemHeight}
+            />
+          )}
+          estimatedItemSize={itemHeight}
+          pagingEnabled
+          disableIntervalMomentum={true}
+          showsVerticalScrollIndicator={false}
+          onEndReached={() => {
+            if (hasNextPage && !isFetchingNextPage) {
+              fetchNextPage();
+            }
+          }}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={renderListFooter}
+          viewabilityConfig={viewabilityConfig}
+          onViewableItemsChanged={onViewableItemsChanged}
+        />
+      )}
+    </View>
   );
-} 
+}
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: 'black',
+        alignItems: 'center',
+        justifyContent: 'center',
+    }
+}); 

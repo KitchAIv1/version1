@@ -50,7 +50,6 @@ export default function DiscoverScreen() {
           className="p-3 border border-gray-300 rounded-lg bg-gray-50"
         />
       </View>
-      {/* TODO: Add "Trending" and "For You" sections later */}
       <FlatList
         data={dummy} // Use dummy data for now
         keyExtractor={(item) => item.id}
