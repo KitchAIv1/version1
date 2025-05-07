@@ -42,7 +42,7 @@ export default function FeedScreen() {
   );
 
   const viewabilityConfig = useRef({
-    viewAreaCoveragePercentThreshold: 75,
+    viewAreaCoveragePercentThreshold: 50,
     waitForInteraction: true,
   }).current;
 
