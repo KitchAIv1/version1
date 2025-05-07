@@ -1,4 +1,5 @@
 import React from 'react';
+import { Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import FeedScreen from '../screens/main/FeedScreen';
 import DiscoverScreen from '../screens/main/DiscoverScreen';
@@ -19,7 +20,16 @@ const MainTabs = () => {
         component={FeedScreen} 
         // options={{ tabBarIcon: ({ color, size }) => (<MaterialCommunityIcons name="home" color={color} size={size} />) }}
       />
-      <Tab.Screen name="Discover" component={DiscoverScreen} />
+      <Tab.Screen 
+        name="Discover" 
+        component={DiscoverScreen} 
+        options={{
+          tabBarLabel: ({ color, focused }) => (
+            <Text style={{ color, fontSize: focused ? 12 : 10 }}>Discover</Text>
+          ),
+          // You might also want to define tabBarIcon similarly if you plan to use icons
+        }}
+      />
       <Tab.Screen name="Pantry" component={PantryScreen} />
       <Tab.Screen name="Create" component={CreateScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
