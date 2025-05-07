@@ -1,103 +1,127 @@
 // RecipeCard component implementation will go here
-import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, DimensionValue } from 'react-native';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, DimensionValue, Image } from 'react-native';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ActionOverlay from './ActionOverlay';
-// import { RecipeItem } from '../types'; // Remove this import if conflicting
+import { RecipeItem } from '../types'; // Import from central types
+import { MainStackParamList } from '../navigation/types'; // Import MainStackParamList
 
-// Define the expected item structure locally if not imported
-// Or ensure it's correctly imported from '../types' without conflict
-interface RecipeItem { // Assuming this is the definition source
-  id: string;
-  title: string;
-  video: string;
-  pantryMatchPct?: number;
-  liked?: boolean;
-  likes?: number;
-  saved?: boolean;
-  saves?: number;
-  onLike?: () => void;
-  onSave?: () => void;
-}
+// Remove local interface definition
+// interface RecipeItem { ... }
 
-// Update props: item should include fields for overlay and handlers
 interface RecipeCardProps {
   item: RecipeItem;
   isActive: boolean;
   containerHeight: number;
 }
 
+// Define the specific navigation prop type for this screen's context
+type RecipeCardNavigationProp = NativeStackNavigationProp<MainStackParamList, 'RecipeDetail'>;
+
 export default function RecipeCard({ item, isActive, containerHeight }: RecipeCardProps) {
   const videoRef = useRef<Video>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const navigation = useNavigation<RecipeCardNavigationProp>(); // Get navigation object
 
   useEffect(() => {
     const videoElement = videoRef.current;
-    console.log(`RecipeCard ${item.id} - Effect: isActive: ${isActive}, isLoaded: ${isLoaded}`);
+    // console.log(`RecipeCard ${item.id} - Effect: isActive: ${isActive}, isLoaded: ${isLoaded}`); // Reduced logging
 
     if (!videoElement) {
-      console.log(`RecipeCard ${item.id} - Effect: Video element not ready.`);
       return;
     }
-
     if (isActive) {
       if (isLoaded) {
-        console.log(`RecipeCard ${item.id} - Effect: Attempting to PLAY (active and loaded)`);
         videoElement.playAsync().catch(e => console.error(`Play error for ${item.id}: ${e.message}`, e));
-      } else {
-        console.log(`RecipeCard ${item.id} - Effect: Active but NOT LOADED YET. Will play once loaded.`);
-        // Optional: could try to explicitly load if not already, but onLoad should handle this.
-        // videoElement.loadAsync({ uri: item.video }).catch(e => console.warn("Explicit load failed", e));
-      }
-    } else { // Not active
-      if (isLoaded) { // Only pause if it was loaded (and possibly playing)
-        console.log(`RecipeCard ${item.id} - Effect: Attempting to PAUSE (inactive and loaded)`);
+      } 
+    } else { 
+      if (isLoaded) { 
         videoElement.pauseAsync().catch(e => console.error(`Pause error for ${item.id}: ${e.message}`, e));
-      } else {
-        console.log(`RecipeCard ${item.id} - Effect: Inactive and NOT LOADED. No action needed for pause.`);
       }
     }
-
     return () => {
       const currentVideoElement = videoRef.current;
-      // Check isLoaded as well? Or just pause aggressively on cleanup if element exists?
-      // For now, if element exists, attempt pause. The error was on initial pause before load.
-      if (currentVideoElement) { 
-        console.log(`RecipeCard ${item.id} - Effect Cleanup: PAUSING video element.`);
+      if (currentVideoElement) {
         currentVideoElement.getStatusAsync().then(status => {
-          if (status.isLoaded && status.isPlaying) { // Only pause if actually playing
+          if (status.isLoaded && status.isPlaying) {
              currentVideoElement.pauseAsync().catch(e => console.error(`Cleanup pause error for ${item.id}: ${e.message}`,e));
-          } else {
-            // console.log(`RecipeCard ${item.id} - Effect Cleanup: Video not playing or not loaded, no pause needed.`);
           }
         }).catch(e => console.error(`Cleanup getStatus error for ${item.id}: ${e.message}`, e));
       }
     };
   }, [isActive, isLoaded, item.id]);
 
+  useFocusEffect(
+    useCallback(() => {
+      const managePlayback = async () => {
+        if (isActive && isLoaded && videoRef.current) {
+          // Screen focused
+          // console.log(`RecipeCard ${item.id} (useFocusEffect - focus): Active & Loaded - Playing with fade attempt`);
+          try {
+            await videoRef.current.setIsMutedAsync(true);
+            await videoRef.current.playAsync();
+            await videoRef.current.setIsMutedAsync(false);
+          } catch (e) {
+            console.error(`RecipeCard ${item.id}: Error in focus effect (play/fade)`, e);
+          }
+        }
+      };
+
+      managePlayback();
+
+      return () => {
+        // Screen blurred
+        const pauseOnBlur = async () => {
+          if (isActive && isLoaded && videoRef.current) {
+            // console.log(`RecipeCard ${item.id} (useFocusEffect - blur): Active & Loaded - Pausing`);
+            try {
+              await videoRef.current.pauseAsync();
+            } catch (e) {
+              console.error(`RecipeCard ${item.id}: Error in focus effect (pause)`, e);
+            }
+          }
+        };
+        pauseOnBlur();
+      };
+    }, [isActive, isLoaded, item.id]) // Dependencies for useCallback
+  );
+
   const handleLoad = (status: AVPlaybackStatus) => {
     if (status.isLoaded) {
-      console.log(`RecipeCard ${item.id} - Video loaded successfully via onLoad.`);
-      if (!isLoaded) { // Prevent setting state if already true
-        setIsLoaded(true);
-      }
+      if (!isLoaded) { setIsLoaded(true); }
     } else if (status.error) {
       console.error(`RecipeCard ${item.id}: Video load error from onLoad:`, status.error);
-      setIsLoaded(false); // Ensure isLoaded is false on error
+      setIsLoaded(false); 
     }
   };
   
   const handleError = (error: string) => {
     console.error(`RecipeCard ${item.id}: Video onError event:`, error);
-    setIsLoaded(false); // Mark as not loaded on error
+    setIsLoaded(false);
   }
+
+  // Handler for navigating to detail screen
+  const handleNavigateToDetail = async () => {
+    console.log(`Navigating to RecipeDetail for ID: ${item.id}`);
+    let seekTime = 0;
+    try {
+      const status = await videoRef.current?.getStatusAsync();
+      if (status && status.isLoaded) {
+        seekTime = status.positionMillis;
+      }
+    } catch (error) {
+      console.warn(`RecipeCard ${item.id}: Could not get video status for seek time`, error);
+    }
+    navigation.navigate('RecipeDetail', { 
+      id: item.id,
+      initialSeekTime: seekTime
+    });
+  };
 
   const containerStyle = {
     height: containerHeight,
-  };
-
-  const overlayStyle = { // This overlayStyle seems unused in the JSX below
-    bottom: 20,
   };
 
   return (
@@ -109,21 +133,44 @@ export default function RecipeCard({ item, isActive, containerHeight }: RecipeCa
         style={StyleSheet.absoluteFill}
         isLooping
         onLoad={handleLoad}
-        onError={handleError} // Changed from inline to handler
+        onError={handleError}
         progressUpdateIntervalMillis={1000} 
       />
-      {/* The textOverlayContainer has its own bottom positioning in styles */}
-      <View style={styles.textOverlayContainer}>
-        <Text style={styles.title}>{item.title}</Text>
-        {item.pantryMatchPct !== undefined && (
-          <Text style={styles.pantryMatch}>
-            {item.pantryMatchPct}% pantry match
-          </Text>
+      
+      {/* New Combined Overlay Wrapper */}
+      <View style={styles.overlayWrapper}>
+        {/* Left Side: Text Info */}
+        <View style={styles.textInfoContainer}>
+          <View style={styles.creatorInfoContainer}>
+            {item.creatorAvatarUrl ? (
+              <Image 
+                source={{ uri: item.creatorAvatarUrl }}
+                style={styles.avatar}
+              />
+            ) : (
+              <View style={[styles.avatar, styles.avatarPlaceholder]} />
+            )}
+            <Text style={styles.usernameText} numberOfLines={1}>{item.userName || 'Unknown User'}</Text>
+          </View>
+          <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+          {item.pantryMatchPct !== undefined && (
+            <Text style={styles.pantryMatch}>
+              {item.pantryMatchPct}% pantry match
+            </Text>
+          )}
+        </View>
+
+        {/* Right Side: Action Buttons */}
+        {item.onLike && item.onSave && (
+          // ActionOverlay is now positioned by flexbox (justifyContent: space-between)
+          <ActionOverlay 
+            item={item} 
+            onLike={item.onLike} 
+            onSave={item.onSave} 
+            onMorePress={handleNavigateToDetail}
+          />
         )}
       </View>
-      {item.onLike && item.onSave && (
-          <ActionOverlay item={item} onLike={item.onLike} onSave={item.onSave} />
-      )}
     </View>
   );
 }
@@ -131,27 +178,51 @@ export default function RecipeCard({ item, isActive, containerHeight }: RecipeCa
 // Basic styling
 const styles = StyleSheet.create({
   container: {
-    width: '100%' as DimensionValue, // Moved width: '100%' here and cast for TS
-    backgroundColor: 'black', // Restore background color
-    overflow: 'hidden', // Can help contain the absolute positioned Video
-    // Remove debug border
-    // borderBottomWidth: 1,
-    // borderBottomColor: 'red',
+    width: '100%' as DimensionValue,
+    backgroundColor: 'black',
+    overflow: 'hidden',
   },
-  textOverlayContainer: {
+  overlayWrapper: { // New wrapper for all overlay content
     position: 'absolute',
+    bottom: 20,
     left: 16,
     right: 16,
-    bottom: 80, // Adjusted slightly higher to ensure visibility above potential nav or other overlays
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    zIndex: 1,
+    zIndex: 10,
+    flexDirection: 'row',       // Arrange text and actions horizontally
+    justifyContent: 'space-between', // Push text left, actions right
+    alignItems: 'flex-end',     // Align items to the bottom of the wrapper
+    backgroundColor: 'rgba(0,0,0,0.6)', // Slightly darker background
+    padding: 12, 
+    borderRadius: 10, 
+  },
+  textInfoContainer: { // Container for left-side text elements
+    flexShrink: 1, // Allow text container to shrink if needed, prevent pushing actions off-screen
+    marginRight: 8, // Add some space between text and actions
+  },
+  creatorInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  avatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 8,
+    backgroundColor: '#555',
+  },
+  avatarPlaceholder: {
+    backgroundColor: '#444',
+  },
+  usernameText: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: 'bold',
+    flexShrink: 1, // Allow username to shrink/wrap if long
   },
   title: {
     color: 'white',
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 4,
   },

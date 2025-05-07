@@ -14,7 +14,7 @@ import {
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 
@@ -53,21 +53,21 @@ export default function RecipeDetailScreen() {
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Log IDs being used
-  console.log(`RecipeDetailScreen: recipeId = ${recipeId}, userId = ${user?.id}`);
+  // console.log(`RecipeDetailScreen: recipeId = ${recipeId}, userId = ${user?.id}`); // Reverted this line for now
 
   // Fetch data
   const {
     data: recipeDetails,
     isLoading,
     error,
-    status, // Add status for more detail
+    status, // Added status back
   } = useRecipeDetails(recipeId, user?.id);
 
   // Log hook status
-  console.log(`RecipeDetailScreen: useRecipeDetails status = ${status}, isLoading = ${isLoading}, error = ${error ? error.message : 'null'}, hasData = ${!!recipeDetails}`);
-  if (status === 'success' && recipeDetails) {
-    console.log('RecipeDetailScreen: Received recipeDetails keys:', Object.keys(recipeDetails).join(', ')); // Log keys instead of full object
-  }
+  // console.log(`RecipeDetailScreen: useRecipeDetails status = ${status}, isLoading = ${isLoading}, error = ${error ? error.message : 'null'}, hasData = ${!!recipeDetails}`); // Reverted this line
+  // if (status === 'success' && recipeDetails) { // Reverted this line
+  //   console.log('RecipeDetailScreen: Received recipeDetails keys:', Object.keys(recipeDetails).join(', ')); // Reverted this line
+  // }
 
   // --- Optimistic updates for like/save --- 
   interface MutationContext {
@@ -112,7 +112,6 @@ export default function RecipeDetailScreen() {
       return; // Exit if no video ref
     }
     videoRef.current.setIsMutedAsync(!isMuted)
-      .then(() => console.log('setIsMutedAsync successful'))
       .catch(e => console.error('setIsMutedAsync error:', e));
     setIsMuted(prevMuted => {
       console.log('Updating isMuted state from', prevMuted, 'to', !prevMuted); // Log 3: State update
@@ -124,7 +123,7 @@ export default function RecipeDetailScreen() {
 
   // --- Render Logic ---
   if (isLoading) {
-    console.log('RecipeDetailScreen: Rendering Loading state');
+    // console.log('RecipeDetailScreen: Rendering Loading state'); // Reverted this line
     return (
       <View style={styles.centeredContainer}>
         <ActivityIndicator size="large" />
@@ -133,7 +132,7 @@ export default function RecipeDetailScreen() {
   }
 
   if (error || !recipeDetails) {
-    console.log(`RecipeDetailScreen: Rendering Error/NoData state (error: ${error ? error.message : 'null'}, !recipeDetails: ${!recipeDetails})`);
+    // console.log(`RecipeDetailScreen: Rendering Error/NoData state (error: ${error ? error.message : 'null'}, !recipeDetails: ${!recipeDetails})`); // Reverted this line
     return (
       <View style={styles.centeredContainer}>
         <Text style={styles.errorText}>
@@ -143,7 +142,7 @@ export default function RecipeDetailScreen() {
     );
   }
 
-  console.log('RecipeDetailScreen: Rendering main content');
+  // console.log('RecipeDetailScreen: Rendering main content'); // Reverted this line
   // Prepare item prop for ActionOverlay - ensure it conforms to RecipeItem where needed
   const actionOverlayItemProps: RecipeItem & { likes?: number; saves?: number; liked?: boolean; saved?: boolean } = { id: recipeDetails.output_id, liked: recipeDetails.output_is_liked, likes: recipeDetails.output_likes, saved: recipeDetails.output_is_saved, title: recipeDetails.output_name, video: recipeDetails.output_video_url, };
 

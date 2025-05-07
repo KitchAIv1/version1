@@ -25,7 +25,8 @@ export type MainTabsParamList = {
 export type MainStackParamList = {
   MainTabs: undefined; // Nest the tabs navigator
   SearchResults: { query: string };
-  RecipeDetail: { id: string }; // Add RecipeDetail based on DiscoverScreen code
+  RecipeDetail: { id: string; initialSeekTime?: number }; // Add initialSeekTime
+  PantryScan: undefined; // Add PantryScan screen
   // Add other stack screens here if needed (e.g., Settings)
 };
 
@@ -44,4 +45,5 @@ export type DiscoverScreenProps = BottomTabScreenProps<MainTabsParamList, 'Disco
 
 // Prop types for screens within MainStack
 export type SearchResultsProps = NativeStackScreenProps<MainStackParamList, 'SearchResults'>;
-export type RecipeDetailProps = NativeStackScreenProps<MainStackParamList, 'RecipeDetail'>; 
+export type RecipeDetailProps = NativeStackScreenProps<MainStackParamList, 'RecipeDetail'>;
+export type PantryScanProps = NativeStackScreenProps<MainStackParamList, 'PantryScan'>; // Add prop type for PantryScan 

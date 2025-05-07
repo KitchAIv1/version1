@@ -3,37 +3,51 @@ import { Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import FeedScreen from '../screens/main/FeedScreen';
 import DiscoverScreen from '../screens/main/DiscoverScreen';
-import PantryScreen from '../screens/main/PantryScreen';
+// import PantryScreen from '../screens/main/PantryScreen'; // Old Pantry Screen
+import MyStockScreen from '../screens/pantry/MyStockScreen'; // Import MyStockScreen
 import CreateScreen from '../screens/main/CreateScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
-// import SearchResultsScreen from '../screens/main/SearchResultsScreen'; // No longer needed here
 import { MainTabsParamList } from './types';
-// import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'; // Example for icons
+import { Feather } from '@expo/vector-icons'; // Import Feather icons
 
 const Tab = createBottomTabNavigator<MainTabsParamList>();
 
 const MainTabs = () => {
   return (
-    <Tab.Navigator screenOptions={{ headerShown: false /* Customize options here */ }}>
-      <Tab.Screen 
-        name="Feed" 
-        component={FeedScreen} 
-        // options={{ tabBarIcon: ({ color, size }) => (<MaterialCommunityIcons name="home" color={color} size={size} />) }}
-      />
-      <Tab.Screen 
-        name="Discover" 
-        component={DiscoverScreen} 
-        options={{
-          tabBarLabel: ({ color, focused }) => (
-            <Text style={{ color, fontSize: focused ? 12 : 10 }}>Discover</Text>
-          ),
-          // You might also want to define tabBarIcon similarly if you plan to use icons
-        }}
-      />
-      <Tab.Screen name="Pantry" component={PantryScreen} />
+    <Tab.Navigator 
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarActiveTintColor: '#22c55e', 
+        tabBarInactiveTintColor: '#6b7280', 
+        tabBarLabelStyle: { fontWeight: '500', fontSize: 10, marginBottom: 3 },
+        tabBarStyle: { paddingTop: 5 }, 
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
+          const iconSize = focused ? 24 : 22;
+
+          if (route.name === 'Feed') {
+            iconName = 'home'; 
+          } else if (route.name === 'Discover') {
+            iconName = 'search';
+          } else if (route.name === 'Pantry') {
+            iconName = 'archive';
+          } else if (route.name === 'Create') {
+            iconName = 'plus-square';
+          } else if (route.name === 'Profile') {
+            iconName = 'user';
+          }
+          // Added check for iconName to prevent errors
+          if (!iconName) return null; 
+          return <Feather name={iconName as any} size={iconSize} color={color} />;
+        },
+      })}
+    >
+      <Tab.Screen name="Feed" component={FeedScreen} />
+      <Tab.Screen name="Discover" component={DiscoverScreen} />
+      {/* Correctly assign MyStockScreen to the Pantry tab */}
+      <Tab.Screen name="Pantry" component={MyStockScreen} /> 
       <Tab.Screen name="Create" component={CreateScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
-      {/* SearchResults screen removed, now part of parent MainStack */}
     </Tab.Navigator>
   );
 };

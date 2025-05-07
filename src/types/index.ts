@@ -9,7 +9,7 @@ export interface RecipeItem {
   saved?: boolean;            // Maps from output_is_saved
   saves?: number;             // Note: RPC doesn't return save count. Need to adjust UI or RPC.
   userName?: string;          // Maps from user_name
-  creatorAvatarUrl?: string;  // Maps from out_creator_avatar_url
+  creatorAvatarUrl?: string | null;  // Maps from out_creator_avatar_url, allow null based on RPC data
   // Add other fields returned by RPC if needed:
   // comments?: any;          // Maps from output_comments
   // commentsCount?: number;  // Maps from output_comments_count
