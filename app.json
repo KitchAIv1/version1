@@ -16,14 +16,17 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Scan pantry items"
-      }
+      },
+      "bundleIdentifier": "com.chieftitan.kitchai-v2"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions": ["CAMERA"],
+      "permissions": [
+        "CAMERA"
+      ],
       "edgeToEdgeEnabled": true
     },
     "web": {

@@ -4,7 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import FeedScreen from '../screens/main/FeedScreen';
 import DiscoverScreen from '../screens/main/DiscoverScreen';
 // import PantryScreen from '../screens/main/PantryScreen'; // Old Pantry Screen
-import MyStockScreen from '../screens/pantry/MyStockScreen'; // Import MyStockScreen
+import MyStockScreen from '../screens/main/MyStockScreen'; // Corrected import path
 import CreateScreen from '../screens/main/CreateScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import { MainTabsParamList } from './types';
@@ -30,7 +30,7 @@ const MainTabs = () => {
           } else if (route.name === 'Discover') {
             iconName = 'search';
           } else if (route.name === 'Pantry') {
-            iconName = 'archive';
+            iconName = 'package'; // Using 'package' icon for the new MyStockScreen
           } else if (route.name === 'Create') {
             iconName = 'plus-square';
           } else if (route.name === 'Profile') {
@@ -44,7 +44,7 @@ const MainTabs = () => {
     >
       <Tab.Screen name="Feed" component={FeedScreen} />
       <Tab.Screen name="Discover" component={DiscoverScreen} />
-      {/* Correctly assign MyStockScreen to the Pantry tab */}
+      {/* Correctly assign MyStockScreen (from /main) to the Pantry tab */}
       <Tab.Screen name="Pantry" component={MyStockScreen} /> 
       <Tab.Screen name="Create" component={CreateScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />

@@ -21,12 +21,28 @@ export type MainTabsParamList = {
   // SearchResults removed from here, moved to MainStack
 };
 
+// Type for the Recipe Detail screen parameters
+export type RecipeDetailParams = {
+  id: string;
+  initialSeekTime?: number; // Optional: time in ms to seek video initially
+};
+
+// Type for the Edit Profile screen parameters
+export type EditProfileParams = {
+  initialProfileData?: {
+    bio?: string | null;
+    avatar_url?: string | null;
+  };
+  userId?: string; // User ID might be needed if RPC doesn't use auth.uid()
+};
+
 // For the main application stack (after login)
 export type MainStackParamList = {
   MainTabs: undefined; // Nest the tabs navigator
   SearchResults: { query: string };
-  RecipeDetail: { id: string; initialSeekTime?: number }; // Add initialSeekTime
+  RecipeDetail: RecipeDetailParams;
   PantryScan: undefined; // Add PantryScan screen
+  EditProfile: EditProfileParams; // Added EditProfile screen
   // Add other stack screens here if needed (e.g., Settings)
 };
 
