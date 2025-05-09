@@ -1,5 +1,5 @@
 // RecipeDetailScreen placeholder
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -11,12 +11,13 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
-import { useRoute, RouteProp } from '@react-navigation/native';
+import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { MainStackParamList } from '../../navigation/types';
 import { useRecipeDetails, RecipeDetailsData } from '../../hooks/useRecipeDetails';
@@ -28,6 +29,8 @@ import StepsTab from '../recipe-detail-tabs/StepsTab';
 import MacrosTab from '../recipe-detail-tabs/MacrosTab';
 import CommentsTab from '../recipe-detail-tabs/CommentsTab';
 import { supabase } from '../../services/supabase';
+import { useGroceryManager } from '../../hooks/useGroceryManager';
+import { COLORS } from '../../constants/theme';
 
 // Define route prop type
 type RecipeDetailScreenRouteProp = RouteProp<
@@ -48,6 +51,8 @@ export default function RecipeDetailScreen() {
   const recipeId = route.params?.id;
   const initialSeekTime = route.params?.initialSeekTime ?? 0; // Get initialSeekTime
   const videoRef = useRef<Video>(null);
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const { groceryList } = useGroceryManager();
 
   const [isMuted, setIsMuted] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -175,6 +180,16 @@ export default function RecipeDetailScreen() {
         <TouchableOpacity style={styles.muteButton} onPress={toggleMute}>
           <Ionicons name={isMuted ? 'volume-mute' : 'volume-high'} size={24} color="white" />
         </TouchableOpacity>
+
+        {/* Cart Icon with Badge - Placed top right */}
+        <TouchableOpacity style={styles.cartButtonContainer} onPress={() => navigation.navigate('MainTabs', { screen: 'GroceryList' })}> 
+          <Ionicons name="cart-outline" size={28} color={COLORS.white || '#FFF'} />
+          {groceryList.length > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{groceryList.length}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
         
         {recipeDetails.output_user_ingredients_count !== undefined && 
          recipeDetails.output_total_ingredients_count !== undefined && (
@@ -239,6 +254,17 @@ const styles = StyleSheet.create({
   video: { ...StyleSheet.absoluteFillObject, zIndex: 0 },
   videoPlaceholder: { justifyContent: 'center', alignItems: 'center', backgroundColor: '#222', },
   muteButton: { position: 'absolute', top: 60, left: 15, zIndex: 12, padding: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, },
+  cartButtonContainer: { position: 'absolute', top: 60, right: 15, zIndex: 12, padding: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -6,
+    backgroundColor: COLORS.error || 'red',
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  badgeText: { color: COLORS.white || 'white', fontSize: 10, fontWeight: 'bold', },
   pantryBadge: { position: 'absolute', bottom: 15, left: 15, zIndex: 11, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 15, },
   pantryText: { color: 'white', fontSize: 12, fontWeight: 'bold', },
   actionOverlayPositioner: { position: 'absolute', bottom: 15, right: 0, zIndex: 11, },

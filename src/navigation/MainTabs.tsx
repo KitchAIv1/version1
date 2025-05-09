@@ -7,6 +7,8 @@ import DiscoverScreen from '../screens/main/DiscoverScreen';
 import MyStockScreen from '../screens/main/MyStockScreen'; // Corrected import path
 import CreateScreen from '../screens/main/CreateScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
+// import StockManagerV2TestScreen from '../screens/StockManagerV2TestScreen'; // <-- REMOVE IMPORT
+import GroceryListScreen from '../screens/grocery/GroceryListScreen'; // <-- IMPORT
 import { MainTabsParamList } from './types';
 import { Feather } from '@expo/vector-icons'; // Import Feather icons
 
@@ -35,7 +37,12 @@ const MainTabs = () => {
             iconName = 'plus-square';
           } else if (route.name === 'Profile') {
             iconName = 'user';
+          } else if (route.name === 'GroceryList') { // <-- ADD ICON LOGIC
+            iconName = 'list'; 
           }
+          // else if (route.name === 'StockV2Test') { // <-- REMOVE ICON LOGIC
+          //   iconName = 'tool'; 
+          // }
           // Added check for iconName to prevent errors
           if (!iconName) return null; 
           return <Feather name={iconName as any} size={iconSize} color={color} />;
@@ -48,6 +55,20 @@ const MainTabs = () => {
       <Tab.Screen name="Pantry" component={MyStockScreen} /> 
       <Tab.Screen name="Create" component={CreateScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen // <-- ADD NEW TAB SCREEN
+        name="GroceryList" 
+        component={GroceryListScreen}
+        options={{
+          tabBarLabel: 'Grocery',
+        }}
+      />
+      {/* <Tab.Screen // <-- REMOVE TAB SCREEN
+        name="StockV2Test"
+        component={StockManagerV2TestScreen}
+        options={{
+          tabBarLabel: 'Stock V2 Test',
+        }}
+      /> */}
     </Tab.Navigator>
   );
 };

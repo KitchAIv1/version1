@@ -1,0 +1,51 @@
+// Step-by-step implementation plan for MyStockScreen V2
+
+// 1. Replace your current MyStockScreen.tsx file with the new modular version:
+
+// FILE: screens/MyStockScreen.tsx
+import React from 'react';
+import { SafeAreaView, StatusBar } from 'react-native';
+import { useStockManager } from '../hooks/useStockManager';
+import StockHeader from '../components/stock/StockHeader';
+import StockList from '../components/stock/StockList';
+import CameraScannerModal from '../components/stock/CameraScannerModal';
+import ManualAddModal from '../components/stock/ManualAddModal';
+
+export default function MyStockScreen() {
+  const {
+    stockData,
+    isLoading,
+    error,
+    openCamera,
+    closeCamera,
+    isCameraVisible,
+    isManualModalVisible,
+    openManualModal,
+    closeManualModal,
+    handleSaveItem,
+    editingItem,
+    setEditingItem,
+    handleDeleteItem
+  } = useStockManager();
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+      <StatusBar barStyle="dark-content" />
+      <StockHeader onScanPress={openCamera} onAddPress={openManualModal} />
+      <StockList
+        data={stockData}
+        isLoading={isLoading}
+        error={error}
+        onEditItem={setEditingItem}
+        onDeleteItem={handleDeleteItem}
+      />
+      <CameraScannerModal visible={isCameraVisible} onClose={closeCamera} />
+      <ManualAddModal
+        visible={isManualModalVisible}
+        onClose={closeManualModal}
+        onSubmit={handleSaveItem}
+        item={editingItem}
+      />
+    </SafeAreaView>
+  );
+}

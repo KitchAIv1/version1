@@ -1,23 +1,51 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { GroceryItemInput } from '../hooks/useGroceryManager'; // Import the type
 
 type Props = {
   ing: { name: string; qty?: string; unit?: string };
   matched: boolean;
   missing: boolean;
+  onAddItem?: (item: GroceryItemInput) => Promise<void>; // Make it async if addGroceryItem is async and we want to await/catch
 };
 
-export default function IngredientRow({ ing, matched, missing }: Props) {
+export default function IngredientRow({ ing, matched, missing, onAddItem }: Props) {
+  const handleAddItem = async () => {
+    if (!ing.name) {
+      Alert.alert("Error", "Ingredient name is missing.");
+      return;
+    }
+    const itemToAdd: GroceryItemInput = {
+      item_name: ing.name,
+      quantity: ing.qty ? parseFloat(ing.qty) : null, // Parse qty, default to null if not present or invalid
+      unit: ing.unit || null, // Default to null if not present
+    };
+    if (isNaN(itemToAdd.quantity as number)) {
+      itemToAdd.quantity = 1; // Default to 1 if parsing failed (e.g. non-numeric qty string)
+    }
+
+    if (onAddItem) {
+      try {
+        await onAddItem(itemToAdd);
+        // Optionally, add a success feedback, though the list refresh in the hook is the main feedback
+        // Alert.alert("Success", `${itemToAdd.item_name} added to grocery list.`);
+      } catch (error: any) {
+        Alert.alert("Error", error.message || "Could not add item to grocery list.");
+      }
+    }
+  };
+
   return (
     <View style={styles.rowContainer}>
       {/* Icon Section */}
       <View style={styles.iconContainer}>
         {matched && <Feather name="check-circle" size={18} color="#22c55e" />}
-        {missing && <Feather name="x-circle" size={18} color="#dc2626" />}
+        {missing && !onAddItem && <Feather name="x-circle" size={18} color="#dc2626" />} 
+        {/* If missing AND no onAddItem, show x. If onAddItem is present, the button serves as the indicator */}
       </View>
 
-      {/* Text Group - This View takes up the available space and arranges its children in a row */}
+      {/* Text Group */}
       <View style={styles.textGroupContainer}>
         {ing.qty && (
           <Text style={[styles.textBase, styles.qtyText, matched ? styles.matchedText : styles.missingText]}>
@@ -29,7 +57,6 @@ export default function IngredientRow({ ing, matched, missing }: Props) {
             {ing.unit}
           </Text>
         )}
-        {/* Name Text - This should shrink and truncate if needed */}
         <Text 
           style={[styles.textBase, styles.nameText, matched ? styles.matchedText : styles.missingText]} 
           numberOfLines={1}
@@ -40,27 +67,28 @@ export default function IngredientRow({ ing, matched, missing }: Props) {
       </View>
 
       {/* ADD Button Section */}
-      {missing && (
-        <TouchableOpacity style={styles.addButton}>
-          <Text style={styles.addButtonText}>ADD</Text>
+      {missing && onAddItem && (
+        <TouchableOpacity onPress={handleAddItem} style={styles.addButton} activeOpacity={0.7}>
+          {/* Using an icon instead of text for a cleaner look */}
+          <Feather name="plus-circle" size={18} color="#b45309" /> 
         </TouchableOpacity>
       )}
     </View>
   );
 }
 
-// Using StyleSheet for more precise control and potentially better performance
+// Styles remain the same, but ensure addButton is styled appropriately for an icon if text is removed
 const styles = StyleSheet.create({
   rowContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 9, // Slightly adjusted for visual balance
+    paddingVertical: 9,
     paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6', // Softer border like in IngredientsTab
+    borderBottomColor: '#f3f4f6',
   },
   iconContainer: {
-    width: 20, // Fixed width for icon container
+    width: 20,
     height: 20,
     alignItems: 'center',
     justifyContent: 'center',
@@ -69,11 +97,12 @@ const styles = StyleSheet.create({
   textGroupContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    overflow: 'hidden', // Important for text truncation within flex children
-    flexShrink: 1, // Allow this group to shrink if very long and button needs space
+    overflow: 'hidden',
+    flexShrink: 1,
+    flex: 1, // Allow text group to take up available space before button
   },
   textBase: {
-    fontSize: 14, // Equivalent to text-sm
+    fontSize: 14,
   },
   qtyText: {
     marginRight: 4,
@@ -82,31 +111,33 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   nameText: {
-    flex: 1,
+    // Removed flex: 1 here as textGroupContainer handles flexing
   },
   matchedText: {
-    fontWeight: '500', // Equivalent to font-medium
-    color: '#1f2937', // Equivalent to text-gray-800
+    fontWeight: '500',
+    color: '#1f2937',
   },
   missingText: {
-    color: '#6b7280', // Equivalent to text-gray-500
+    color: '#6b7280',
   },
   matchedUnitText: {
-    color: '#4b5563', // Equivalent to text-gray-600
+    color: '#4b5563',
   },
   missingUnitText: {
-    color: '#9ca3af', // Equivalent to text-gray-400
+    color: '#9ca3af',
   },
   addButton: {
-    marginLeft: 8, // Fixed margin for consistency
-    backgroundColor: '#fef3c7', // amber-100
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6, // rounded-md
+    marginLeft: 8,
+    paddingHorizontal: 6, // Adjust padding for icon
+    paddingVertical: 4,   // Adjust padding for icon
+    borderRadius: 15, // Make it rounder for an icon button
+    // backgroundColor: '#fef3c7', // Consider removing bg or using a more subtle one for icon only
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  addButtonText: {
-    color: '#b45309', // amber-600
-    fontSize: 12, // text-xs
+  addButtonText: { // This style is no longer used if using an icon
+    color: '#b45309',
+    fontSize: 12,
     fontWeight: '500',
   },
 }); 

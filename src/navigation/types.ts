@@ -1,5 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import type { NavigatorScreenParams } from '@react-navigation/native';
 
 // Define ParamList types for each navigator
 
@@ -18,6 +19,7 @@ export type MainTabsParamList = {
   Pantry: undefined;
   Create: undefined;
   Profile: undefined;
+  GroceryList: undefined;
   // SearchResults removed from here, moved to MainStack
 };
 
@@ -38,7 +40,7 @@ export type EditProfileParams = {
 
 // For the main application stack (after login)
 export type MainStackParamList = {
-  MainTabs: undefined; // Nest the tabs navigator
+  MainTabs: NavigatorScreenParams<MainTabsParamList>;
   SearchResults: { query: string };
   RecipeDetail: RecipeDetailParams;
   PantryScan: undefined; // Add PantryScan screen

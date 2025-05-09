@@ -12,6 +12,7 @@ import { StockHeader } from '../../components/stock/StockHeader'; // Use named i
 import { StockList } from '../../components/stock/StockList'; // Use named import
 import { CameraScannerModal } from '../../components/stock/CameraScannerModal'; // Uncommented component
 import { ManualAddModal } from '../../components/stock/ManualAddModal'; // Uncommented component import
+import StockConfirmation from '../../../components/stock/StockConfirmation'; // Verifying path for new location
 import { COLORS as ThemeColors } from '../../constants/theme'; // Import real COLORS, maybe alias
 
 // const COLORS = { background: '#FFF' }; // Remove mock

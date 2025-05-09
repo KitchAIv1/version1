@@ -36,6 +36,14 @@ export interface PreparedItem {
     description?: string | null;
 }
 
+// Type for data coming from the modal on confirmation - ENSURE THIS IS EXPORTED
+export type ConfirmedStockItemFromModal = { item_name: string; quantity: number; unit: string; description?: string | null };
+
+// Type for items to be passed to the StockConfirmation component (from components/stock/StockConfirmation.tsx)
+interface ScannedItemForConfirmation { // Renamed to avoid conflict if StockConfirmation itself exports a ScannedItem type
+    name?: string;
+    quantity?: string;
+}
 
 export type UnitOption = { label: string; value: string };
 
@@ -111,6 +119,10 @@ export const useStockManager = () => {
   // Modal Visibility States
   const [isCameraVisible, setIsCameraVisible] = useState(false);
   const [isManualModalVisible, setIsManualModalVisible] = useState(false);
+  const [isStockConfirmationVisible, setIsStockConfirmationVisible] = useState(false); // ADDED
+
+  // Data for confirmation modal
+  const [scannedItemsForConfirmation, setScannedItemsForConfirmation] = useState<ScannedItemForConfirmation[]>([]); // ADDED
 
   // Editing State
   const [editingItem, setEditingItem] = useState<StockItem | null>(null);
@@ -386,28 +398,73 @@ export const useStockManager = () => {
     }
   };
   
-  // Combined handler for camera capture, recognition, and saving
+  // Stock Confirmation Modal Handlers
+  const openStockConfirmationModal = (preparedItems: PreparedItem[]) => {
+    console.log("[useStockManager] Opening stock confirmation for prepared items:", preparedItems);
+    const itemsToConfirm: ScannedItemForConfirmation[] = preparedItems.map(item => ({
+        name: item.item_name,
+        quantity: `${item.quantity} ${item.unit || 'units'}` 
+    }));
+    setScannedItemsForConfirmation(itemsToConfirm);
+    setIsStockConfirmationVisible(true);
+  };
+
+  const closeStockConfirmationModal = () => {
+    setIsStockConfirmationVisible(false);
+    setScannedItemsForConfirmation([]);
+    closeCamera();
+  };
+
+  const handleConfirmStockItems = async (itemsToSave: ConfirmedStockItemFromModal[]) => {
+    console.log("[useStockManager] User confirmed stock items:", itemsToSave);
+    setIsStockConfirmationVisible(false);    
+    const preparedItemsToSave: PreparedItem[] = itemsToSave.map(item => ({
+      item_name: item.item_name,
+      quantity: item.quantity,
+      unit: item.unit,
+      description: item.description || null
+    }));
+    // saveScannedItems MUST be defined before this point for this to work
+    const success = await saveScannedItems(preparedItemsToSave); 
+    if (success) {
+      Alert.alert("Success", "Items added to your stock!");
+    } 
+    setScannedItemsForConfirmation([]);
+    closeCamera();
+  };
+
+  // Combined handler for camera capture, recognition, and showing confirmation
   const handleCaptureAndProcessImage = async (base64Image: string) => {
-    // First, process the image and get recognized items.
-    // recognizeItemsFromImage will set isRecognizing to true then false.
-    const recognizedItems = await recognizeItemsFromImage(base64Image);
+    console.log('!!!!!! [useStockManager] DIAGNOSTIC: handleCaptureAndProcessImage WAS CALLED! base64Image present:', !!base64Image);
+    Alert.alert(
+      'DIAGNOSTIC ALERT FROM useStockManager',
+      'handleCaptureAndProcessImage was unexpectedly called. This means old code is running or there is an unexpected trigger.'
+    );
+    // Temporarily disable the entire function to see if it's being called
+    if (true) { // Ensure this path is taken
+        setIsRecognizing(false); // Make sure any loading state is turned off
+        setRecognitionError('Diagnostic: handleCaptureAndProcessImage was called but then aborted.');
+        return; 
+    }
 
-    // Now that recognition is done (and isRecognizing should be false), close the camera.
-    closeCamera(); 
+    // Original logic (now effectively disabled by the return above):
+    // console.log('[useStockManager] handleCaptureAndProcessImage: Closing camera first.');
+    // closeCamera(); // Call this at the beginning as per user's new structure
 
-    if (recognizedItems && recognizedItems.length > 0) {
-      // Here you might want to show a confirmation modal before saving
-      // For now, directly saving
-      const success = await saveScannedItems(recognizedItems);
-      if (success) {
-        Alert.alert("Success", "Scanned items added to your stock!");
-      } else {
-        // Error already handled and alerted in saveScannedItems
-      }
-    } else if (recognizedItems === null) {
-      // Error already handled/alerted in recognizeItemsFromImage
-    } else {
+    const recognizedPreparedItems = await recognizeItemsFromImage(base64Image);
+
+    if (recognizedPreparedItems && recognizedPreparedItems.length > 0) {
+      // console.log('[useStockManager] Items recognized, opening confirmation modal:', recognizedPreparedItems);
+      openStockConfirmationModal(recognizedPreparedItems);
+      closeCamera(); // Added this back as per one of the prior states that seemed logical
+    } else if (recognizedPreparedItems === null) {
+      // Error supposedly handled and alerted by recognizeItemsFromImage.
+      // console.log('[useStockManager] Recognition returned null (error expected to be handled in recognizeItemsFromImage).');
+      closeCamera();
+    } else { // recognizedItems is an empty array
+      // console.log('[useStockManager] No items recognized by recognizeItemsFromImage.');
       Alert.alert("No Items Recognized", "Could not find any items in the image. Try again?");
+      closeCamera();
     }
   };
 
@@ -441,6 +498,7 @@ export const useStockManager = () => {
     return false;
   };
 
+  // --- RETURN OBJECT (ensure all new exports are here) ---
   return {
     stockData,
     userId,
@@ -477,6 +535,13 @@ export const useStockManager = () => {
     fetchStock, 
     
     unitOptions: DEFAULT_UNIT_OPTIONS,
+
+    // Stock Confirmation related
+    isStockConfirmationVisible,
+    scannedItemsForConfirmation,
+    openStockConfirmationModal,
+    closeStockConfirmationModal,
+    handleConfirmStockItems,
   };
 };
 

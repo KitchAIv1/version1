@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect } from 'react';
-import { View, ScrollView, Text, ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, ScrollView, Text, ActivityIndicator, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useRecipeDetails } from '../../hooks/useRecipeDetails';
 import { useAuth } from '../../providers/AuthProvider';
 import { parseIngredients, Ingredient } from '../../utils/parseIngredients';
@@ -8,6 +8,7 @@ import { supabase } from '../../services/supabase';
 import { useNavigation, RouteProp, useRoute } from '@react-navigation/native';
 import { MainStackParamList } from '../../navigation/types';
 import { Feather } from '@expo/vector-icons';
+import { useGroceryManager, GroceryItemInput } from '../../hooks/useGroceryManager';
 
 type IngredientsTabRouteProp = RouteProp<MainStackParamList, 'RecipeDetail'>;
 
@@ -17,6 +18,10 @@ export default function IngredientsTab() {
   const route = useRoute<IngredientsTabRouteProp>();
   const recipeId = route.params?.id;
   const { data: recipeDetails, isLoading, error } = useRecipeDetails(recipeId, user?.id);
+
+  const {
+    addGroceryItem,
+  } = useGroceryManager();
 
   const ingredients = useMemo(() => {
     if (!recipeDetails?.output_ingredients_json) return [];
@@ -46,7 +51,7 @@ export default function IngredientsTab() {
   const groupedIngredients = useMemo(() => {
     const matched: Ingredient[] = [];
     const missing: Ingredient[] = [];
-    const other: Ingredient[] = []; // For ingredients not explicitly matched or missing
+    const other: Ingredient[] = [];
 
     ingredients.forEach(ing => {
       const ingNameForCheck = ing.name?.trim().toLowerCase();
@@ -55,37 +60,45 @@ export default function IngredientsTab() {
       } else if (missingIngredientNamesSet.has(ingNameForCheck)) {
         missing.push(ing);
       } else {
-        other.push(ing); // Default to other/missing if not in either set explicitly
+        other.push(ing);
       }
     });
-    // If an ingredient is in 'other', but the logic implies it should be missing if not matched,
-    // combine 'other' with 'missing'. This handles cases where an ingredient might not be in either list from backend.
     return { matched, missing: [...missing, ...other] };
   }, [ingredients, matchedIngredientsSet, missingIngredientNamesSet]);
 
-  const addToList = async () => {
-    if (!user) {
+  const addAllMissingToList = async () => {
+    if (!user?.id) {
+      Alert.alert("Error", "User not found. Cannot add items to grocery list.");
       console.error("User not found for adding to grocery list");
       return;
     }
     if (groupedIngredients.missing.length === 0) return;
 
     try {
-      const { error: insertError } = await supabase.from('grocery_list').insert(
-        groupedIngredients.missing.map((i) => ({
-          user_id: user.id,
-          name: i.name,
-          quantity: typeof i.qty === 'string' ? parseFloat(i.qty) : (i.qty || 1),
-          unit: i.unit ?? '',
-          is_checked: false,
-        }))
-      );
+      const itemsToAdd = groupedIngredients.missing.map((i) => ({
+        user_id: user.id,
+        item_name: i.name,
+        quantity: typeof i.qty === 'string' ? parseFloat(i.qty) : (i.qty || 1),
+        unit: i.unit ?? 'units',
+        is_checked: false,
+      }));
+
+      const { error: insertError } = await supabase.from('grocery_list').insert(itemsToAdd);
+      
       if (insertError) throw insertError;
-      alert(`${groupedIngredients.missing.length} item(s) added to your grocery list!`);
-    } catch (e) {
-      console.error("Error adding to grocery list:", e);
-      alert("Could not add items to grocery list.");
+      Alert.alert("Success", `${groupedIngredients.missing.length} item(s) added to your grocery list!`);
+    } catch (e: any) {
+      console.error("Error adding all missing items to grocery list:", e);
+      Alert.alert("Error", e.message || "Could not add items to grocery list.");
     }
+  };
+
+  const handleAddSingleItemToGrocery = async (item: GroceryItemInput) => {
+    if (!user?.id) {
+      Alert.alert("Error", "User not authenticated. Cannot add item.");
+      throw new Error("User not authenticated");
+    }
+    await addGroceryItem(item, user.id);
   };
 
   if (isLoading) {
@@ -96,7 +109,7 @@ export default function IngredientsTab() {
     return <View style={styles.centered}><Text style={styles.errorText}>Could not load ingredients.</Text></View>;
   }
 
-  const totalIngredientsCount = ingredients.length; // Use parsed ingredients length for total
+  const totalIngredientsCount = ingredients.length;
   const userIngredientsCount = groupedIngredients.matched.length;
   
   const pct = totalIngredientsCount === 0
@@ -107,9 +120,8 @@ export default function IngredientsTab() {
     <View className="flex-1 bg-white">
       <ScrollView 
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 20 }} // Add padding for scroll end
+        contentContainerStyle={{ paddingBottom: 20 }}
       >
-        {/* Summary Header */}
         <View className="bg-gray-50 p-4 border-b border-gray-200">
           <View className="flex-row items-center justify-between mb-1">
             <Text className="text-lg font-semibold text-gray-800">
@@ -122,11 +134,9 @@ export default function IngredientsTab() {
           </View>
         </View>
 
-        {/* In Pantry Section */}
         {groupedIngredients.matched.length > 0 && (
           <View className="px-4 pt-4">
             <View className="flex-row items-center mb-2.5">
-              {/* <Feather name="check-circle" size={18} color="#16a34a" /> */}
               <Text className="text-base font-semibold text-gray-700">In Your Pantry ({groupedIngredients.matched.length})</Text>
             </View>
             <View className="bg-white rounded-lg border border-gray-200">
@@ -143,11 +153,9 @@ export default function IngredientsTab() {
           </View>
         )}
 
-        {/* Missing Ingredients Section */}
         {groupedIngredients.missing.length > 0 && (
           <View className="px-4 pt-4">
             <View className="flex-row items-center mb-2.5">
-              {/* <Feather name="x-circle" size={18} color="#dc2626" /> */}
               <Text className="text-base font-semibold text-gray-700">Need to Buy ({groupedIngredients.missing.length})</Text>
             </View>
             <View className="bg-white rounded-lg border border-gray-200">
@@ -157,6 +165,7 @@ export default function IngredientsTab() {
                     ing={ing}
                     matched={false}
                     missing={true}
+                    onAddItem={handleAddSingleItemToGrocery}
                   />
                 </View>
               ))}
@@ -172,12 +181,11 @@ export default function IngredientsTab() {
         )}
       </ScrollView>
 
-      {/* Action Button Area - Pinned to bottom */}
       {groupedIngredients.missing.length > 0 && (
         <View className="px-4 py-3 border-t border-gray-200 bg-white">
           <TouchableOpacity 
             className="rounded-lg bg-amber-500 p-3.5 items-center flex-row justify-center shadow-sm"
-            onPress={addToList}
+            onPress={addAllMissingToList}
             activeOpacity={0.8}
           >
             <Feather name="plus-circle" size={18} color="white" />
@@ -205,7 +213,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff', // Ensure background for loading/error
+    backgroundColor: '#fff',
   },
   errorText: {
     color: 'red',

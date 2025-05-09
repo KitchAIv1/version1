@@ -25,9 +25,11 @@
         "backgroundColor": "#ffffff"
       },
       "permissions": [
+        "CAMERA",
         "CAMERA"
       ],
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.chieftitan.kitchaiv2"
     },
     "web": {
       "favicon": "./assets/favicon.png"
