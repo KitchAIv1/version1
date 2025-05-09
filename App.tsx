@@ -6,6 +6,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { paperTheme } from './theme/paperTheme';
 import { AuthProvider } from './src/providers/AuthProvider';
+import { GroceryProvider } from './src/providers/GroceryProvider';
 import AppNavigator from './src/navigation/AppNavigator';
 
 // Create a client
@@ -18,10 +19,12 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <PaperProvider theme={paperTheme}>
           <AuthProvider>
-            <NavigationContainer>
-              <AppNavigator />
-              <StatusBar style="auto" />
-            </NavigationContainer>
+            <GroceryProvider>
+              <NavigationContainer>
+                <AppNavigator />
+                <StatusBar style="auto" />
+              </NavigationContainer>
+            </GroceryProvider>
           </AuthProvider>
         </PaperProvider>
       </QueryClientProvider>

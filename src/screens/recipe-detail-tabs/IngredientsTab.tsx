@@ -1,5 +1,6 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { View, ScrollView, Text, ActivityIndicator, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRecipeDetails } from '../../hooks/useRecipeDetails';
 import { useAuth } from '../../providers/AuthProvider';
 import { parseIngredients, Ingredient } from '../../utils/parseIngredients';
@@ -17,10 +18,20 @@ export default function IngredientsTab() {
   const { user } = useAuth();
   const route = useRoute<IngredientsTabRouteProp>();
   const recipeId = route.params?.id;
+  const queryClient = useQueryClient();
   const { data: recipeDetails, isLoading, error } = useRecipeDetails(recipeId, user?.id);
+  const [forceRenderKey, setForceRenderKey] = useState(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setForceRenderKey(prevKey => prevKey + 1);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   const {
     addGroceryItem,
+    fetchGroceryList
   } = useGroceryManager();
 
   const ingredients = useMemo(() => {
@@ -86,7 +97,11 @@ export default function IngredientsTab() {
       const { error: insertError } = await supabase.from('grocery_list').insert(itemsToAdd);
       
       if (insertError) throw insertError;
+
+      await fetchGroceryList(user.id);
+      
       Alert.alert("Success", `${groupedIngredients.missing.length} item(s) added to your grocery list!`);
+      queryClient.invalidateQueries({ queryKey: ['recipe', recipeId] });
     } catch (e: any) {
       console.error("Error adding all missing items to grocery list:", e);
       Alert.alert("Error", e.message || "Could not add items to grocery list.");
@@ -96,9 +111,15 @@ export default function IngredientsTab() {
   const handleAddSingleItemToGrocery = async (item: GroceryItemInput) => {
     if (!user?.id) {
       Alert.alert("Error", "User not authenticated. Cannot add item.");
-      throw new Error("User not authenticated");
+      return;
     }
-    await addGroceryItem(item, user.id);
+    try {
+      await addGroceryItem(item, user.id);
+      queryClient.invalidateQueries({ queryKey: ['recipe', recipeId] });
+    } catch (e: any) {
+      console.error(`Error adding item ${item.item_name} to grocery list:`, e);
+      Alert.alert("Error", e.message || `Could not add ${item.item_name} to grocery list.`);
+    }
   };
 
   if (isLoading) {
@@ -117,25 +138,21 @@ export default function IngredientsTab() {
       : Math.round((userIngredientsCount / totalIngredientsCount) * 100);
 
   return (
-    <View className="flex-1 bg-white">
+    <View key={`ingredients-tab-${forceRenderKey}`} style={{ opacity: 0.999 }} className="flex-1 bg-white">
       <ScrollView 
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 20 }}
+        contentContainerStyle={{ paddingBottom: 20, paddingHorizontal: 24, paddingTop: 20 }}
       >
-        <View className="bg-gray-50 p-4 border-b border-gray-200">
-          <View className="flex-row items-center justify-between mb-1">
+        <View className="bg-gray-50 pt-6 pb-4 border-b border-gray-200">
+          <View className="flex-row items-center justify-start mb-1">
             <Text className="text-lg font-semibold text-gray-800">
               {totalIngredientsCount} Ingredients
             </Text>
-            <Text className="text-sm font-medium text-green-600">{pct}% In Pantry</Text>
-          </View>
-          <View className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-            <View className="h-full bg-green-500" style={{ width: `${pct}%` }} />
           </View>
         </View>
 
         {groupedIngredients.matched.length > 0 && (
-          <View className="px-4 pt-4">
+          <View className="pt-4">
             <View className="flex-row items-center mb-2.5">
               <Text className="text-base font-semibold text-gray-700">In Your Pantry ({groupedIngredients.matched.length})</Text>
             </View>
@@ -154,7 +171,7 @@ export default function IngredientsTab() {
         )}
 
         {groupedIngredients.missing.length > 0 && (
-          <View className="px-4 pt-4">
+          <View className="pt-4">
             <View className="flex-row items-center mb-2.5">
               <Text className="text-base font-semibold text-gray-700">Need to Buy ({groupedIngredients.missing.length})</Text>
             </View>
@@ -182,17 +199,19 @@ export default function IngredientsTab() {
       </ScrollView>
 
       {groupedIngredients.missing.length > 0 && (
-        <View className="px-4 py-3 border-t border-gray-200 bg-white">
-          <TouchableOpacity 
-            className="rounded-lg bg-amber-500 p-3.5 items-center flex-row justify-center shadow-sm"
-            onPress={addAllMissingToList}
-            activeOpacity={0.8}
-          >
-            <Feather name="plus-circle" size={18} color="white" />
-            <Text className="text-white text-sm font-semibold ml-2">
-              Add {groupedIngredients.missing.length} Missing to Grocery List
-            </Text>
-          </TouchableOpacity>
+        <View className="px-4 py-10 border-t border-gray-200 bg-white">
+          <View style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <TouchableOpacity 
+              className="rounded-lg bg-green-600 p-4 items-center flex-row justify-center shadow-sm"
+              onPress={addAllMissingToList}
+              activeOpacity={0.8}
+            >
+              <Feather name="plus-circle" size={18} color="white" />
+              <Text className="text-white text-base font-semibold ml-2 uppercase tracking-wide">
+                Add All Missing Items
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
       

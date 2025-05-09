@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, FlatList, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Button, SafeAreaView, LayoutAnimation, UIManager, Platform } from 'react-native';
-import { useGroceryManager, GroceryItem } from '../../hooks/useGroceryManager'; // Corrected hook name and import GroceryItem type
-import { COLORS, FONTS, SIZES } from '../../constants/theme'; // Assuming these constants are correctly set up
+import { View, Text, SafeAreaView, /* other imports used by original component */ ActivityIndicator, Button, Alert, StyleSheet, LayoutAnimation, UIManager, Platform, FlatList, TouchableOpacity, Image } from 'react-native';
+import { useGroceryManager, GroceryItem } from '../../hooks/useGroceryManager';
+import { COLORS, FONTS, SIZES } from '../../constants/theme';
 import Icon from 'react-native-vector-icons/Ionicons';
 
 // Enable LayoutAnimation for Android
@@ -105,41 +105,41 @@ const getIconForItem = (itemName: string): string => {
 
 export default function GroceryListScreen() {
   const {
-    groceryList, // Changed from groceryItems
+    groceryList, 
     isLoading,
-    error, // Added error handling from hook
-    toggleGroceryItemChecked, // Corrected name
-    removeGroceryItem,      // Corrected name
-    fetchGroceryList,       // Corrected name (for manual refresh, if needed)
-    currentUserId,          // Available from hook if needed for other operations
-    clearAllItems,          // Added clearAllItems
+    error, 
+    toggleGroceryItemChecked,
+    removeGroceryItem,
+    fetchGroceryList,
+    clearAllItems,
   } = useGroceryManager();
 
+  console.log('[GroceryListScreen] isLoading:', isLoading, 'error:', error, 'list length:', groceryList.length);
+
+  // Helper function to clear checked items
   const clearCheckedItems = async () => {
     const checkedItems = groceryList.filter(item => item.is_checked);
     if (checkedItems.length === 0) {
-      Alert.alert("No Items", "No checked items to clear.");
+      Alert.alert("No items to clear", "There are no checked items in your grocery list.");
       return;
     }
 
     Alert.alert(
-      "Clear Checked Items",
-      `Are you sure you want to remove ${checkedItems.length} checked item(s)? This action cannot be undone.`,
+      "Confirm Clear",
+      `Are you sure you want to remove ${checkedItems.length} checked item(s)?`,
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Clear Items",
+          text: "Clear",
           style: "destructive",
           onPress: async () => {
             try {
-              // Await all promises from removeGroceryItem
-              await Promise.all(checkedItems.map(item => removeGroceryItem(item.id)));
-              // The list will refresh via the hook after each successful removal, 
-              // or more efficiently, the last successful removal triggers the final refresh.
-              // No need to call fetchGroceryList() here explicitly if removeGroceryItem handles it.
-              Alert.alert("Success", "Checked items cleared.");
+              for (const item of checkedItems) {
+                await removeGroceryItem(item.id);
+              }
+              // fetchGroceryList(); // removeGroceryItem already refreshes
             } catch (e: any) {
-              Alert.alert("Error", e.message || "Could not clear checked items.");
+              Alert.alert("Error", e.message || "Failed to clear checked items.");
             }
           },
         },
@@ -147,14 +147,15 @@ export default function GroceryListScreen() {
     );
   };
 
+  // Helper function to clear all items
   const handleClearAllItems = () => {
     if (groceryList.length === 0) {
-      Alert.alert("No Items", "The grocery list is already empty.");
+      Alert.alert("List Empty", "Your grocery list is already empty.");
       return;
     }
     Alert.alert(
       "Clear All Items",
-      "Are you sure you want to remove ALL items from your grocery list? This action cannot be undone.",
+      "Are you sure you want to remove all items from your grocery list? This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -162,10 +163,10 @@ export default function GroceryListScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await clearAllItems(); // Call the hook function
-              Alert.alert("Success", "All grocery items cleared.");
+              await clearAllItems();
+              // fetchGroceryList(); // clearAllItems already refreshes
             } catch (e: any) {
-              Alert.alert("Error", e.message || "Could not clear all items.");
+              Alert.alert("Error", `Failed to clear all items: ${e.message}`);
             }
           },
         },
@@ -173,60 +174,66 @@ export default function GroceryListScreen() {
     );
   };
 
-  const handleDeleteItem = (itemId: string, itemName: string) => { // itemId is string
+  // Helper function to handle deleting an item
+  const handleDeleteItem = (itemId: string, itemName: string) => {
     Alert.alert(
-      'Delete Item',
-      `Are you sure you want to remove "${itemName}" from your grocery list?`,
+      "Delete Item",
+      `Are you sure you want to delete "${itemName}"?`,
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', onPress: async () => {
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
             try {
-              await removeGroceryItem(itemId); 
-              // List automatically refreshes via hook after successful removal
+              await removeGroceryItem(itemId);
             } catch (e: any) {
-              Alert.alert("Error", e.message || "Could not delete item.");
+              Alert.alert("Error", `Failed to delete item: ${e.message}`);
             }
-          }, style: 'destructive' 
-        }
+          },
+        },
       ]
     );
   };
 
+  // Helper function to toggle item checked state
   const handleToggleChecked = async (item: GroceryItem) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     try {
-      // Configure the animation before the state change
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       await toggleGroceryItemChecked(item.id, !item.is_checked);
-      // List automatically refreshes via hook
     } catch (e: any) {
-      Alert.alert("Error", e.message || "Could not update item.");
+      Alert.alert("Error", `Failed to update item: ${e.message}`);
     }
   };
 
+  // Render individual grocery item
   const renderItem = ({ item }: { item: GroceryItem }) => {
-    const iconName = getIconForItem(item.item_name);
+    const itemIconName = getIconForItem(item.item_name);
     return (
-      <TouchableOpacity
-        style={[styles.itemContainer, item.is_checked && styles.itemChecked]}
-        onPress={() => handleToggleChecked(item)} // Use new handler
-      >
-        <Icon name={iconName} size={24} color={item.is_checked ? (COLORS.gray || '#6b7280') : (COLORS.primary || '#22c55e')} style={styles.itemIcon} />
-        <View style={styles.itemTextContainer}> 
-          <Text style={[styles.itemText, item.is_checked && styles.itemTextChecked]}>
-            {/* Conditional rendering for quantity and unit if they can be null */}
-            {item.quantity ? `${item.quantity} ` : ''}
-            {item.unit ? `${item.unit} ` : ''}
-            {item.item_name}
-          </Text>
+      <TouchableOpacity onPress={() => handleToggleChecked(item)} activeOpacity={0.7}>
+        <View style={[styles.itemContainer, item.is_checked && styles.itemChecked]}>
+          <Icon name={itemIconName} size={SIZES.large || 20} color={COLORS.primary || '#22c55e'} style={styles.itemIcon} />
+          <View style={styles.itemTextContainer}>
+            <Text style={[styles.itemText, item.is_checked && styles.itemTextChecked]}>
+              {item.item_name}
+            </Text>
+            { (item.quantity || item.unit) && 
+              <View style={styles.tagContainer}>
+                 {item.quantity && <Text style={styles.tagText}>{item.quantity}</Text>}
+                 {item.unit && <Text style={styles.tagText}>{item.unit}</Text>}
+              </View>
+            }
+          </View>
+          <TouchableOpacity onPress={() => handleDeleteItem(item.id, item.item_name)} style={styles.deleteButton}>
+            <Icon name="trash-bin-outline" size={SIZES.medium || 20} color={COLORS.gray || '#6b7280'} />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={() => handleDeleteItem(item.id, item.item_name)} style={styles.deleteButton}>
-          <Icon name="trash-outline" size={22} color={COLORS.error || '#dc2626'} />
-        </TouchableOpacity>
       </TouchableOpacity>
     );
   };
 
-  if (isLoading && groceryList.length === 0) { // Show full page loader only on initial load
+  // 1. isLoading block (already restored)
+  if (isLoading && groceryList.length === 0) { 
     return (
       <SafeAreaView style={styles.safeAreaContainer}>
         <View style={[styles.container, styles.centered]}>
@@ -236,6 +243,7 @@ export default function GroceryListScreen() {
     );
   }
 
+  // 2. Restore if (error) block
   if (error) {
     return (
       <SafeAreaView style={styles.safeAreaContainer}>
@@ -247,46 +255,72 @@ export default function GroceryListScreen() {
     );
   }
 
+  // --- Restore main content structure ---
   return (
     <SafeAreaView style={styles.safeAreaContainer}>
       <View style={styles.container}>
-        {/* New Header Bar */}
+        {/* Header Bar */}
         <View style={styles.headerBar}>
-          <Text style={styles.headerTitle}>🛒 Grocery List</Text>
-          <View style={styles.headerButtonsContainer}> 
+          <Text style={styles.headerTitle}>Grocery List</Text>
+          <View style={styles.headerButtonsContainer}>
             <TouchableOpacity onPress={clearCheckedItems} style={styles.headerButton}>
-              <Icon name="checkmark-done-outline" size={28} color={COLORS.primary || '#22c55e'} />
+              <Icon name="checkmark-done-outline" size={SIZES.medium || 24} color={COLORS.primary || '#22c55e'} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleClearAllItems} style={[styles.headerButton, styles.clearAllButton]}> 
-              <Icon name="trash-bin-outline" size={26} color={COLORS.error || '#dc2626'} />
+            <TouchableOpacity onPress={handleClearAllItems} style={[styles.headerButton, styles.clearAllButton]}>
+              <Icon name="trash-outline" size={SIZES.medium || 24} color={COLORS.error || '#ef4444'} />
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Content Area */}
         {groceryList.length === 0 && !isLoading ? (
-          <View style={[styles.centered, { flex: 1 }]}> {/* Ensure empty state also takes up space below header */}
-            <Icon name="list-outline" size={48} color={COLORS.gray || '#9ca3af'} />
-            <Text style={styles.emptyText}>Your grocery list is empty.</Text>
+          <View style={[styles.container, styles.centered]}>
+            {/* <Image 
+              source={require('../../assets/images/empty-basket.png')} 
+              style={{ width: 150, height: 150, marginBottom: SIZES.large }} 
+              resizeMode="contain"
+            /> */}
+            <Text style={styles.emptyText}>Your Basket is Empty</Text>
             <Text style={styles.emptySubText}>Add items from recipes or manually.</Text>
           </View>
         ) : (
           <FlatList
-            data={groceryList} // Use groceryList from hook
-            keyExtractor={(item) => item.id} // .toString() not needed as id is already string
+            data={groceryList.sort((a, b) => {
+              // Sort by is_checked (false first), then by created_at or item_name
+              if (a.is_checked !== b.is_checked) {
+                return a.is_checked ? 1 : -1;
+              }
+              // Add secondary sort if needed, e.g., by name or date
+              // return a.item_name.localeCompare(b.item_name);
+              return 0; // Keep original order for items with same checked status for now
+            })}
             renderItem={renderItem}
-            contentContainerStyle={{ paddingBottom: 100 }}
-            // Optionally add a RefreshControl if you want pull-to-refresh
-            // refreshing={isLoading} // Link to isLoading if implementing RefreshControl
-            // onRefresh={fetchGroceryList} 
+            keyExtractor={(item) => item.id.toString()} // Ensure id is a string
+            contentContainerStyle={groceryList.length === 0 ? styles.centered : { paddingBottom: SIZES.large }} // Added paddingBottom
+            // ListEmptyComponent is handled by the conditional rendering above the FlatList
           />
         )}
       </View>
     </SafeAreaView>
   );
+
+  /* --- Further original JSX to be restored incrementally ---
+  // const handleDeleteItem = (itemId: string, itemName: string) => { ... };
+  // const handleToggleChecked = async (item: GroceryItem) => { ... };
+  // const renderItem = ({ item }: { item: GroceryItem }) => { ... };
+
+  // return (
+  //   <SafeAreaView style={styles.safeAreaContainer}>
+  //     <View style={styles.container}>
+  //       <View style={styles.headerBar}>{ ... }</View>
+  //       {groceryList.length === 0 && !isLoading ? ( ... empty state ... ) : ( <FlatList ... /> )}
+  //     </View>
+  //   </SafeAreaView>
+  // );
+  */
 }
 
-// Assuming SIZES, FONTS, COLORS are defined in your theme constants
+// --- Original Styles (Restored) ---
 const styles = StyleSheet.create({
   safeAreaContainer: {
     flex: 1,
@@ -388,7 +422,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     // fontFamily: FONTS.family?.semibold, // Example
     color: COLORS.textSecondary || '#4b5563',
-    marginTop: SIZES.small || 8,
+    marginTop: SIZES.small || 8, // Adjusted from SIZES.medium
   },
   emptySubText: {
     fontSize: SIZES.body2 || 14, // Use SIZES.body2 if available
@@ -396,5 +430,21 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary || '#9ca3af', // Changed from textMuted
     marginTop: (SIZES.base || 8) / 2,
     textAlign: 'center',
-  }
+  },
+  // Styles for item tags
+  tagContainer: {
+    flexDirection: 'row',
+    marginTop: SIZES.base / 2 || 4,
+  },
+  tagText: {
+    fontSize: SIZES.body5 || 12, // Use SIZES.body5 or a small size
+    // fontFamily: FONTS.family?.regular, // Example
+    color: COLORS.textSecondary || '#6b7280',
+    backgroundColor: COLORS.border || '#e5e7eb', // Light background for tag
+    paddingHorizontal: SIZES.base || 8,
+    paddingVertical: SIZES.base / 2 || 4,
+    borderRadius: SIZES.small || 4, // SIZES.radius might not exist
+    marginRight: SIZES.base / 2 || 4,
+    overflow: 'hidden', // Ensure text stays within rounded corners
+  },
 }); 
