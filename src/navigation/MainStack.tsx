@@ -4,7 +4,8 @@ import MainTabs from './MainTabs'; // Import the tabs navigator
 // import SearchResultsScreen from '../screens/main/SearchResultsScreen'; // Commented out
 import RecipeDetailScreen from '../screens/main/RecipeDetailScreen'; // Uncommented
 // import PantryScanningScreen from '../screens/pantry/PantryScanningScreen'; // Commented out
-// import EditProfileScreen from '../screens/EditProfileScreen'; // Commented out
+import EditProfileScreen from '../screens/EditProfileScreen'; // Uncommented
+import VideoRecipeUploaderScreen from '../screens/recipe/VideoRecipeUploaderScreen';
 import { MainStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -19,7 +20,7 @@ const MainStack = () => (
       component={PantryScanningScreen} 
       options={{ presentation: 'modal' }} 
     /> */}
-    {/* <Stack.Screen 
+    <Stack.Screen 
       name="EditProfile" // Changed from EditProfileScreen to EditProfile for brevity
       component={EditProfileScreen} 
       options={{ 
@@ -27,7 +28,15 @@ const MainStack = () => (
         title: 'Edit Profile', // Set a title
         // Add back button customization if needed
       }} 
-    /> */}
+    />
+    <Stack.Screen 
+      name="VideoRecipeUploader"
+      component={VideoRecipeUploaderScreen}
+      options={{
+        headerShown: true,
+        title: 'Upload Recipe',
+      }}
+    />
     {/* Add other stack screens like Settings here */}
   </Stack.Navigator>
 );

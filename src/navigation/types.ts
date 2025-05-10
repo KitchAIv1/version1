@@ -45,6 +45,7 @@ export type MainStackParamList = {
   RecipeDetail: RecipeDetailParams;
   PantryScan: undefined; // Add PantryScan screen
   EditProfile: EditProfileParams; // Added EditProfile screen
+  VideoRecipeUploader: undefined; // Add VideoRecipeUploader screen
   // Add other stack screens here if needed (e.g., Settings)
 };
 

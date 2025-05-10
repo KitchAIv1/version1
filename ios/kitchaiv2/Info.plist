@@ -45,11 +45,11 @@
       <true/>
     </dict>
     <key>NSCameraUsageDescription</key>
-    <string>Scan pantry items</string>
+    <string>We need access to your camera to record recipe videos.</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your microphone</string>
+    <string>We need access to your microphone to record audio for recipe videos.</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your photos</string>
+    <string>We need access to your photo library to upload recipe videos.</string>
     <key>UILaunchStoryboardName</key>
     <string>SplashScreen</string>
     <key>UIRequiredDeviceCapabilities</key>
