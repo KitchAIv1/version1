@@ -65,7 +65,6 @@ export default function RecipeDetailScreen() {
     data: recipeDetails,
     isLoading,
     error,
-    status, // Added status back
   } = useRecipeDetails(recipeId, user?.id);
 
   // Log hook status
@@ -78,12 +77,52 @@ export default function RecipeDetailScreen() {
   interface MutationContext {
     previousDetails?: RecipeDetailsData;
   }
-  const likeMut = useMutation<void, Error, void, MutationContext>({ mutationFn: async () => { if (!recipeId) throw new Error('Recipe ID missing'); const { error } = await supabase.rpc('like_recipe', { recipe_id: recipeId }); if (error) throw error; }, onMutate: async () => { await queryClient.cancelQueries({ queryKey: ['recipe', recipeId] }); const previousDetails = queryClient.getQueryData<RecipeDetailsData>(['recipe', recipeId]); queryClient.setQueryData<RecipeDetailsData | undefined>(['recipe', recipeId], (oldData) => oldData ? { ...oldData, output_is_liked: !oldData.output_is_liked, output_likes: oldData.output_is_liked ? oldData.output_likes - 1 : oldData.output_likes + 1, } : undefined ); return { previousDetails }; }, onError: (_err, _vars, context) => { queryClient.setQueryData(['recipe', recipeId], context?.previousDetails); }, onSettled: () => { queryClient.invalidateQueries({ queryKey: ['recipe', recipeId] }); queryClient.invalidateQueries({ queryKey: ['feed'] }); }, });
-  const saveMut = useMutation<void, Error, void, MutationContext>({ mutationFn: async () => { if (!recipeId) throw new Error('Recipe ID missing'); const { error } = await supabase.rpc('save_recipe', { recipe_id: recipeId }); if (error) throw error; }, onMutate: async () => { await queryClient.cancelQueries({ queryKey: ['recipe', recipeId] }); const previousDetails = queryClient.getQueryData<RecipeDetailsData>(['recipe', recipeId]); queryClient.setQueryData<RecipeDetailsData | undefined>(['recipe', recipeId], (oldData) => oldData ? { ...oldData, output_is_saved: !oldData.output_is_saved } : undefined ); return { previousDetails }; }, onError: (_err, _vars, context) => { queryClient.setQueryData(['recipe', recipeId], context?.previousDetails); }, onSettled: () => { queryClient.invalidateQueries({ queryKey: ['recipe', recipeId] }); queryClient.invalidateQueries({ queryKey: ['feed'] }); }, });
+  const likeMut = useMutation<void, Error, void, MutationContext>({ 
+    mutationFn: async () => { 
+      if (!recipeId) throw new Error('Recipe ID missing'); 
+      const { error } = await supabase.rpc('like_recipe', { recipe_id: recipeId }); 
+      if (error) throw error; 
+    },
+    // Optimistic update removed: backend does not provide per-user like state
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['recipe', recipeId] });
+      const previousDetails = queryClient.getQueryData<RecipeDetailsData>(['recipe', recipeId]);
+      // If backend adds per-user like state, optimistic update logic can be added here
+      return { previousDetails };
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(['recipe', recipeId], context?.previousDetails);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['recipe', recipeId] });
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+    },
+  });
+  const saveMut = useMutation<void, Error, void, MutationContext>({ 
+    mutationFn: async () => { 
+      if (!recipeId) throw new Error('Recipe ID missing'); 
+      const { error } = await supabase.rpc('save_recipe', { recipe_id: recipeId }); 
+      if (error) throw error; 
+    },
+    // Optimistic update removed: backend does not provide per-user save state
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['recipe', recipeId] });
+      const previousDetails = queryClient.getQueryData<RecipeDetailsData>(['recipe', recipeId]);
+      // If backend adds per-user save state, optimistic update logic can be added here
+      return { previousDetails };
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(['recipe', recipeId], context?.previousDetails);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['recipe', recipeId] });
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+    },
+  });
   // --- End Optimistic Updates ---
 
   // --- Share Functionality ---
-  const handleShare = async () => { const shareUrl = recipeDetails?.output_video_url || 'https://yourapp.com'; try { const available = await Sharing.isAvailableAsync(); if (available) { await Sharing.shareAsync(shareUrl, { dialogTitle: `Check out this recipe: ${recipeDetails?.output_name || 'Recipe'}`, }); } else { Alert.alert('Sharing not available on this device'); } } catch (shareError: any) { console.error('Error sharing:', shareError); Alert.alert('Error', 'Could not share recipe.'); } };
+  const handleShare = async () => { const shareUrl = recipeDetails?.video_url || 'https://yourapp.com'; try { const available = await Sharing.isAvailableAsync(); if (available) { await Sharing.shareAsync(shareUrl, { dialogTitle: `Check out this recipe: ${recipeDetails?.title || 'Recipe'}`, }); } else { Alert.alert('Sharing not available on this device'); } } catch (shareError: any) { console.error('Error sharing:', shareError); Alert.alert('Error', 'Could not share recipe.'); } };
   // --- End Share ---
 
   // --- Video Player Logic ---
@@ -126,6 +165,21 @@ export default function RecipeDetailScreen() {
   const handleError = (error: string) => { console.error(`RecipeDetailScreen ${recipeId}: Video onError event:`, error); setIsLoaded(false); }
   // --- End Video Player ---
 
+  // Calculate pantry badge values using the same logic as IngredientsTab
+  const ingredients = React.useMemo(() => {
+    if (!recipeDetails?.ingredients) return [];
+    // Use the same parseIngredients utility
+    try {
+      const { parseIngredients } = require('../../utils/parseIngredients');
+      return parseIngredients(recipeDetails.ingredients);
+    } catch {
+      return recipeDetails.ingredients;
+    }
+  }, [recipeDetails]);
+  const matchedSet = React.useMemo(() => new Set((recipeDetails?.matched_ingredients || []).map(name => name.trim().toLowerCase())), [recipeDetails]);
+  const matchedCount = React.useMemo(() => ingredients.filter((ing: any) => matchedSet.has(ing.name?.trim().toLowerCase())).length, [ingredients, matchedSet]);
+  const totalCount = ingredients.length;
+
   // --- Render Logic ---
   if (isLoading) {
     // console.log('RecipeDetailScreen: Rendering Loading state'); // Reverted this line
@@ -141,7 +195,7 @@ export default function RecipeDetailScreen() {
     return (
       <View style={styles.centeredContainer}>
         <Text style={styles.errorText}>
-          {error ? error.message : 'Could not load recipe details.'}
+          {error ? error : 'Could not load recipe details.'}
         </Text>
       </View>
     );
@@ -149,7 +203,15 @@ export default function RecipeDetailScreen() {
 
   // console.log('RecipeDetailScreen: Rendering main content'); // Reverted this line
   // Prepare item prop for ActionOverlay - ensure it conforms to RecipeItem where needed
-  const actionOverlayItemProps: RecipeItem & { likes?: number; saves?: number; liked?: boolean; saved?: boolean } = { id: recipeDetails.output_id, liked: recipeDetails.output_is_liked, likes: recipeDetails.output_likes, saved: recipeDetails.output_is_saved, title: recipeDetails.output_name, video: recipeDetails.output_video_url, };
+  const actionOverlayItemProps: RecipeItem & { likes?: number; saves?: number; liked?: boolean; saved?: boolean } = {
+    id: recipeDetails.recipe_id,
+    title: recipeDetails.title,
+    video: recipeDetails.video_url ?? '',
+    likes: recipeDetails.likes,
+    // No output_is_liked, output_is_saved, output_likes, etc.
+  };
+
+  const shareUrl = recipeDetails.video_url || 'https://yourapp.com';
 
   return (
     // Using stickyHeaderIndices to attempt to keep tabs below header when scrolling
@@ -157,17 +219,17 @@ export default function RecipeDetailScreen() {
     <ScrollView style={styles.screenContainer} stickyHeaderIndices={[1]} showsVerticalScrollIndicator={false}>
       {/* Header Section */}
       <View style={styles.headerContainer}>
-        {recipeDetails.output_video_url ? (
+        {recipeDetails.video_url ? (
           <Video
             ref={videoRef}
-            source={{ uri: recipeDetails.output_video_url }}
+            source={{ uri: recipeDetails.video_url }}
             style={styles.video}
             resizeMode={ResizeMode.COVER}
             isLooping
             isMuted={isMuted}
             shouldPlay // Autoplay
             onLoad={handleLoad}
-            onError={handleError} // Use the defined handler
+            onError={handleError}
             pointerEvents="none"
           />
         ) : (
@@ -191,15 +253,6 @@ export default function RecipeDetailScreen() {
           )}
         </TouchableOpacity>
         
-        {recipeDetails.output_user_ingredients_count !== undefined && 
-         recipeDetails.output_total_ingredients_count !== undefined && (
-           <View style={styles.pantryBadge}>
-              <Text style={styles.pantryText}>
-                {recipeDetails.output_user_ingredients_count}/{recipeDetails.output_total_ingredients_count} pantry match
-              </Text>
-           </View>
-        )}
-        
         {/* Position ActionOverlay within header */}
         <View style={styles.actionOverlayPositioner}>
           <ActionOverlay 
@@ -209,6 +262,21 @@ export default function RecipeDetailScreen() {
             onMorePress={handleShare}
           />
         </View>
+      </View>
+
+      {/* Recipe Name and Pantry Badge Header */}
+      <View style={styles.recipeInfoContainer}>
+        <Text style={styles.recipeTitle} numberOfLines={2} ellipsizeMode="tail">
+          {recipeDetails.title}
+        </Text>
+        {totalCount > 0 && (
+          <View style={styles.pantryBadgePill}>
+            <Ionicons name="restaurant-outline" style={styles.pantryBadgeIcon} />
+            <Text style={styles.pantryBadgeTextValue}>
+              {matchedCount}/{totalCount}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Tab Section - Wrapped in a View for sticky headers */}
@@ -247,14 +315,14 @@ export default function RecipeDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  screenContainer: { flex: 1, backgroundColor: '#fff', },
-  centeredContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, },
-  errorText: { color: 'red', textAlign: 'center', },
-  headerContainer: { height: HEADER_HEIGHT, backgroundColor: '#000', position: 'relative', zIndex: 1, },
+  screenContainer: { flex: 1, backgroundColor: COLORS.white || '#fff' },
+  centeredContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  errorText: { color: COLORS.error || 'red', textAlign: 'center' },
+  headerContainer: { height: HEADER_HEIGHT, backgroundColor: COLORS.black || '#000', position: 'relative', zIndex: 1 },
   video: { ...StyleSheet.absoluteFillObject, zIndex: 0 },
-  videoPlaceholder: { justifyContent: 'center', alignItems: 'center', backgroundColor: '#222', },
-  muteButton: { position: 'absolute', top: 60, left: 15, zIndex: 12, padding: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, },
-  cartButtonContainer: { position: 'absolute', top: 60, right: 15, zIndex: 12, padding: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, },
+  videoPlaceholder: { justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.darkgray || '#222' },
+  muteButton: { position: 'absolute', top: 60, left: 15, zIndex: 12, padding: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20 },
+  cartButtonContainer: { position: 'absolute', top: 60, right: 15, zIndex: 12, padding: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20 },
   badge: {
     position: 'absolute',
     top: -4,
@@ -264,13 +332,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 2,
   },
-  badgeText: { color: COLORS.white || 'white', fontSize: 10, fontWeight: 'bold', },
-  pantryBadge: { position: 'absolute', bottom: 15, left: 15, zIndex: 11, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 15, },
-  pantryText: { color: 'white', fontSize: 12, fontWeight: 'bold', },
-  actionOverlayPositioner: { position: 'absolute', bottom: 15, right: 0, zIndex: 11, },
-  // Adjusted tabContainerWrapper: Removed flex: 1, using minHeight to ensure content area
+  badgeText: { color: COLORS.white || 'white', fontSize: 10, fontWeight: 'bold' },
+  actionOverlayPositioner: { position: 'absolute', bottom: 15, right: 0, zIndex: 11 },
+  recipeInfoContainer: {
+    backgroundColor: COLORS.white || '#fff',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border || '#eee',
+  },
+  recipeTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: COLORS.text || '#333',
+    flex: 1,
+    marginRight: 10,
+  },
+  pantryBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface || '#f0f0f0',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginLeft: 10,
+  },
+  pantryBadgeIcon: {
+    fontSize: 18,
+    color: COLORS.primary || '#00796b',
+    marginRight: 6,
+  },
+  pantryBadgeTextValue: {
+    fontSize: 15,
+    color: COLORS.primary || '#00796b',
+    fontWeight: '600',
+  },
   tabContainerWrapper: {
-    // flex: 1, // Remove flex: 1 when inside ScrollView
-    minHeight: screenHeight, // Set minHeight to ensure space, adjust as needed
+    minHeight: screenHeight, 
   },
 }); 

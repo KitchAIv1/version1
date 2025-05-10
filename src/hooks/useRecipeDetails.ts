@@ -1,58 +1,123 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQueries } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 
-// Define an expected structure for the data returned by the RPC
-// This should be refined based on the actual RPC output
-// Placeholder - adjust based on actual 'get_recipe_details_with_pantry_match' return type
+// Define the RecipeDetailsData interface for type safety
 export interface RecipeDetailsData {
-  output_id: string;
-  output_name: string;
-  output_video_url: string;
-  output_likes: number;
-  output_is_liked: boolean;
-  output_is_saved: boolean;
-  output_pantry_match_pct: number; // Assuming RPC provides this directly or calculate if needed
-  // Add ALL other fields returned by the RPC:
-  // e.g., ingredients: Array<{ name: string; quantity: number; unit: string }>;
-  // e.g., steps: string[];
-  // e.g., macros: { calories: number; protein: number; carbs: number; fat: number };
-  // e.g., comments: Array<{ userId: string; text: string; createdAt: string }>;
-  // e.g., creator_user_id: string;
-  // e.g., creator_username: string;
-  // e.g., creator_avatar_url: string | null;
-  [key: string]: any; // Allow other fields for now
+  recipe_id: string;
+  title: string;
+  user_id: string;
+  servings: number | null;
+  diet_tags: string[] | null;
+  is_public: boolean;
+  video_url: string | null;
+  created_at: string;
+  description: string | null;
+  ingredients: Array<{ name: string; unit: string | null; quantity: string | null }>;
+  comments_count: number;
+  cook_time_minutes: number | null;
+  prep_time_minutes: number | null;
+  preparation_steps: string[];
+  likes: number;
+  matched_ingredients?: string[];
+  missing_ingredient_names?: string[];
 }
 
+// Define the hook's return type
+interface UseRecipeDetailsResult {
+  data: RecipeDetailsData | null;
+  isLoading: boolean;
+  error: string | null;
+  refetch: () => void;
+}
 
-export const useRecipeDetails = (id: string | undefined, userId: string | undefined) =>
-  useQuery<RecipeDetailsData, Error>({ // Specify return type and error type
-    queryKey: ['recipe', id], // Query key uses recipe ID
-    queryFn: async () => {
-      if (!id || !userId) { // Check if ids are available
-        throw new Error('Recipe ID or User ID is required.');
-      }
-      console.log(`Fetching details for recipe: ${id}, user: ${userId}`);
-      const { data, error } = await supabase.rpc(
-        'get_recipe_details_with_pantry_match',
-        { recipe_id_param: id, user_id_param: userId }
-      );
-      
-      if (error) {
-        console.error('Supabase RPC error fetching recipe details:', error);
-        throw error;
-      }
-      
-      console.log('Received recipe details data:', data);
+export const useRecipeDetails = (recipeId: string | undefined, userId?: string) => {
+  const results = useQueries({
+    queries: [
+      {
+        queryKey: ['recipeDetails', recipeId],
+        queryFn: async () => {
+          if (!recipeId) throw new Error('Recipe ID is required');
+          const { data, error } = await supabase.rpc('get_recipe_details', { p_recipe_id: recipeId });
+          if (error) throw error;
+          if (!data) throw new Error('Recipe not found');
+          // Clean up preparation_steps (remove extra quotes and trim)
+          const cleanedSteps = (data.preparation_steps || []).map(
+            (step: string) => step.replace(/^"+|"+$/g, '').trim()
+          );
+          return {
+            ...data,
+            preparation_steps: cleanedSteps,
+            ingredients: data.ingredients || [],
+            diet_tags: data.diet_tags || [],
+            description: data.description || '',
+            servings: data.servings ?? null,
+            prep_time_minutes: data.prep_time_minutes ?? null,
+            cook_time_minutes: data.cook_time_minutes ?? null,
+            video_url: data.video_url ?? null,
+            likes: data.likes ?? 0,
+            comments_count: data.comments_count ?? 0,
+          };
+        },
+        enabled: !!recipeId,
+        staleTime: 5 * 60 * 1000,
+        retry: 1,
+      },
+      {
+        queryKey: ['pantryMatch', recipeId, userId],
+        queryFn: async () => {
+          if (!recipeId || !userId) return { matched_ingredients: [], missing_ingredient_names: [] };
+          const { data, error } = await supabase.rpc('match_pantry_ingredients', {
+            p_recipe_id: recipeId,
+            p_user_id: userId
+          });
 
-      // Check if data is an array and has at least one element
-      if (!Array.isArray(data) || data.length === 0) {
-        throw new Error('Recipe details not found or invalid data format.');
-      }
+          if (error) {
+            console.error('RPC Error Details (match_pantry_ingredients):', error);
+            throw new Error('Failed to fetch pantry match: ' + error.message);
+          }
 
-      // Assuming the RPC returns an array containing a single object
-      // Add type assertion if necessary, after inspecting the actual data structure
-      return data[0] as RecipeDetailsData; 
+          if (!data) {
+            console.warn('No data returned from match_pantry_ingredients');
+            throw new Error('No pantry match data found');
+          }
+
+          console.log('match_pantry_ingredients response:', data);
+          return {
+            matched_ingredients: data?.matched_ingredients || [],
+            missing_ingredient_names: data?.missing_ingredient_names || [],
+          };
+        },
+        enabled: !!recipeId && !!userId,
+        staleTime: 5 * 60 * 1000,
+        retry: 1,
+      },
+    ],
+  });
+
+  const recipeResult = results[0];
+  const pantryResult = results[1];
+
+  const isLoading = recipeResult.isLoading || pantryResult.isLoading;
+  const error = recipeResult.error || pantryResult.error;
+
+  let data: RecipeDetailsData | null = null;
+  if (recipeResult.data) {
+    data = {
+      ...recipeResult.data,
+      matched_ingredients: pantryResult.data?.matched_ingredients || [],
+      missing_ingredient_names: pantryResult.data?.missing_ingredient_names || [],
+    };
+  }
+
+  return {
+    data,
+    isLoading,
+    error: error ? (error as Error).message : null,
+    refetch: () => {
+      recipeResult.refetch();
+      pantryResult.refetch();
     },
-    enabled: !!id && !!userId, // Only run the query if both id and userId are available
-    staleTime: 5 * 60 * 1000, // Keep data fresh for 5 minutes
-  }); 
+  };
+};
+
+export default useRecipeDetails; 

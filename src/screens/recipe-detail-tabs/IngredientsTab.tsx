@@ -22,6 +22,27 @@ export default function IngredientsTab() {
   const { data: recipeDetails, isLoading, error } = useRecipeDetails(recipeId, user?.id);
   const [forceRenderKey, setForceRenderKey] = useState(0);
 
+  // Debug logging for useRecipeDetails response in IngredientsTab
+  useEffect(() => {
+    if (recipeId === '5380a8c1-c8de-4e20-a7ed-1d9062a7916d') {
+      console.log('IngredientsTab - useRecipeDetails response for 5380a8c1-c8de-4e20-a7ed-1d9062a7916d:', {
+        matched_ingredients: recipeDetails?.matched_ingredients,
+        missing_ingredient_names: recipeDetails?.missing_ingredient_names,
+        // If you also have a raw missing_ingredients field from the hook, log it too:
+        // missing_ingredients_raw: recipeDetails?.missing_ingredients, 
+        full_recipeDetails: recipeDetails ? { ...recipeDetails } : null // Log a shallow copy to see all fields if needed
+      });
+    }
+  }, [recipeDetails, recipeId]);
+
+  // Original debug logging
+  console.log('IngredientsTab debug:', {
+    recipeId,
+    userId: user?.id,
+    error,
+    recipeDetails
+  });
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setForceRenderKey(prevKey => prevKey + 1);
@@ -34,48 +55,14 @@ export default function IngredientsTab() {
     fetchGroceryList
   } = useGroceryManager();
 
+  // Pantry match logic
+  const matchedSet = useMemo(() => new Set((recipeDetails?.matched_ingredients || []).map(name => name.trim().toLowerCase())), [recipeDetails]);
+  const missingSet = useMemo(() => new Set((recipeDetails?.missing_ingredient_names || []).map(name => name.trim().toLowerCase())), [recipeDetails]);
+
   const ingredients = useMemo(() => {
-    if (!recipeDetails?.output_ingredients_json) return [];
-    return parseIngredients(recipeDetails.output_ingredients_json);
+    if (!recipeDetails?.ingredients) return [];
+    return parseIngredients(recipeDetails.ingredients);
   }, [recipeDetails]);
-
-  const matchedIngredientsSet = useMemo(() => {
-    if (!recipeDetails?.output_matched_ingredients) return new Set<string>();
-    const matchedArray = Array.isArray(recipeDetails.output_matched_ingredients)
-        ? recipeDetails.output_matched_ingredients.map(item => 
-            (typeof item === 'string' ? item : String(item.name || item)).trim().toLowerCase()
-          )
-        : [];
-    return new Set(matchedArray);
-  }, [recipeDetails]);
-
-  const missingIngredientNamesSet = useMemo(() => {
-    if (!recipeDetails?.output_missing_ingredient_names) return new Set<string>();
-    const missingArray = Array.isArray(recipeDetails.output_missing_ingredient_names)
-        ? recipeDetails.output_missing_ingredient_names.map(item => 
-            (typeof item === 'string' ? item : String(item.name || item)).trim().toLowerCase()
-          )
-        : [];
-    return new Set(missingArray);
-  }, [recipeDetails]);
-
-  const groupedIngredients = useMemo(() => {
-    const matched: Ingredient[] = [];
-    const missing: Ingredient[] = [];
-    const other: Ingredient[] = [];
-
-    ingredients.forEach(ing => {
-      const ingNameForCheck = ing.name?.trim().toLowerCase();
-      if (matchedIngredientsSet.has(ingNameForCheck)) {
-        matched.push(ing);
-      } else if (missingIngredientNamesSet.has(ingNameForCheck)) {
-        missing.push(ing);
-      } else {
-        other.push(ing);
-      }
-    });
-    return { matched, missing: [...missing, ...other] };
-  }, [ingredients, matchedIngredientsSet, missingIngredientNamesSet]);
 
   const addAllMissingToList = async () => {
     if (!user?.id) {
@@ -83,10 +70,10 @@ export default function IngredientsTab() {
       console.error("User not found for adding to grocery list");
       return;
     }
-    if (groupedIngredients.missing.length === 0) return;
+    if (ingredients.length === 0) return;
 
     try {
-      const itemsToAdd = groupedIngredients.missing.map((i) => ({
+      const itemsToAdd = ingredients.map((i) => ({
         user_id: user.id,
         item_name: i.name,
         quantity: typeof i.qty === 'string' ? parseFloat(i.qty) : (i.qty || 1),
@@ -100,7 +87,7 @@ export default function IngredientsTab() {
 
       await fetchGroceryList(user.id);
       
-      Alert.alert("Success", `${groupedIngredients.missing.length} item(s) added to your grocery list!`);
+      Alert.alert("Success", `${ingredients.length} item(s) added to your grocery list!`);
       queryClient.invalidateQueries({ queryKey: ['recipe', recipeId] });
     } catch (e: any) {
       console.error("Error adding all missing items to grocery list:", e);
@@ -131,11 +118,6 @@ export default function IngredientsTab() {
   }
 
   const totalIngredientsCount = ingredients.length;
-  const userIngredientsCount = groupedIngredients.matched.length;
-  
-  const pct = totalIngredientsCount === 0
-      ? 0
-      : Math.round((userIngredientsCount / totalIngredientsCount) * 100);
 
   return (
     <View key={`ingredients-tab-${forceRenderKey}`} style={{ opacity: 0.999 }} className="flex-1 bg-white">
@@ -151,54 +133,35 @@ export default function IngredientsTab() {
           </View>
         </View>
 
-        {groupedIngredients.matched.length > 0 && (
+        {ingredients.length > 0 ? (
           <View className="pt-4">
-            <View className="flex-row items-center mb-2.5">
-              <Text className="text-base font-semibold text-gray-700">In Your Pantry ({groupedIngredients.matched.length})</Text>
-            </View>
             <View className="bg-white rounded-lg border border-gray-200">
-              {groupedIngredients.matched.map((ing, index) => (
-                <View key={`matched-${ing.name}-${index}`} className={index === groupedIngredients.matched.length - 1 ? '' : 'border-b border-gray-100'}>
-                  <IngredientRow
-                    ing={ing}
-                    matched={true}
-                    missing={false}
-                  />
-                </View>
-              ))}
+              {ingredients.map((ing, index) => {
+                const ingName = ing.name?.trim().toLowerCase();
+                const matched = matchedSet.has(ingName);
+                const missing = missingSet.has(ingName);
+                return (
+                  <View key={`ingredient-${ing.name}-${index}`} className={index === ingredients.length - 1 ? '' : 'border-b border-gray-100'}>
+                    <IngredientRow
+                      ing={ing}
+                      matched={matched}
+                      missing={missing}
+                      {...(missing ? { onAddItem: handleAddSingleItemToGrocery } : {})}
+                    />
+                  </View>
+                );
+              })}
             </View>
           </View>
-        )}
-
-        {groupedIngredients.missing.length > 0 && (
-          <View className="pt-4">
-            <View className="flex-row items-center mb-2.5">
-              <Text className="text-base font-semibold text-gray-700">Need to Buy ({groupedIngredients.missing.length})</Text>
-            </View>
-            <View className="bg-white rounded-lg border border-gray-200">
-              {groupedIngredients.missing.map((ing, index) => (
-                 <View key={`missing-${ing.name}-${index}`} className={index === groupedIngredients.missing.length - 1 ? '' : 'border-b border-gray-100'}>
-                  <IngredientRow
-                    ing={ing}
-                    matched={false}
-                    missing={true}
-                    onAddItem={handleAddSingleItemToGrocery}
-                  />
-                </View>
-              ))}
-            </View>
+        ) : (
+          <View className="items-center justify-center py-10 px-4">
+            <Feather name="info" size={24} color="#6b7280" />
+            <Text className="text-gray-600 text-base mt-2 text-center">No ingredients listed for this recipe yet.</Text>
           </View>
-        )}
-        
-        {totalIngredientsCount === 0 && !isLoading && (
-            <View className="items-center justify-center py-10 px-4">
-                <Feather name="info" size={24} color="#6b7280" />
-                <Text className="text-gray-600 text-base mt-2 text-center">No ingredients listed for this recipe yet.</Text>
-            </View>
         )}
       </ScrollView>
 
-      {groupedIngredients.missing.length > 0 && (
+      {ingredients.length > 0 && (
         <View className="px-4 py-10 border-t border-gray-200 bg-white">
           <View style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <TouchableOpacity 
@@ -208,18 +171,9 @@ export default function IngredientsTab() {
             >
               <Feather name="plus-circle" size={18} color="white" />
               <Text className="text-white text-base font-semibold ml-2 uppercase tracking-wide">
-                Add All Missing Items
+                Add All Ingredients to Grocery List
               </Text>
             </TouchableOpacity>
-          </View>
-        </View>
-      )}
-      
-      {groupedIngredients.missing.length === 0 && totalIngredientsCount > 0 && (
-         <View className="px-4 py-3 border-t border-gray-200 bg-white">
-          <View className="rounded-lg bg-green-500 p-3.5 items-center flex-row justify-center">
-            <Feather name="check-circle" size={18} color="white" />
-            <Text className="text-white text-sm font-semibold ml-2">You have all ingredients!</Text>
           </View>
         </View>
       )}

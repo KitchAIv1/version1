@@ -7,7 +7,7 @@ type Props = {
   ing: { name: string; qty?: string; unit?: string };
   matched: boolean;
   missing: boolean;
-  onAddItem?: (item: GroceryItemInput) => Promise<void>; // Make it async if addGroceryItem is async and we want to await/catch
+  onAddItem?: (item: GroceryItemInput) => Promise<void>;
 };
 
 export default function IngredientRow({ ing, matched, missing, onAddItem }: Props) {
@@ -18,18 +18,15 @@ export default function IngredientRow({ ing, matched, missing, onAddItem }: Prop
     }
     const itemToAdd: GroceryItemInput = {
       item_name: ing.name,
-      quantity: ing.qty ? parseFloat(ing.qty) : null, // Parse qty, default to null if not present or invalid
-      unit: ing.unit || null, // Default to null if not present
+      quantity: ing.qty ? parseFloat(ing.qty) : null,
+      unit: ing.unit || null,
     };
     if (isNaN(itemToAdd.quantity as number)) {
-      itemToAdd.quantity = 1; // Default to 1 if parsing failed (e.g. non-numeric qty string)
+      itemToAdd.quantity = 1;
     }
-
     if (onAddItem) {
       try {
         await onAddItem(itemToAdd);
-        // Optionally, add a success feedback, though the list refresh in the hook is the main feedback
-        // Alert.alert("Success", `${itemToAdd.item_name} added to grocery list.`);
       } catch (error: any) {
         Alert.alert("Error", error.message || "Could not add item to grocery list.");
       }
@@ -41,10 +38,8 @@ export default function IngredientRow({ ing, matched, missing, onAddItem }: Prop
       {/* Icon Section */}
       <View style={styles.iconContainer}>
         {matched && <Feather name="check-circle" size={18} color="#22c55e" />}
-        {missing && !onAddItem && <Feather name="x-circle" size={18} color="#dc2626" />} 
-        {/* If missing AND no onAddItem, show x. If onAddItem is present, the button serves as the indicator */}
+        {missing && !onAddItem && <Feather name="x-circle" size={18} color="#dc2626" />}
       </View>
-
       {/* Text Group */}
       <View style={styles.textGroupContainer}>
         {ing.qty && (
@@ -65,12 +60,10 @@ export default function IngredientRow({ ing, matched, missing, onAddItem }: Prop
           {ing.name}
         </Text>
       </View>
-
       {/* ADD Button Section */}
       {missing && onAddItem && (
         <TouchableOpacity onPress={handleAddItem} style={styles.addButton} activeOpacity={0.7}>
-          {/* Using an icon instead of text for a cleaner look */}
-          <Feather name="plus-circle" size={18} color="#b45309" /> 
+          <Feather name="plus-circle" size={18} color="#b45309" />
         </TouchableOpacity>
       )}
     </View>
