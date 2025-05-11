@@ -53,7 +53,12 @@ export default function IngredientRow({ ing, matched, missing, onAddItem }: Prop
           </Text>
         )}
         <Text 
-          style={[styles.textBase, styles.nameText, matched ? styles.matchedText : styles.missingText]} 
+          style={[
+            styles.textBase, 
+            styles.nameText, 
+            matched ? styles.matchedText : styles.missingText,
+            { fontWeight: 'bold' }
+          ]}
           numberOfLines={1}
           ellipsizeMode="tail"
         >
@@ -96,6 +101,9 @@ const styles = StyleSheet.create({
   },
   textBase: {
     fontSize: 14,
+  },
+  boldText: {
+    fontWeight: 'bold',
   },
   qtyText: {
     marginRight: 4,

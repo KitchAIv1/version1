@@ -20,6 +20,7 @@ export interface RecipeDetailsData {
   likes: number;
   matched_ingredients?: string[];
   missing_ingredient_names?: string[];
+  missing_ingredients?: string[];
 }
 
 // Define the hook's return type
@@ -65,7 +66,7 @@ export const useRecipeDetails = (recipeId: string | undefined, userId?: string) 
       {
         queryKey: ['pantryMatch', recipeId, userId],
         queryFn: async () => {
-          if (!recipeId || !userId) return { matched_ingredients: [], missing_ingredient_names: [] };
+          if (!recipeId || !userId) return { matched_ingredients: [], missing_ingredients: [] };
           const { data, error } = await supabase.rpc('match_pantry_ingredients', {
             p_recipe_id: recipeId,
             p_user_id: userId
@@ -81,10 +82,10 @@ export const useRecipeDetails = (recipeId: string | undefined, userId?: string) 
             throw new Error('No pantry match data found');
           }
 
-          console.log('match_pantry_ingredients response:', data);
+          console.log('DEBUG: useRecipeDetails - pantryQuery.data:', data);
           return {
             matched_ingredients: data?.matched_ingredients || [],
-            missing_ingredient_names: data?.missing_ingredient_names || [],
+            missing_ingredients: data?.missing_ingredients || [],
           };
         },
         enabled: !!recipeId && !!userId,
@@ -105,8 +106,10 @@ export const useRecipeDetails = (recipeId: string | undefined, userId?: string) 
     data = {
       ...recipeResult.data,
       matched_ingredients: pantryResult.data?.matched_ingredients || [],
-      missing_ingredient_names: pantryResult.data?.missing_ingredient_names || [],
+      missing_ingredients: pantryResult.data?.missing_ingredients || [],
+      missing_ingredient_names: pantryResult.data?.missing_ingredients || [],
     };
+    console.log('DEBUG: useRecipeDetails - final combined data:', data);
   }
 
   return {

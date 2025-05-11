@@ -64,37 +64,6 @@ export default function IngredientsTab() {
     return parseIngredients(recipeDetails.ingredients);
   }, [recipeDetails]);
 
-  const addAllMissingToList = async () => {
-    if (!user?.id) {
-      Alert.alert("Error", "User not found. Cannot add items to grocery list.");
-      console.error("User not found for adding to grocery list");
-      return;
-    }
-    if (ingredients.length === 0) return;
-
-    try {
-      const itemsToAdd = ingredients.map((i) => ({
-        user_id: user.id,
-        item_name: i.name,
-        quantity: typeof i.qty === 'string' ? parseFloat(i.qty) : (i.qty || 1),
-        unit: i.unit ?? 'units',
-        is_checked: false,
-      }));
-
-      const { error: insertError } = await supabase.from('grocery_list').insert(itemsToAdd);
-      
-      if (insertError) throw insertError;
-
-      await fetchGroceryList(user.id);
-      
-      Alert.alert("Success", `${ingredients.length} item(s) added to your grocery list!`);
-      queryClient.invalidateQueries({ queryKey: ['recipe', recipeId] });
-    } catch (e: any) {
-      console.error("Error adding all missing items to grocery list:", e);
-      Alert.alert("Error", e.message || "Could not add items to grocery list.");
-    }
-  };
-
   const handleAddSingleItemToGrocery = async (item: GroceryItemInput) => {
     if (!user?.id) {
       Alert.alert("Error", "User not authenticated. Cannot add item.");
@@ -123,7 +92,7 @@ export default function IngredientsTab() {
     <View key={`ingredients-tab-${forceRenderKey}`} style={{ opacity: 0.999 }} className="flex-1 bg-white">
       <ScrollView 
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 20, paddingHorizontal: 24, paddingTop: 20 }}
+        contentContainerStyle={{ paddingBottom: 700, paddingHorizontal: 24, paddingTop: 20 }}
       >
         <View className="bg-gray-50 pt-6 pb-4 border-b border-gray-200">
           <View className="flex-row items-center justify-start mb-1">
@@ -160,23 +129,6 @@ export default function IngredientsTab() {
           </View>
         )}
       </ScrollView>
-
-      {ingredients.length > 0 && (
-        <View className="px-4 py-10 border-t border-gray-200 bg-white">
-          <View style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <TouchableOpacity 
-              className="rounded-lg bg-green-600 p-4 items-center flex-row justify-center shadow-sm"
-              onPress={addAllMissingToList}
-              activeOpacity={0.8}
-            >
-              <Feather name="plus-circle" size={18} color="white" />
-              <Text className="text-white text-base font-semibold ml-2 uppercase tracking-wide">
-                Add All Ingredients to Grocery List
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
     </View>
   );
 }

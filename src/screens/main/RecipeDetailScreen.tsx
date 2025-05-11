@@ -180,6 +180,11 @@ export default function RecipeDetailScreen() {
   const matchedCount = React.useMemo(() => ingredients.filter((ing: any) => matchedSet.has(ing.name?.trim().toLowerCase())).length, [ingredients, matchedSet]);
   const totalCount = ingredients.length;
 
+  // Prepare time information
+  const prepTime = recipeDetails?.prep_time_minutes;
+  const cookTime = recipeDetails?.cook_time_minutes;
+  const totalTime = (prepTime || 0) + (cookTime || 0);
+
   // --- Render Logic ---
   if (isLoading) {
     // console.log('RecipeDetailScreen: Rendering Loading state'); // Reverted this line
@@ -216,7 +221,7 @@ export default function RecipeDetailScreen() {
   return (
     // Using stickyHeaderIndices to attempt to keep tabs below header when scrolling
     // Note: This might require specific styling or structure depending on exact behavior needed.
-    <ScrollView style={styles.screenContainer} stickyHeaderIndices={[1]} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.screenContainer} showsVerticalScrollIndicator={false}>
       {/* Header Section */}
       <View style={styles.headerContainer}>
         {recipeDetails.video_url ? (
@@ -252,31 +257,34 @@ export default function RecipeDetailScreen() {
             </View>
           )}
         </TouchableOpacity>
-        
-        {/* Position ActionOverlay within header */}
-        <View style={styles.actionOverlayPositioner}>
-          <ActionOverlay 
-            item={actionOverlayItemProps} // Pass the correctly typed object
-            onLike={likeMut.mutate}
-            onSave={saveMut.mutate} 
-            onMorePress={handleShare}
-          />
-        </View>
       </View>
 
-      {/* Recipe Name and Pantry Badge Header */}
-      <View style={styles.recipeInfoContainer}>
-        <Text style={styles.recipeTitle} numberOfLines={2} ellipsizeMode="tail">
+      {/* Position ActionOverlay within header */}
+      <View style={styles.actionOverlayPositioner}>
+        <ActionOverlay 
+          item={actionOverlayItemProps} // Pass the correctly typed object
+          onLike={likeMut.mutate}
+          onSave={saveMut.mutate} 
+          onMorePress={handleShare}
+        />
+      </View>
+
+      {/* NEW: Recipe Info Section (Title, Badge, Times) - Below video, above tabs */}
+      <View style={styles.recipeInfoSection}>
+        <Text style={styles.recipeTitleText} numberOfLines={3} ellipsizeMode="tail">
           {recipeDetails.title}
         </Text>
-        {totalCount > 0 && (
-          <View style={styles.pantryBadgePill}>
-            <Ionicons name="restaurant-outline" style={styles.pantryBadgeIcon} />
-            <Text style={styles.pantryBadgeTextValue}>
-              {matchedCount}/{totalCount}
-            </Text>
-          </View>
-        )}
+        <View style={styles.pantryBadgeRow}>
+          <Ionicons name="restaurant-outline" style={styles.pantryBadgeIcon} />
+          <Text style={styles.pantryBadgeInfoText}>
+            {matchedCount}/{totalCount} Ingredients at pantry
+          </Text>
+        </View>
+        <View style={styles.timeInfoRow}>
+          {prepTime !== null && <Text style={styles.timeDetailText}>Prep: {prepTime} min</Text>}
+          {cookTime !== null && <Text style={styles.timeDetailText}>Cook: {cookTime} min</Text>}
+          {totalTime > 0 && <Text style={styles.timeDetailText}>Total: {totalTime} min</Text>}
+        </View>
       </View>
 
       {/* Tab Section - Wrapped in a View for sticky headers */}
@@ -334,42 +342,45 @@ const styles = StyleSheet.create({
   },
   badgeText: { color: COLORS.white || 'white', fontSize: 10, fontWeight: 'bold' },
   actionOverlayPositioner: { position: 'absolute', bottom: 15, right: 0, zIndex: 11 },
-  recipeInfoContainer: {
+  recipeInfoSection: {
     backgroundColor: COLORS.white || '#fff',
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border || '#eee',
   },
-  recipeTitle: {
-    fontSize: 24,
-    fontWeight: '700',
+  recipeTitleText: {
+    fontSize: 24, // Larger title
+    fontWeight: 'bold',
     color: COLORS.text || '#333',
-    flex: 1,
-    marginRight: 10,
+    marginBottom: 12, // More space below title
+    textAlign: 'center', // Centered title
   },
-  pantryBadgePill: {
+  pantryBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface || '#f0f0f0',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginLeft: 10,
+    justifyContent: 'center', // Center badge items
+    marginBottom: 10, // Space below badge row
   },
   pantryBadgeIcon: {
     fontSize: 18,
     color: COLORS.primary || '#00796b',
-    marginRight: 6,
+    marginRight: 8,
   },
-  pantryBadgeTextValue: {
+  pantryBadgeInfoText: {
     fontSize: 15,
     color: COLORS.primary || '#00796b',
     fontWeight: '600',
+  },
+  timeInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around', // Space out time details
+    alignItems: 'center',
+  },
+  timeDetailText: {
+    color: COLORS.textSecondary || '#555',
+    fontSize: 13,
+    fontWeight: '500',
   },
   tabContainerWrapper: {
     minHeight: screenHeight, 
