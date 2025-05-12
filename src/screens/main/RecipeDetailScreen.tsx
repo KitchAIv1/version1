@@ -260,16 +260,6 @@ export default function RecipeDetailScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Position ActionOverlay within header */}
-      <View style={styles.actionOverlayPositioner}>
-        <ActionOverlay 
-          item={actionOverlayItemProps} // Pass the correctly typed object
-          onLike={likeMut.mutate}
-          onSave={saveMut.mutate} 
-          onMorePress={handleShare}
-        />
-      </View>
-
       {/* NEW: Recipe Info Section (Title, Badge, Times) - Below video, above tabs */}
       <View style={styles.recipeInfoSection}>
         {/* Removed Author Info Row from ABOVE the title */}
@@ -279,7 +269,7 @@ export default function RecipeDetailScreen() {
         </Text>
 
         {/* Moved Author Info Row BELOW the title */}
-        {recipeDetails?.username && ( // Check if username exists (also implies avatar might)
+        {recipeDetails?.username && (
           <View style={styles.authorInfoRow}>
             {recipeDetails.avatar_url ? (
               <Image 
@@ -287,7 +277,6 @@ export default function RecipeDetailScreen() {
                 style={styles.authorAvatarImage}
               />
             ) : (
-              // Use icon placeholder instead of require
               <View style={styles.authorAvatarPlaceholder}>
                 <Ionicons name="person-outline" size={18} color={COLORS.primary || '#00796b'} />
               </View>
@@ -297,6 +286,72 @@ export default function RecipeDetailScreen() {
             </Text>
           </View>
         )}
+
+        {/* Subtle visual divider */}
+        <View style={styles.sectionDivider} />
+
+        {/* NEW: Action Row (Like, Save, Comment, Share) */}
+        <View style={styles.actionRow}>
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={() => likeMut.mutate()}
+          >
+            <Ionicons 
+              name="heart-outline" 
+              size={26} 
+              color={COLORS.primary} 
+            />
+            {recipeDetails.likes !== undefined && (
+              <Text style={styles.actionCount}>{recipeDetails.likes}</Text>
+            )}
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => saveMut.mutate()}
+          >
+            <Ionicons 
+              name="bookmark-outline" 
+              size={26} 
+              color={COLORS.primary}
+            />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => {
+              // Scroll to Comments tab via the Tab.Navigator
+              // This is a simplified approach - you may need to use a ref
+              // to the Tab.Navigator to programmatically switch tabs
+              if (recipeId) {
+                // Show the comments tab
+                // Note: Actual tab switching would require a ref to Tab.Navigator
+                // For now, we'll just log the intention
+                console.log('Navigate to Comments tab');
+              }
+            }}
+          >
+            <Ionicons 
+              name="chatbubble-outline" 
+              size={26} 
+              color={COLORS.primary}
+            />
+            {recipeDetails.comments_count !== undefined && (
+              <Text style={styles.actionCount}>{recipeDetails.comments_count}</Text>
+            )}
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={handleShare}
+          >
+            <Ionicons 
+              name="share-social-outline" 
+              size={26} 
+              color={COLORS.primary}
+            />
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.pantryBadgeRow}>
           <Ionicons name="restaurant-outline" style={styles.pantryBadgeIcon} />
@@ -317,7 +372,10 @@ export default function RecipeDetailScreen() {
         <Tab.Navigator
           screenOptions={{
             tabBarLabelStyle: { fontSize: 12, textTransform: 'capitalize' },
-            tabBarIndicatorStyle: { backgroundColor: '#000' }, 
+            tabBarIndicatorStyle: { backgroundColor: COLORS.primary || '#00796b' }, 
+            tabBarStyle: { elevation: 0, shadowOpacity: 0, borderBottomWidth: 1, borderBottomColor: COLORS.border || '#eee' },
+            lazy: true, // Only render tabs when they become active
+            lazyPreloadDistance: 1, // Preload adjacent tabs
           }}
         >
           <Tab.Screen 
@@ -377,14 +435,14 @@ const styles = StyleSheet.create({
     fontSize: 24, // Larger title
     fontWeight: 'bold',
     color: COLORS.text || '#333',
-    marginBottom: 12, // Reset space below title
+    marginBottom: 16, // Increased space below title (was 12)
     textAlign: 'center', // Centered title
   },
   authorInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12, // Space below author row
+    marginBottom: 20, // Increased space below author row (was 12)
   },
   authorAvatarImage: { // Style for actual image
     width: 30, 
@@ -411,8 +469,8 @@ const styles = StyleSheet.create({
   pantryBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center', // Center badge items
-    marginBottom: 10, // Space below badge row
+    justifyContent: 'center',
+    marginBottom: 20, // Increased from 16 for better separation from times
   },
   pantryBadgeIcon: {
     fontSize: 18,
@@ -428,6 +486,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around', // Space out time details
     alignItems: 'center',
+    marginTop: 4, // Add a small top margin
   },
   timeDetailText: {
     color: COLORS.textSecondary || '#555',
@@ -435,6 +494,41 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   tabContainerWrapper: {
-    minHeight: screenHeight, 
+    minHeight: screenHeight * 0.6, // Use 60% of the screen height as minimum
+    backgroundColor: COLORS.white || '#fff',
+  },
+  // NEW: Add subtle divider styling
+  sectionDivider: {
+    height: 1,
+    backgroundColor: COLORS.border || '#eaeaea',
+    marginHorizontal: 40, // Smaller than full width for subtle effect
+    marginTop: 4,
+    marginBottom: 16,
+    opacity: 0.7, // Subtle appearance
+  },
+  // Action Row Styles
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly', 
+    alignItems: 'center',
+    paddingVertical: 8, // Reduced from 12
+    marginBottom: 24, // Increased from 20 for more separation from pantry
+    // Remove bottom border since we have a divider below
+    borderBottomWidth: 0, // Changed from 1
+    borderColor: COLORS.border || '#eaeaea',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10, // Increased from 8
+    minWidth: 70, // Increased from 60 for more space
+  },
+  actionCount: {
+    marginLeft: 8, // Increased from 6
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.textSecondary || '#666',
   },
 }); 

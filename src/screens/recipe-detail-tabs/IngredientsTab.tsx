@@ -89,28 +89,34 @@ export default function IngredientsTab() {
   const totalIngredientsCount = ingredients.length;
 
   return (
-    <View key={`ingredients-tab-${forceRenderKey}`} style={{ opacity: 0.999 }} className="flex-1 bg-white">
+    <View key={`ingredients-tab-${forceRenderKey}`} style={styles.container} className="flex-1 bg-white">
       <ScrollView 
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 700, paddingHorizontal: 24, paddingTop: 20 }}
+        contentContainerStyle={styles.scrollContent}
       >
-        <View className="bg-gray-50 pt-6 pb-4 border-b border-gray-200">
-          <View className="flex-row items-center justify-start mb-1">
-            <Text className="text-lg font-semibold text-gray-800">
+        <View style={styles.headerContainer}>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>
               {totalIngredientsCount} Ingredients
             </Text>
           </View>
         </View>
 
         {ingredients.length > 0 ? (
-          <View className="pt-4">
-            <View className="bg-white rounded-lg border border-gray-200">
+          <View style={styles.ingredientsContainer}>
+            <View style={styles.ingredientsList}>
               {ingredients.map((ing, index) => {
                 const ingName = ing.name?.trim().toLowerCase();
                 const matched = matchedSet.has(ingName);
                 const missing = missingSet.has(ingName);
                 return (
-                  <View key={`ingredient-${ing.name}-${index}`} className={index === ingredients.length - 1 ? '' : 'border-b border-gray-100'}>
+                  <View 
+                    key={`ingredient-${ing.name}-${index}`} 
+                    style={[
+                      styles.ingredientRow,
+                      index === ingredients.length - 1 ? null : styles.ingredientBorder
+                    ]}
+                  >
                     <IngredientRow
                       ing={ing}
                       matched={matched}
@@ -123,9 +129,9 @@ export default function IngredientsTab() {
             </View>
           </View>
         ) : (
-          <View className="items-center justify-center py-10 px-4">
+          <View style={styles.emptyContainer}>
             <Feather name="info" size={24} color="#6b7280" />
-            <Text className="text-gray-600 text-base mt-2 text-center">No ingredients listed for this recipe yet.</Text>
+            <Text style={styles.emptyText}>No ingredients listed for this recipe yet.</Text>
           </View>
         )}
       </ScrollView>
@@ -134,6 +140,63 @@ export default function IngredientsTab() {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 40, // Smaller bottom padding - we'll use flexGrow to fill space
+  },
+  headerContainer: {
+    backgroundColor: '#f9fafb',
+    paddingTop: 24,
+    paddingBottom: 16,
+    marginHorizontal: -24,
+    paddingHorizontal: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  ingredientsContainer: {
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  ingredientsList: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  ingredientRow: {
+    paddingVertical: 4,
+  },
+  ingredientBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginTop: 8,
+  },
   centered: {
     flex: 1,
     justifyContent: 'center',

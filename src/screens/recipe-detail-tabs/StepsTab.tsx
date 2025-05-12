@@ -28,12 +28,14 @@ export default function StepsTab() {
       showsVerticalScrollIndicator={false}
     >
       {cleanedSteps.length > 0 ? (
-        cleanedSteps.map((step, idx) => (
-          <View key={idx} style={styles.stepContainer}>
-            <Text style={styles.stepNumber}>{`${idx + 1}.`}</Text>
-            <Text style={styles.stepText}>{step}</Text>
-          </View>
-        ))
+        <View style={styles.stepsListContainer}>
+          {cleanedSteps.map((step, idx) => (
+            <View key={idx} style={styles.stepContainer}>
+              <Text style={styles.stepNumber}>{`${idx + 1}.`}</Text>
+              <Text style={styles.stepText}>{step}</Text>
+            </View>
+          ))}
+        </View>
       ) : (
         <View style={styles.centeredFeedback}>
           <Text style={styles.infoText}>No preparation steps available for this recipe.</Text>
@@ -49,9 +51,13 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white || '#fff',
   },
   scrollContentContainer: {
+    flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 20,
-    paddingBottom: 700,
+    paddingBottom: 40,
+  },
+  stepsListContainer: {
+    paddingBottom: 24, 
   },
   centered: {
     flex: 1,
@@ -66,21 +72,22 @@ const styles = StyleSheet.create({
   },
   stepContainer: {
     flexDirection: 'row',
-    marginBottom: 12,
+    marginBottom: 20,
     alignItems: 'flex-start',
+    paddingHorizontal: 4,
   },
   stepNumber: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: 'bold',
     color: COLORS.primary || '#00796b',
-    marginRight: 8,
+    marginRight: 10,
     minWidth: 25,
   },
   stepText: {
-    fontSize: 14,
+    fontSize: 15,
     color: COLORS.text || '#333',
     flex: 1,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   centeredFeedback: {
     flex: 1,
