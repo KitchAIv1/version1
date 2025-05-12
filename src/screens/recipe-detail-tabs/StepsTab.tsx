@@ -1,30 +1,96 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { useRecipeDetails } from '../../hooks/useRecipeDetails';
+import { COLORS } from '../../constants/theme';
 
 export default function StepsTab() {
   const route = useRoute<any>();
   const recipeId = route.params?.id;
-  const { data, isLoading, error } = useRecipeDetails(recipeId);
+  const { data: recipeDetails, isLoading, error } = useRecipeDetails(recipeId);
 
-  if (isLoading) return <Text>Loading...</Text>;
-  if (error || !data) return <Text>Error loading steps.</Text>;
+  if (isLoading) {
+    return <View style={styles.centered}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
+  }
+
+  if (error || !recipeDetails || !recipeDetails.preparation_steps) {
+    return <View style={styles.centered}><Text style={styles.errorText}>Could not load preparation steps.</Text></View>;
+  }
+
+  const cleanedSteps = recipeDetails.preparation_steps.map(step => 
+    step.replace(/^\s*\d+[.)]*\s*/, '')
+  );
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Preparation Steps</Text>
-      {data.preparation_steps.map((step, idx) => (
-        <Text key={idx} style={styles.step}>
-          {idx + 1}. {step}
-        </Text>
-      ))}
+    <ScrollView 
+      style={styles.scrollViewStyle}
+      contentContainerStyle={styles.scrollContentContainer}
+      showsVerticalScrollIndicator={false}
+    >
+      {cleanedSteps.length > 0 ? (
+        cleanedSteps.map((step, idx) => (
+          <View key={idx} style={styles.stepContainer}>
+            <Text style={styles.stepNumber}>{`${idx + 1}.`}</Text>
+            <Text style={styles.stepText}>{step}</Text>
+          </View>
+        ))
+      ) : (
+        <View style={styles.centeredFeedback}>
+          <Text style={styles.infoText}>No preparation steps available for this recipe.</Text>
+        </View>
+      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 16 },
-  title: { fontSize: 20, fontWeight: 'bold', marginBottom: 12 },
-  step: { fontSize: 16, marginBottom: 8 },
+  scrollViewStyle: {
+    flex: 1,
+    backgroundColor: COLORS.white || '#fff',
+  },
+  scrollContentContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 700,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.white || '#fff',
+  },
+  errorText: {
+    color: COLORS.error || 'red',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  stepContainer: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    alignItems: 'flex-start',
+  },
+  stepNumber: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.primary || '#00796b',
+    marginRight: 8,
+    minWidth: 25,
+  },
+  stepText: {
+    fontSize: 14,
+    color: COLORS.text || '#333',
+    flex: 1,
+    lineHeight: 20,
+  },
+  centeredFeedback: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  infoText: {
+    fontSize: 16,
+    color: COLORS.textSecondary || '#666',
+    textAlign: 'center',
+  },
 }); 

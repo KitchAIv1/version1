@@ -10,6 +10,7 @@ import {
   Share,
   Alert,
   ScrollView,
+  Image,
 } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
@@ -271,9 +272,32 @@ export default function RecipeDetailScreen() {
 
       {/* NEW: Recipe Info Section (Title, Badge, Times) - Below video, above tabs */}
       <View style={styles.recipeInfoSection}>
+        {/* Removed Author Info Row from ABOVE the title */}
+
         <Text style={styles.recipeTitleText} numberOfLines={3} ellipsizeMode="tail">
           {recipeDetails.title}
         </Text>
+
+        {/* Moved Author Info Row BELOW the title */}
+        {recipeDetails?.username && ( // Check if username exists (also implies avatar might)
+          <View style={styles.authorInfoRow}>
+            {recipeDetails.avatar_url ? (
+              <Image 
+                source={{ uri: recipeDetails.avatar_url }} 
+                style={styles.authorAvatarImage}
+              />
+            ) : (
+              // Use icon placeholder instead of require
+              <View style={styles.authorAvatarPlaceholder}>
+                <Ionicons name="person-outline" size={18} color={COLORS.primary || '#00796b'} />
+              </View>
+            )}
+            <Text style={styles.authorNameText}>
+              {recipeDetails.username || 'Unknown Author'}
+            </Text>
+          </View>
+        )}
+
         <View style={styles.pantryBadgeRow}>
           <Ionicons name="restaurant-outline" style={styles.pantryBadgeIcon} />
           <Text style={styles.pantryBadgeInfoText}>
@@ -353,8 +377,36 @@ const styles = StyleSheet.create({
     fontSize: 24, // Larger title
     fontWeight: 'bold',
     color: COLORS.text || '#333',
-    marginBottom: 12, // More space below title
+    marginBottom: 12, // Reset space below title
     textAlign: 'center', // Centered title
+  },
+  authorInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12, // Space below author row
+  },
+  authorAvatarImage: { // Style for actual image
+    width: 30, 
+    height: 30,
+    borderRadius: 15, 
+    marginRight: 8,
+  },
+  authorAvatarPlaceholder: { // Style for icon placeholder
+    width: 30, 
+    height: 30,
+    borderRadius: 15, 
+    marginRight: 8,
+    backgroundColor: COLORS.surface || '#f0f0f0', 
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border || '#ddd',
+  },
+  authorNameText: {
+    fontSize: 14,
+    color: COLORS.textSecondary || '#555',
+    fontWeight: '500',
   },
   pantryBadgeRow: {
     flexDirection: 'row',

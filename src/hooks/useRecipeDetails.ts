@@ -12,6 +12,8 @@ export interface RecipeDetailsData {
   video_url: string | null;
   created_at: string;
   description: string | null;
+  username?: string | null;
+  avatar_url?: string | null;
   ingredients: Array<{ name: string; unit: string | null; quantity: string | null }>;
   comments_count: number;
   cook_time_minutes: number | null;
