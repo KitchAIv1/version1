@@ -21,6 +21,8 @@ export interface RecipeDetailsData {
   prep_time_minutes: number | null;
   preparation_steps: string[];
   likes: number;
+  is_liked_by_user: boolean;
+  is_saved_by_user: boolean;
   matched_ingredients?: string[];
   missing_ingredient_names?: string[];
   missing_ingredients?: string[];
@@ -34,20 +36,33 @@ interface UseRecipeDetailsResult {
   refetch: () => void;
 }
 
-// Separate query functions for potential reuse in prefetching
-export const fetchRecipeDetails = async (recipeId: string) => {
+// Update fetchRecipeDetails to accept userId and pass it to RPC
+export const fetchRecipeDetails = async (recipeId: string, userId?: string) => {
   if (!recipeId) throw new Error('Recipe ID is required');
   
-  const { data, error } = await supabase.rpc('get_recipe_details', { p_recipe_id: recipeId });
+  console.log(`[fetchRecipeDetails] Fetching for recipe ${recipeId}, user ${userId}`);
   
-  if (error) throw error;
-  if (!data) throw new Error('Recipe not found');
+  // Pass userId to the RPC. Backend RPC needs to handle null/undefined userId gracefully (return is_saved_by_user: false)
+  const { data, error } = await supabase.rpc('get_recipe_details', { 
+    p_recipe_id: recipeId, 
+    p_user_id: userId // Pass the user ID
+  });
+  
+  if (error) {
+    console.error('[fetchRecipeDetails] RPC Error:', error);
+    throw error;
+  }
+  if (!data) {
+    console.warn(`[fetchRecipeDetails] No data returned for recipe ${recipeId}`);
+    throw new Error('Recipe not found');
+  }
   
   // Clean up preparation_steps (remove extra quotes and trim)
   const cleanedSteps = (data.preparation_steps || []).map(
     (step: string) => step.replace(/^"+|"+$/g, '').trim()
   );
   
+  // Return data including the new is_saved_by_user field (assuming RPC provides it)
   return {
     ...data,
     preparation_steps: cleanedSteps,
@@ -59,8 +74,10 @@ export const fetchRecipeDetails = async (recipeId: string) => {
     cook_time_minutes: data.cook_time_minutes ?? null,
     video_url: data.video_url ?? null,
     likes: data.likes ?? 0,
+    is_liked_by_user: data.is_liked_by_user ?? false, // Default if missing
+    is_saved_by_user: data.is_saved_by_user ?? false, // Default if missing
     comments_count: data.comments_count ?? 0,
-  };
+  } as RecipeDetailsData; // Cast to ensure type match
 };
 
 export const fetchPantryMatch = async (recipeId: string, userId: string) => {
@@ -83,7 +100,7 @@ export const fetchPantryMatch = async (recipeId: string, userId: string) => {
 
   return {
     matched_ingredients: data?.matched_ingredients || [],
-    missing_ingredients: data?.missing_ingredients || [],
+    missing_ingredients: data?.unmatched_ingredients || [],
   };
 };
 
@@ -109,22 +126,21 @@ export const prefetchRecipeDetails = async (queryClient: any, recipeId: string, 
 export const useRecipeDetails = (recipeId: string | undefined, userId?: string): UseRecipeDetailsResult => {
   const queryClient = useQueryClient();
   
-  // Use React Query's useQueries for parallel queries with better caching
   const results = useQueries({
     queries: [
       {
-        queryKey: ['recipeDetails', recipeId],
-        queryFn: () => fetchRecipeDetails(recipeId!), 
-        enabled: !!recipeId,
-        staleTime: 10 * 60 * 1000, // 10 minutes - longer stale time for recipe details
-        gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache longer
+        queryKey: ['recipeDetails', recipeId, userId], // Add userId to queryKey
+        queryFn: () => fetchRecipeDetails(recipeId!, userId), // Pass userId here
+        enabled: !!recipeId, // Still enabled even if userId is missing, fetchRecipeDetails handles it
+        staleTime: 10 * 60 * 1000, 
+        gcTime: 30 * 60 * 1000,
       },
       {
         queryKey: ['pantryMatch', recipeId, userId],
         queryFn: () => fetchPantryMatch(recipeId!, userId!),
         enabled: !!recipeId && !!userId,
-        staleTime: 5 * 60 * 1000, // 5 minutes
-        gcTime: 15 * 60 * 1000, // 15 minutes
+        staleTime: 5 * 60 * 1000,
+        gcTime: 15 * 60 * 1000,
       },
     ],
   });
@@ -135,26 +151,25 @@ export const useRecipeDetails = (recipeId: string | undefined, userId?: string):
   const isLoading = recipeResult.isLoading || (!!userId && pantryResult.isLoading);
   const error = recipeResult.error || pantryResult.error;
   
-  // Memoize the combined data to prevent unnecessary re-renders
+  // Memoize the combined data
   const data = useMemo(() => {
     if (!recipeResult.data) return null;
     
+    // Combine results, ensuring is_saved_by_user is included from recipeResult.data
     return {
-      ...recipeResult.data,
+      ...recipeResult.data, 
       matched_ingredients: pantryResult.data?.matched_ingredients || [],
       missing_ingredients: pantryResult.data?.missing_ingredients || [],
       missing_ingredient_names: pantryResult.data?.missing_ingredients || [],
     } as RecipeDetailsData;
   }, [recipeResult.data, pantryResult.data]);
 
-  // Expose a refetch method that handles both queries
+  // Update refetch logic if needed, but it might be okay as is
   const refetch = () => {
     recipeResult.refetch();
     if (userId) {
       pantryResult.refetch();
     }
-    
-    // Also invalidate related queries like recipe comments
     if (recipeId) {
       queryClient.invalidateQueries({ queryKey: ['recipe-comments', recipeId] });
     }

@@ -7,10 +7,11 @@ type Props = {
   ing: { name: string; qty?: string; unit?: string };
   matched: boolean;
   missing: boolean;
+  isAdded?: boolean;
   onAddItem?: (item: GroceryItemInput) => Promise<void>;
 };
 
-export default function IngredientRow({ ing, matched, missing, onAddItem }: Props) {
+export default function IngredientRow({ ing, matched, missing, isAdded, onAddItem }: Props) {
   const handleAddItem = async () => {
     if (!ing.name) {
       Alert.alert("Error", "Ingredient name is missing.");
@@ -38,7 +39,8 @@ export default function IngredientRow({ ing, matched, missing, onAddItem }: Prop
       {/* Icon Section */}
       <View style={styles.iconContainer}>
         {matched && <Feather name="check-circle" size={18} color="#22c55e" />}
-        {missing && !onAddItem && <Feather name="x-circle" size={18} color="#dc2626" />}
+        {missing && !isAdded && !onAddItem && <Feather name="x-circle" size={18} color="#dc2626" />}
+        {missing && isAdded && <Feather name="check-circle" size={18} color="#fbbf24" />}
       </View>
       {/* Text Group */}
       <View style={styles.textGroupContainer}>
@@ -65,17 +67,22 @@ export default function IngredientRow({ ing, matched, missing, onAddItem }: Prop
           {ing.name}
         </Text>
       </View>
-      {/* ADD Button Section */}
-      {missing && onAddItem && (
+      {/* ADD/ADDED Button Section */}
+      {isAdded ? (
+        <View style={[styles.addButton, styles.addedState]}> 
+          <Feather name="check" size={16} color="#166534" />
+          <Text style={styles.addedButtonText}>ADDED</Text>
+        </View>
+      ) : missing && onAddItem ? (
         <TouchableOpacity onPress={handleAddItem} style={styles.addButton} activeOpacity={0.7}>
           <Feather name="plus-circle" size={18} color="#b45309" />
         </TouchableOpacity>
-      )}
+      ) : null}
     </View>
   );
 }
 
-// Styles remain the same, but ensure addButton is styled appropriately for an icon if text is removed
+// Styles
 const styles = StyleSheet.create({
   rowContainer: {
     flexDirection: 'row',
@@ -128,17 +135,23 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
   },
   addButton: {
-    marginLeft: 8,
-    paddingHorizontal: 6, // Adjust padding for icon
-    paddingVertical: 4,   // Adjust padding for icon
-    borderRadius: 15, // Make it rounder for an icon button
-    // backgroundColor: '#fef3c7', // Consider removing bg or using a more subtle one for icon only
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    marginLeft: 8,
+    paddingHorizontal: 8, 
+    paddingVertical: 6,   
+    borderRadius: 6,
   },
-  addButtonText: { // This style is no longer used if using an icon
-    color: '#b45309',
-    fontSize: 12,
-    fontWeight: '500',
+  addedState: { // Style for the "ADDED" state view
+    backgroundColor: '#f0fdf4', // Light green background
+    borderColor: '#bbf7d0',
+    borderWidth: 1,
+  },
+  addedButtonText: {
+    color: '#166534', // Darker green text
+    fontSize: 11,
+    fontWeight: '600',
+    marginLeft: 4,
+    textTransform: 'uppercase',
   },
 }); 

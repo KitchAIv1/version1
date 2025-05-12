@@ -15,7 +15,7 @@ import {
   LayoutChangeEvent,
   StatusBar,
 } from 'react-native';
-import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
+import { useRoute, RouteProp, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
@@ -135,7 +135,7 @@ export default function RecipeDetailScreen() {
   const initialSeekTime = route.params?.initialSeekTime ?? 0;
   const videoRef = useRef<Video>(null);
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
-  const { groceryList } = useGroceryManager();
+  const { groceryList, fetchGroceryList } = useGroceryManager();
   const scrollViewRef = useRef<ScrollView>(null);
   
   // Track original tab bar measurements
@@ -164,6 +164,16 @@ export default function RecipeDetailScreen() {
 
   // Debug logging helper for visibility changes
   const logVisibilityChange = useRef(0);
+
+  // Use useFocusEffect to refresh grocery list when the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.id) {
+        console.log('RecipeDetailScreen focused, fetching grocery list...');
+        fetchGroceryList(user.id); 
+      }
+    }, [user?.id, fetchGroceryList]) // Dependencies
+  );
 
   // Fetch recipe details
   const {
@@ -201,48 +211,55 @@ export default function RecipeDetailScreen() {
   }, [isLoading, recipeDetails]);
 
   // --- Optimistic updates for like/save --- 
-  interface MutationContext {
-    previousDetails?: RecipeDetailsData;
-  }
-  const likeMut = useMutation<void, Error, void, MutationContext>({ 
+  const likeMut = useMutation<void, Error, void, any>({
     mutationFn: async () => { 
       if (!recipeId) throw new Error('Recipe ID missing'); 
-      const { error } = await supabase.rpc('like_recipe', { recipe_id: recipeId }); 
-      if (error) throw error; 
+      // Assuming 'toggle_like_recipe' RPC and it handles user internally
+      const { error: likeError } = await supabase.rpc('toggle_like_recipe', { p_recipe_id: recipeId }); 
+      if (likeError) throw likeError; 
     },
-    onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: ['recipe', recipeId] });
-      const previousDetails = queryClient.getQueryData<RecipeDetailsData>(['recipe', recipeId]);
-      return { previousDetails };
-    },
-    onError: (_err, _vars, context) => {
-      queryClient.setQueryData(['recipe', recipeId], context?.previousDetails);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['recipe', recipeId] });
+    onSuccess: () => {
+      // Optimistically update UI or simply refetch for consistency
+      queryClient.invalidateQueries({ queryKey: ['recipeDetails', recipeId, user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['profile'] }); // If likes affect profile display
       queryClient.invalidateQueries({ queryKey: ['feed'] });
     },
+    // onError: (err, _vars, context) => {
+    //   queryClient.setQueryData(['recipeDetails', recipeId, user?.id], context?.previousDetails);
+    // },
   });
-  const saveMut = useMutation<void, Error, void, MutationContext>({ 
+
+  // Updated saveMut for the new 'save_recipe_video' RPC
+  const saveRecipeVideoMut = useMutation<void, Error, void, any>({
     mutationFn: async () => { 
-      if (!recipeId) throw new Error('Recipe ID missing'); 
-      const { error } = await supabase.rpc('save_recipe', { recipe_id: recipeId }); 
-      if (error) throw error; 
+      const userId = user?.id;
+      if (!recipeId || !userId) { 
+        throw new Error('Recipe ID or User ID missing for save action'); 
+      }
+      // Call the new RPC, passing both recipe_id and user_id
+      const { error: saveError } = await supabase.rpc('save_recipe_video', { 
+        p_recipe_id: recipeId, 
+        p_user_id: userId // Pass user ID
+      }); 
+      if (saveError) {
+        console.error('Error saving recipe video:', saveError);
+        throw saveError; 
+      }
     },
-    onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: ['recipe', recipeId] });
-      const previousDetails = queryClient.getQueryData<RecipeDetailsData>(['recipe', recipeId]);
-      return { previousDetails };
+    onSuccess: () => {
+      console.log('Recipe save/unsave successful, invalidating queries...');
+      // Invalidate recipe details to refetch and get updated is_saved_by_user status
+      queryClient.invalidateQueries({ queryKey: ['recipeDetails', recipeId, user?.id] });
+      // Invalidate profile data as the saved list will change
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      // Optionally, invalidate feed if saved status affects feed items
+      queryClient.invalidateQueries({ queryKey: ['feed'] }); 
     },
-    onError: (_err, _vars, context) => {
-      queryClient.setQueryData(['recipe', recipeId], context?.previousDetails);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['recipe', recipeId] });
-      queryClient.invalidateQueries({ queryKey: ['feed'] });
-    },
+    onError: (saveError) => {
+      console.error('Mutation error for save_recipe_video:', saveError);
+      Alert.alert('Error', 'Could not update save status. Please try again.');
+    }
   });
-  // --- End Optimistic Updates ---
 
   // --- Share Functionality ---
   const handleShare = async () => { 
@@ -555,7 +572,7 @@ export default function RecipeDetailScreen() {
           <Ionicons name={isMuted ? 'volume-mute' : 'volume-high'} size={24} color="white" />
         </TouchableOpacity>
 
-        {/* Cart Icon with Badge - Placed top right */}
+        {/* Cart Icon with Badge - Uses groceryList.length */}
         <TouchableOpacity 
           style={styles.cartButtonContainer} 
           onPress={() => navigation.navigate('MainTabs', { screen: 'GroceryList' })}
@@ -645,25 +662,27 @@ export default function RecipeDetailScreen() {
             <TouchableOpacity 
               style={styles.actionButton} 
               onPress={() => likeMut.mutate()}
+              disabled={likeMut.isPending}
             >
               <Ionicons 
-                name="heart-outline" 
+                name={recipeDetails?.is_liked_by_user ? "heart" : "heart-outline"} 
                 size={26} 
-                color={COLORS.primary} 
+                color={recipeDetails?.is_liked_by_user ? COLORS.error : COLORS.primary} 
               />
-              {recipeDetails.likes !== undefined && (
+              {recipeDetails?.likes !== undefined && (
                 <Text style={styles.actionCount}>{recipeDetails.likes}</Text>
               )}
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => saveMut.mutate()}
+              onPress={() => saveRecipeVideoMut.mutate()}
+              disabled={saveRecipeVideoMut.isPending}
             >
               <Ionicons 
-                name="bookmark-outline" 
+                name={recipeDetails?.is_saved_by_user ? "bookmark" : "bookmark-outline"}
                 size={26} 
-                color={COLORS.primary}
+                color={recipeDetails?.is_saved_by_user ? COLORS.primary : COLORS.textSecondary}
               />
             </TouchableOpacity>
             

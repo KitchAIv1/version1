@@ -13,19 +13,20 @@ import { Tabs, MaterialTabBar } from 'react-native-collapsible-tab-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { supabase } from '../../services/supabase';
-import UploadGridItem from '../../components/UploadGridItem'; // Import the actual component
-import SavedGrid from '../../components/SavedGrid'; // Import SavedGrid
+import ProfileRecipeCard from '../../components/ProfileRecipeCard'; // Import the new card
 import ActivityList from '../../components/ActivityList'; // Import ActivityList
 import { useNavigation } from '@react-navigation/native'; // Import useNavigation
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // Import navigation type
 import { MainStackParamList } from '../../navigation/types'; // Import param list
+import { useAuth } from '../../providers/AuthProvider'; // Import useAuth
 
 // Define types for profile and post data
-interface VideoPostData { // Renamed from PostData for clarity
+interface VideoPostData { 
   recipe_id: string;
-  recipe_name: string;
+  recipe_name: string; // Frontend expects this name
   video_url: string;
-  // thumbnail_url?: string; // Desirable, to be added if backend provides it
+  thumbnail_url: string | null;
+  created_at: string;
 }
 
 interface ProfileData { 
@@ -34,8 +35,9 @@ interface ProfileData {
   followers: number;
   following: number;
   bio?: string | null;
-  videos: VideoPostData[]; // Embed video posts data here
-  // Add other fields from get_profile_details
+  videos: VideoPostData[]; // User's uploaded videos/recipes
+  saved_recipes: VideoPostData[]; // Add array for saved recipes
+  // Add other fields from get_profile_details if needed
 }
 
 const ACTIVE_COLOR = '#22c55e'; // Defined active color
@@ -43,22 +45,74 @@ const ACTIVE_COLOR = '#22c55e'; // Defined active color
 // -----------------------------------------------------------------------------
 // Hooks (data)
 // -----------------------------------------------------------------------------
-const useProfile = () =>
-  useQuery<ProfileData, Error, ProfileData, QueryKey>({
-    queryKey: ['profile'], 
+const useProfile = () => {
+  const { user } = useAuth(); 
+  const userId = user?.id;
+
+  return useQuery<ProfileData, Error, ProfileData, QueryKey>({
+    queryKey: ['profile', userId], 
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_profile_details');
-      if (error) throw error;
-      if (!data) throw new Error('Profile data not found.'); 
-      // The RPC returns a single JSON object which is ProfileData
-      // Ensure the `videos` field is an array, default to empty if not.
-      const profileData = data as any; // Cast to any temporarily to check videos
-      return { 
-        ...profileData,
-        videos: Array.isArray(profileData.videos) ? profileData.videos : [] 
-      } as ProfileData;
-    }
+      if (!userId) throw new Error("User ID is required for profile fetch");
+      
+      const { data: rawData, error: rpcError } = await supabase
+        .rpc('get_profile_details', { p_user_id: userId }); 
+
+      if (rpcError) {
+        console.error('[useProfile] Supabase RPC Error:', rpcError);
+        throw rpcError;
+      }
+      if (!rawData) {
+        console.error('[useProfile] No data received from RPC for user:', userId);
+        throw new Error('Profile data not found.'); 
+      }
+      
+      const profileDataBackend = rawData as any;
+      
+      // Map uploaded recipes (from backend 'recipes' to frontend 'videos')
+      let processedUploadedVideos: VideoPostData[] = [];
+      if (Array.isArray(profileDataBackend.recipes)) {
+        processedUploadedVideos = profileDataBackend.recipes.map((recipe: any) => ({
+          recipe_id: recipe.recipe_id,
+          recipe_name: recipe.title, // Map title to recipe_name
+          video_url: recipe.video_url,
+          thumbnail_url: recipe.thumbnail_url,
+          created_at: recipe.created_at,
+        }));
+      } else {
+        console.warn('[useProfile] profileDataBackend.recipes is not an array or is missing.');
+      }
+
+      // Map saved recipes (from backend 'saved_recipes' to frontend 'saved_recipes')
+      let processedSavedRecipes: VideoPostData[] = [];
+      if (Array.isArray(profileDataBackend.saved_recipes)) {
+        processedSavedRecipes = profileDataBackend.saved_recipes.map((recipe: any) => ({
+          recipe_id: recipe.recipe_id,
+          recipe_name: recipe.title, // Map title to recipe_name
+          video_url: recipe.video_url,
+          thumbnail_url: recipe.thumbnail_url,
+          created_at: recipe.created_at,
+        }));
+      } else {
+        console.warn('[useProfile] profileDataBackend.saved_recipes is not an array or is missing.');
+      }
+      
+      // Construct the final ProfileData object for the frontend
+      const processedFrontendData: ProfileData = { 
+        username: profileDataBackend.username,
+        avatar_url: profileDataBackend.avatar_url,
+        followers: profileDataBackend.followers ?? 0,
+        following: profileDataBackend.following ?? 0,
+        bio: profileDataBackend.bio,
+        videos: processedUploadedVideos, // Use the processed uploaded videos
+        saved_recipes: processedSavedRecipes // Use the processed saved recipes
+      };
+      
+      console.log(`[useProfile] Processed ${processedUploadedVideos.length} uploaded, ${processedSavedRecipes.length} saved recipes.`);
+      return processedFrontendData;
+    },
+    enabled: !!userId, 
   });
+}
 
 // -----------------------------------------------------------------------------
 // Components
@@ -119,36 +173,33 @@ const Bio: React.FC<{ profile: ProfileData }> = ({ profile }) => (
 // Screen
 // -----------------------------------------------------------------------------
 export const ProfileScreen: React.FC = () => {
+  const { user } = useAuth(); // Get user here for handleEditProfilePress
   const { data: profile, isLoading: profileLoading, isError: profileError } = useProfile();
-  const [savedItems, setSavedItems] = React.useState<any[]>([]); // Placeholder state
-  const [activityItems, setActivityItems] = React.useState<any[]>([]); // Placeholder state
-  const navigation = useNavigation<ProfileNavigationProp>(); // Hook for navigation
+  const [savedItems, setSavedItems] = React.useState<any[]>([]);
+  const [activityItems, setActivityItems] = React.useState<any[]>([]);
+  const navigation = useNavigation<ProfileNavigationProp>();
 
   if (profileLoading) return <Loader />;
-  if (profileError || !profile || typeof profile !== 'object') return <ErrorMsg message="Could not load profile" />;
-
-  // Get user ID to pass to Edit screen (safer than relying on route params there)
-  // Note: useProfile already fetches data based on auth.uid() in the RPC
-  // We might pass the user ID from auth state if readily available, or fetch it here
-  // For now, assuming profile includes user id, or Edit screen refetches based on auth.
-  // Let's refine how userId is obtained if needed.
-  // const { data: { user } } = await supabase.auth.getUser(); // Example of getting user ID
+  
+  if (profileError || !profile || typeof profile !== 'object') {
+    return <ErrorMsg message="Could not load profile" />;
+  }
 
   // Add handler for navigating to Edit Profile
   const handleEditProfilePress = () => {
-    // Pass the necessary initial data and potentially the user ID
-    // If profile.id exists from the RPC, use that, otherwise need another way to get user ID
-    const userIdFromProfile = (profile as any).id; // Assuming 'id' is returned by get_profile_details
-    if (!userIdFromProfile) {
-      console.warn('User ID not found in profile data for EditProfile navigation');
-      // Optionally get from auth state here if needed
+    const userIdToPass = (profile as any)?.id || user?.id; 
+    if (!userIdToPass) {
+      console.warn('User ID not found for EditProfile navigation');
+      return;
     }
     navigation.navigate('EditProfile', { 
+      // Pass only the data EditProfileScreen expects
       initialProfileData: {
         bio: profile.bio,
         avatar_url: profile.avatar_url
+        // username might be fetched within EditProfileScreen or passed differently if needed
       },
-      userId: userIdFromProfile // Pass the user ID
+      userId: userIdToPass
     });
   };
 
@@ -166,14 +217,15 @@ export const ProfileScreen: React.FC = () => {
     </View>
   );
 
-  const renderGridItem = ({ item }: { item: VideoPostData }) => (
-    <UploadGridItem item={item} />
+  // Update renderItem to use ProfileRecipeCard
+  const renderProfileCardItem = ({ item }: { item: VideoPostData }) => (
+    <ProfileRecipeCard item={item} />
   );
 
   return (
     <Tabs.Container 
       renderHeader={renderHeader} 
-      headerHeight={320} 
+      headerHeight={320} // Adjust if needed after layout changes
       renderTabBar={props => (
         <MaterialTabBar
           {...props}
@@ -188,19 +240,28 @@ export const ProfileScreen: React.FC = () => {
         {profile.videos && profile.videos.length > 0 ? (
           <Tabs.FlatList
             data={profile.videos} 
-            numColumns={3}
+            numColumns={2} // Changed to 2 columns
             keyExtractor={(item) => item.recipe_id}
-            renderItem={renderGridItem} 
-            contentContainerStyle={styles.listContentContainer} // Use shared list style
+            renderItem={renderProfileCardItem} // Use the new render function
+            contentContainerStyle={styles.listContentContainer} // Keep or adjust this style
           />
         ) : (
           <Empty label="No uploads yet" />
         )}
       </Tabs.Tab>
-      <Tabs.Tab name="Saved" label="Saved">
-        {/* Use SavedGrid component */}
-        {/* TODO: Replace [] with actual savedItems data when fetched */}
-        <SavedGrid data={savedItems} /> 
+      <Tabs.Tab name="Saved" label={`Saved (${profile.saved_recipes?.length ?? 0})`}>
+        {/* Use Tabs.FlatList with ProfileRecipeCard for consistency */}
+        {profile.saved_recipes && profile.saved_recipes.length > 0 ? (
+          <Tabs.FlatList
+            data={profile.saved_recipes} 
+            numColumns={2} 
+            keyExtractor={(item) => item.recipe_id} // Use recipe_id
+            renderItem={renderProfileCardItem} // Reuse the same render item
+            contentContainerStyle={styles.listContentContainer} 
+          />
+        ) : (
+          <Empty label="No saved recipes yet" />
+        )}
       </Tabs.Tab>
       <Tabs.Tab name="Activity" label="Activity">
         {/* Use ActivityList component */}
@@ -275,9 +336,9 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
     fontSize: 14,
   },
-  listContentContainer: { // Added shared style for FlatList content padding
-     paddingBottom: 80, // Example padding, adjust as needed
-     paddingHorizontal: 1.5, // Match grid item margin for alignment
+  listContentContainer: {
+    padding: 8, // Adjust overall padding for the grid
+    alignItems: 'center', // Center items if needed, or remove if using margins
   },
   editButtonContainer: {
     paddingHorizontal: 16,
