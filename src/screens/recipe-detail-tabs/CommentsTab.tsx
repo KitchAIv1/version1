@@ -1,21 +1,24 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { 
   View, 
   Text, 
   StyleSheet,
-  ScrollView,
   TextInput,
   TouchableOpacity,
   Platform,
   ActivityIndicator,
   Image,
   Keyboard,
+  KeyboardAvoidingView,
   Dimensions,
-  Animated,
-  SafeAreaView
+  Easing,
+  ScrollView,
+  SafeAreaView,
+  KeyboardEvent,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRoute } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../providers/AuthProvider';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
@@ -31,21 +34,60 @@ interface Comment {
   avatar_url: string | null;
 }
 
+// Memoized Comment component for better performance
+const CommentItem = memo(({ comment, formatCommentDate }: { 
+  comment: Comment, 
+  formatCommentDate: (date: string) => string 
+}) => {
+  return (
+    <View style={styles.commentItem}>
+      <View style={styles.commentHeader}>
+        {comment.avatar_url ? (
+          <Image 
+            source={{ uri: comment.avatar_url }} 
+            style={styles.avatar}
+          />
+        ) : (
+          <View style={styles.avatarPlaceholder}>
+            <Feather name="user" size={16} color={COLORS.primary} />
+          </View>
+        )}
+        <View style={styles.commentInfo}>
+          <Text style={styles.username}>{comment.username || 'Anonymous'}</Text>
+          <Text style={styles.timestamp}>{formatCommentDate(comment.created_at)}</Text>
+        </View>
+      </View>
+      <Text style={styles.commentText}>{comment.comment_text}</Text>
+    </View>
+  );
+});
+
+// Empty state component
+const EmptyComments = memo(() => (
+  <View style={styles.emptyState}>
+    <Feather name="message-circle" size={24} color={COLORS.textSecondary} />
+    <Text style={styles.emptyText}>No comments yet. Be the first to comment!</Text>
+  </View>
+));
+
 export default function CommentsTab() {
   const route = useRoute<any>();
+  const navigation = useNavigation<any>();
   const recipeId = route.params?.id;
   const { user } = useAuth();
   const [commentText, setCommentText] = useState('');
   const queryClient = useQueryClient();
-  const scrollViewRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const animatedPosition = useRef(new Animated.Value(0)).current;
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [showAllComments, setShowAllComments] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
   
-  // Use React Query to fetch comments
+  const VISIBLE_COMMENTS_COUNT = 3; // Number of comments to show initially
+  
+  // Use React Query to fetch comments with optimized caching
   const {
-    data: comments,
+    data: comments = [],
     isLoading,
     error
   } = useQuery<Comment[]>({
@@ -62,6 +104,8 @@ export default function CommentsTab() {
       return data || [];
     },
     enabled: !!recipeId,
+    staleTime: 2 * 60 * 1000, // 2 minutes stale time
+    gcTime: 10 * 60 * 1000, // 10 minutes cache time
   });
   
   // Update the comment count whenever comments change
@@ -77,8 +121,6 @@ export default function CommentsTab() {
           ...currentDetails,
           comments_count: comments.length
         });
-        
-        console.log(`Updated comment count from ${currentDetails.comments_count} to ${comments.length}`);
       }
     }
   }, [comments, recipeId, queryClient]);
@@ -106,79 +148,75 @@ export default function CommentsTab() {
       queryClient.invalidateQueries({ queryKey: ['recipe-comments', recipeId] });
       queryClient.invalidateQueries({ queryKey: ['recipeDetails', recipeId] });
       
-      // Log for debugging
-      console.log('Comment posted successfully, invalidated both queries');
+      // After posting, show all comments to see the new one
+      setShowAllComments(true);
     }
   });
 
-  const handlePostComment = () => {
+  // Handle post comment
+  const handlePostComment = useCallback(() => {
     if (!commentText.trim()) return;
     postCommentMutation.mutate(commentText.trim());
-  };
+  }, [commentText, postCommentMutation]);
   
-  const formatCommentDate = (dateString: string) => {
+  // Enhanced keyboard monitoring to track both visibility and height
+  useEffect(() => {
+    const keyboardWillShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e: KeyboardEvent) => {
+        setIsKeyboardVisible(true);
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+    
+    const keyboardWillHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setIsKeyboardVisible(false);
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardWillShowListener.remove();
+      keyboardWillHideListener.remove();
+    };
+  }, []);
+
+  // Function to focus the input
+  const focusCommentInput = useCallback(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
+
+  // Handle click on a comment
+  const handleCommentPress = useCallback(() => {
+    // Focus the input field when a comment is clicked
+    focusCommentInput();
+  }, [focusCommentInput]);
+
+  // Function to handle viewing all comments
+  const handleViewAllComments = () => {
+    setShowAllComments(true);
+  };
+
+  // Get the comments to display based on showAllComments state
+  const visibleComments = showAllComments 
+    ? comments 
+    : comments.slice(0, VISIBLE_COMMENTS_COUNT);
+  
+  // Memoize this function to prevent re-renders
+  const formatCommentDate = useCallback((dateString: string) => {
     try {
       return formatDistance(new Date(dateString), new Date(), { addSuffix: true });
     } catch (e) {
       return 'recently';
     }
-  };
-
-  // Handle keyboard event listeners
-  useEffect(() => {
-    function keyboardWillShow(e: any) {
-      const keyboardHeight = e.endCoordinates.height;
-      setKeyboardHeight(keyboardHeight);
-      setIsKeyboardVisible(true);
-      
-      // Animate the position
-      Animated.timing(animatedPosition, {
-        toValue: -keyboardHeight,
-        duration: Platform.OS === 'ios' ? 250 : 100,
-        useNativeDriver: false,
-      }).start();
-      
-      // Scroll to bottom with a slight delay
-      setTimeout(() => {
-        if (scrollViewRef.current) {
-          scrollViewRef.current.scrollToEnd({ animated: true });
-        }
-      }, 250);
-    }
-
-    function keyboardWillHide() {
-      setIsKeyboardVisible(false);
-      setKeyboardHeight(0);
-      
-      // Animate back to original position
-      Animated.timing(animatedPosition, {
-        toValue: 0,
-        duration: Platform.OS === 'ios' ? 250 : 100,
-        useNativeDriver: false,
-      }).start();
-    }
-    
-    // Platform specific listeners
-    const keyboardWillShowListener = Platform.OS === 'ios' 
-      ? Keyboard.addListener('keyboardWillShow', keyboardWillShow)
-      : Keyboard.addListener('keyboardDidShow', keyboardWillShow);
-      
-    const keyboardWillHideListener = Platform.OS === 'ios'
-      ? Keyboard.addListener('keyboardWillHide', keyboardWillHide)
-      : Keyboard.addListener('keyboardDidHide', keyboardWillHide);
-    
-    return () => {
-      keyboardWillShowListener.remove();
-      keyboardWillHideListener.remove();
-    };
-  }, [animatedPosition]);
+  }, []);
 
   if (isLoading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
+    return <View style={styles.centered}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
   }
 
   if (error) {
@@ -191,56 +229,64 @@ export default function CommentsTab() {
     );
   }
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.scrollView}
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingBottom: isKeyboardVisible ? keyboardHeight + 80 : 100 }
-          ]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {comments && comments.length > 0 ? (
-            comments.map((comment) => (
-              <View key={comment.id} style={styles.commentItem}>
-                <View style={styles.commentHeader}>
-                  {comment.avatar_url ? (
-                    <Image 
-                      source={{ uri: comment.avatar_url }} 
-                      style={styles.avatar} 
-                    />
-                  ) : (
-                    <View style={styles.avatarPlaceholder}>
-                      <Feather name="user" size={16} color={COLORS.primary} />
-                    </View>
-                  )}
-                  <View style={styles.commentInfo}>
-                    <Text style={styles.username}>{comment.username || 'Anonymous'}</Text>
-                    <Text style={styles.timestamp}>{formatCommentDate(comment.created_at)}</Text>
-                  </View>
-                </View>
-                <Text style={styles.commentText}>{comment.comment_text}</Text>
-              </View>
-            ))
-          ) : (
-            <View style={styles.emptyState}>
-              <Feather name="message-circle" size={24} color={COLORS.textSecondary} />
-              <Text style={styles.emptyText}>No comments yet. Be the first to comment!</Text>
-            </View>
-          )}
-        </ScrollView>
+  // Create a clickable comment item that focuses the input on press
+  const renderCommentItem = (comment: Comment) => (
+    <TouchableOpacity 
+      key={`comment-${recipeId}-${comment.id || Math.random().toString()}`}
+      onPress={handleCommentPress}
+      activeOpacity={0.8}
+    >
+      <CommentItem
+        comment={comment}
+        formatCommentDate={formatCommentDate}
+      />
+    </TouchableOpacity>
+  );
 
-        {/* Input field with animated position */}
-        <Animated.View style={[
+  return (
+    <View style={styles.container}>
+      {/* Scrollable Comments Section */}
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.scrollView}
+        contentContainerStyle={styles.commentsContainer}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {comments.length === 0 ? (
+          <EmptyComments />
+        ) : (
+          <>
+            {visibleComments.map(renderCommentItem)}
+            
+            {comments.length > VISIBLE_COMMENTS_COUNT && !showAllComments && (
+              <TouchableOpacity 
+                style={styles.viewAllButton} 
+                onPress={handleViewAllComments}
+              >
+                <Text style={styles.viewAllText}>
+                  View all {comments.length} comments
+                </Text>
+              </TouchableOpacity>
+            )}
+            
+            {/* Extra space at the bottom to prevent the comment input from covering content */}
+            <View style={{ height: 80 }} />
+          </>
+        )}
+      </ScrollView>
+
+      {/* Fixed comment input field - uses absolute positioning to stay at bottom */}
+      <View 
+        style={[
+          styles.inputWrapper, 
+          // Adjust position when keyboard is visible
+          isKeyboardVisible && { bottom: Platform.OS === 'ios' ? keyboardHeight : 0 }
+        ]}
+      >
+        <View style={[
           styles.inputContainer,
-          { 
-            transform: [{ translateY: animatedPosition }],
-            borderTopColor: isKeyboardVisible ? COLORS.primary : COLORS.border, 
-          }
+          { borderTopColor: isKeyboardVisible ? COLORS.primary : COLORS.border }
         ]}>
           <TextInput
             ref={inputRef}
@@ -250,13 +296,6 @@ export default function CommentsTab() {
             onChangeText={setCommentText}
             multiline={true}
             maxLength={500}
-            onFocus={() => {
-              if (scrollViewRef.current) {
-                setTimeout(() => {
-                  scrollViewRef.current?.scrollToEnd({ animated: true });
-                }, 100);
-              }
-            }}
           />
           <TouchableOpacity 
             style={[
@@ -272,45 +311,42 @@ export default function CommentsTab() {
               <Feather name="send" size={18} color="#fff" />
             )}
           </TouchableOpacity>
-        </Animated.View>
+        </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: COLORS.white || '#fff',
-  },
   container: {
     flex: 1,
     backgroundColor: COLORS.white || '#fff',
+    position: 'relative', // Important for absolute positioning of child components
+  },
+  scrollView: {
+    flex: 1,
+  },
+  commentsContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 10,
+    paddingBottom: 20,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: COLORS.white || '#fff',
+    paddingVertical: 30,
   },
   errorText: {
     color: COLORS.error || 'red',
     fontSize: 16,
     textAlign: 'center',
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 20,
-  },
   emptyState: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 60,
+    justifyContent: 'center',
+    paddingVertical: 30,
   },
   emptyText: {
     marginTop: 12,
@@ -366,29 +402,43 @@ const styles = StyleSheet.create({
     color: COLORS.text || '#333',
     paddingLeft: 44, // Align with username
   },
-  inputContainer: {
+  viewAllButton: {
+    padding: 12,
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  viewAllText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.primary || '#00796b',
+  },
+  inputWrapper: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
+    width: '100%',
+    backgroundColor: COLORS.white,
+    zIndex: 999, // Ensure it's above other elements
+  },
+  inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderTopWidth: 2,
+    borderTopWidth: 1,
     backgroundColor: COLORS.white || '#ffffff',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 16,
-    zIndex: 1000,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 8,
   },
   input: {
     flex: 1,
     backgroundColor: '#f0f0f0',
     borderRadius: 20,
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     fontSize: 15,
     maxHeight: 100,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { useRecipeDetails } from '../../hooks/useRecipeDetails';
 import { COLORS } from '../../constants/theme';
@@ -22,15 +22,11 @@ export default function StepsTab() {
   );
 
   return (
-    <ScrollView 
-      style={styles.scrollViewStyle}
-      contentContainerStyle={styles.scrollContentContainer}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={styles.container}>
       {cleanedSteps.length > 0 ? (
         <View style={styles.stepsListContainer}>
           {cleanedSteps.map((step, idx) => (
-            <View key={idx} style={styles.stepContainer}>
+            <View key={`${recipeId}-step-${idx}-${step.substring(0, 10)}`} style={styles.stepContainer}>
               <Text style={styles.stepNumber}>{`${idx + 1}.`}</Text>
               <Text style={styles.stepText}>{step}</Text>
             </View>
@@ -41,29 +37,25 @@ export default function StepsTab() {
           <Text style={styles.infoText}>No preparation steps available for this recipe.</Text>
         </View>
       )}
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollViewStyle: {
-    flex: 1,
+  container: {
     backgroundColor: COLORS.white || '#fff',
-  },
-  scrollContentContainer: {
-    flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 20,
-    paddingBottom: 40,
+    paddingBottom: 30,
   },
   stepsListContainer: {
     paddingBottom: 24, 
   },
   centered: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: COLORS.white || '#fff',
+    padding: 30,
   },
   errorText: {
     color: COLORS.error || 'red',
@@ -90,7 +82,6 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   centeredFeedback: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 50,

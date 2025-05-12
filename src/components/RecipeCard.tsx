@@ -1,12 +1,15 @@
 // RecipeCard component implementation will go here
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, DimensionValue, Image } from 'react-native';
+import { View, Text, StyleSheet, DimensionValue, Image, TouchableWithoutFeedback } from 'react-native';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useQueryClient } from '@tanstack/react-query';
 import ActionOverlay from './ActionOverlay';
 import { RecipeItem } from '../types'; // Import from central types
 import { MainStackParamList } from '../navigation/types'; // Import MainStackParamList
+import { prefetchRecipeDetails } from '../hooks/useRecipeDetails';
+import { useAuth } from '../providers/AuthProvider';
 
 // Remove local interface definition
 // interface RecipeItem { ... }
@@ -23,7 +26,10 @@ type RecipeCardNavigationProp = NativeStackNavigationProp<MainStackParamList, 'R
 export default function RecipeCard({ item, isActive, containerHeight }: RecipeCardProps) {
   const videoRef = useRef<Video>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isPrefetched, setIsPrefetched] = useState(false);
   const navigation = useNavigation<RecipeCardNavigationProp>(); // Get navigation object
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   useEffect(() => {
     const videoElement = videoRef.current;
@@ -35,6 +41,13 @@ export default function RecipeCard({ item, isActive, containerHeight }: RecipeCa
     if (isActive) {
       if (isLoaded) {
         videoElement.playAsync().catch(e => console.error(`Play error for ${item.id}: ${e.message}`, e));
+        
+        // Prefetch data when video becomes active and visible
+        if (!isPrefetched && item.id) {
+          prefetchRecipeDetails(queryClient, item.id, user?.id)
+            .then(() => setIsPrefetched(true))
+            .catch(e => console.error(`Prefetch error for ${item.id}:`, e));
+        }
       } 
     } else { 
       if (isLoaded) { 
@@ -51,7 +64,7 @@ export default function RecipeCard({ item, isActive, containerHeight }: RecipeCa
         }).catch(e => console.error(`Cleanup getStatus error for ${item.id}: ${e.message}`, e));
       }
     };
-  }, [isActive, isLoaded, item.id]);
+  }, [isActive, isLoaded, item.id, isPrefetched, queryClient, user?.id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -102,6 +115,15 @@ export default function RecipeCard({ item, isActive, containerHeight }: RecipeCa
     setIsLoaded(false);
   }
 
+  // Handler for touch events to trigger prefetching
+  const handlePressIn = useCallback(() => {
+    if (item.id && !isPrefetched) {
+      prefetchRecipeDetails(queryClient, item.id, user?.id)
+        .then(() => setIsPrefetched(true))
+        .catch(e => console.error(`Prefetch error for ${item.id}:`, e));
+    }
+  }, [item.id, isPrefetched, queryClient, user?.id]);
+
   // Handler for navigating to detail screen
   const handleNavigateToDetail = async () => {
     console.log(`Navigating to RecipeDetail for ID: ${item.id}`);
@@ -125,53 +147,55 @@ export default function RecipeCard({ item, isActive, containerHeight }: RecipeCa
   };
 
   return (
-    <View style={[styles.container, containerStyle]}>
-      <Video
-        ref={videoRef}
-        source={{ uri: item.video }}
-        resizeMode={ResizeMode.COVER}
-        style={StyleSheet.absoluteFill}
-        isLooping
-        onLoad={handleLoad}
-        onError={handleError}
-        progressUpdateIntervalMillis={1000} 
-      />
-      
-      {/* New Combined Overlay Wrapper */}
-      <View style={styles.overlayWrapper}>
-        {/* Left Side: Text Info */}
-        <View style={styles.textInfoContainer}>
-          <View style={styles.creatorInfoContainer}>
-            {item.creatorAvatarUrl ? (
-              <Image 
-                source={{ uri: item.creatorAvatarUrl }}
-                style={styles.avatar}
-              />
-            ) : (
-              <View style={[styles.avatar, styles.avatarPlaceholder]} />
+    <TouchableWithoutFeedback onPressIn={handlePressIn}>
+      <View style={[styles.container, containerStyle]}>
+        <Video
+          ref={videoRef}
+          source={{ uri: item.video }}
+          resizeMode={ResizeMode.COVER}
+          style={StyleSheet.absoluteFill}
+          isLooping
+          onLoad={handleLoad}
+          onError={handleError}
+          progressUpdateIntervalMillis={1000} 
+        />
+        
+        {/* New Combined Overlay Wrapper */}
+        <View style={styles.overlayWrapper}>
+          {/* Left Side: Text Info */}
+          <View style={styles.textInfoContainer}>
+            <View style={styles.creatorInfoContainer}>
+              {item.creatorAvatarUrl ? (
+                <Image 
+                  source={{ uri: item.creatorAvatarUrl }}
+                  style={styles.avatar}
+                />
+              ) : (
+                <View style={[styles.avatar, styles.avatarPlaceholder]} />
+              )}
+              <Text style={styles.usernameText} numberOfLines={1}>{item.userName || 'Unknown User'}</Text>
+            </View>
+            <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+            {item.pantryMatchPct !== undefined && (
+              <Text style={styles.pantryMatch}>
+                {item.pantryMatchPct}% pantry match
+              </Text>
             )}
-            <Text style={styles.usernameText} numberOfLines={1}>{item.userName || 'Unknown User'}</Text>
           </View>
-          <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-          {item.pantryMatchPct !== undefined && (
-            <Text style={styles.pantryMatch}>
-              {item.pantryMatchPct}% pantry match
-            </Text>
+
+          {/* Right Side: Action Buttons */}
+          {item.onLike && item.onSave && (
+            // ActionOverlay is now positioned by flexbox (justifyContent: space-between)
+            <ActionOverlay 
+              item={item} 
+              onLike={item.onLike} 
+              onSave={item.onSave} 
+              onMorePress={handleNavigateToDetail}
+            />
           )}
         </View>
-
-        {/* Right Side: Action Buttons */}
-        {item.onLike && item.onSave && (
-          // ActionOverlay is now positioned by flexbox (justifyContent: space-between)
-          <ActionOverlay 
-            item={item} 
-            onLike={item.onLike} 
-            onSave={item.onSave} 
-            onMorePress={handleNavigateToDetail}
-          />
-        )}
       </View>
-    </View>
+    </TouchableWithoutFeedback>
   );
 }
 

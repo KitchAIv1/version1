@@ -9,8 +9,23 @@ import { AuthProvider } from './src/providers/AuthProvider';
 import { GroceryProvider } from './src/providers/GroceryProvider';
 import AppNavigator from './src/navigation/AppNavigator';
 
-// Create a client
-const queryClient = new QueryClient();
+// Create a client with optimized caching configuration
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Keep data fresh for 5 minutes by default
+      staleTime: 5 * 60 * 1000,
+      // Cache data for 30 minutes
+      gcTime: 30 * 60 * 1000,
+      // Retry failed requests 1 time
+      retry: 1,
+      // Use stale data while fetching new data
+      refetchOnMount: true,
+      // Don't refetch on window focus by default (reduces unnecessary network calls)
+      refetchOnWindowFocus: false,
+    }
+  }
+});
 
 export default function App() {
   return (

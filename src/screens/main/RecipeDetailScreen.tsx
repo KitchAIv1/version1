@@ -1,5 +1,5 @@
 // RecipeDetailScreen placeholder
-import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,11 @@ import {
   TouchableOpacity,
   Share,
   Alert,
-  ScrollView,
   Image,
+  ScrollView,
+  Animated,
+  LayoutChangeEvent,
+  StatusBar,
 } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
@@ -19,6 +22,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { NavigationState } from '@react-navigation/native';
 
 import { MainStackParamList } from '../../navigation/types';
 import { useRecipeDetails, RecipeDetailsData } from '../../hooks/useRecipeDetails';
@@ -32,6 +36,7 @@ import CommentsTab from '../recipe-detail-tabs/CommentsTab';
 import { supabase } from '../../services/supabase';
 import { useGroceryManager } from '../../hooks/useGroceryManager';
 import { COLORS } from '../../constants/theme';
+import FloatingTabBar from '../../components/FloatingTabBar';
 
 // Define route prop type
 type RecipeDetailScreenRouteProp = RouteProp<
@@ -42,7 +47,84 @@ type RecipeDetailScreenRouteProp = RouteProp<
 // Create Tab Navigator
 const Tab = createMaterialTopTabNavigator();
 
-const { height: screenHeight } = Dimensions.get('window');
+// Define tab routes constant (keep this outside the component function)
+const TAB_ROUTES = {
+  INGREDIENTS: 'Ingredients',
+  STEPS: 'Steps',
+  MACROS: 'Macros',
+  COMMENTS: 'Comments'
+};
+
+// Create custom Tab Navigator to handle scroll issues
+const CustomTabNavigator = ({ 
+  activeTab, 
+  setActiveTab, 
+  tabs, 
+  tabContent,
+  onTabChange
+}: { 
+  activeTab: string; 
+  setActiveTab: (tab: string) => void;
+  tabs: string[];
+  tabContent: React.ReactNode;
+  onTabChange?: (tab: string) => void;
+}) => {
+  const animatedValue = useRef(new Animated.Value(0)).current;
+  
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    if (onTabChange) onTabChange(tab);
+    
+    // Animate the tab transition
+    Animated.spring(animatedValue, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 50,
+      friction: 7
+    }).start(() => {
+      animatedValue.setValue(0);
+    });
+  };
+  
+  return (
+    <View style={styles.customTabContainer}>
+      <View style={styles.tabBarContainer}>
+        {tabs.map(tab => (
+          <TouchableOpacity 
+            key={`tab-${tab}`}
+            style={[styles.tabButton, activeTab === tab && styles.activeTabButton]} 
+            onPress={() => handleTabChange(tab)}
+          >
+            <Text style={[styles.tabButtonText, activeTab === tab && styles.activeTabButtonText]}>
+              {tab}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <Animated.View 
+        style={[
+          styles.tabContentContainer,
+          {
+            opacity: animatedValue.interpolate({
+              inputRange: [0, 0.5, 1],
+              outputRange: [1, 0.8, 1]
+            }),
+            transform: [{
+              scale: animatedValue.interpolate({
+                inputRange: [0, 0.5, 1],
+                outputRange: [1, 0.98, 1]
+              })
+            }]
+          }
+        ]}
+      >
+        {tabContent}
+      </Animated.View>
+    </View>
+  );
+};
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const HEADER_HEIGHT = screenHeight * 0.4; // 40% of screen height
 
 export default function RecipeDetailScreen() {
@@ -50,29 +132,73 @@ export default function RecipeDetailScreen() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const recipeId = route.params?.id;
-  const initialSeekTime = route.params?.initialSeekTime ?? 0; // Get initialSeekTime
+  const initialSeekTime = route.params?.initialSeekTime ?? 0;
   const videoRef = useRef<Video>(null);
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { groceryList } = useGroceryManager();
+  const scrollViewRef = useRef<ScrollView>(null);
+  
+  // Track original tab bar measurements
+  const tabBarRef = useRef<View>(null);
+  const [tabBarPosition, setTabBarPosition] = useState(0);
+  const [tabBarHeight, setTabBarHeight] = useState(0);
+  
+  // State for floating tab bar control with debouncing
+  const [shouldShowFloatingBar, setShouldShowFloatingBar] = useState(false);
+  const floatingTabBarVisible = useRef(new Animated.Value(0)).current;
+  const floatingBarAnimating = useRef(false);
+  
+  // Track tab content heights
+  const [tabContentHeights, setTabContentHeights] = useState<Record<string, number>>({
+    [TAB_ROUTES.INGREDIENTS]: 0,
+    [TAB_ROUTES.STEPS]: 0,
+    [TAB_ROUTES.MACROS]: 0,
+    [TAB_ROUTES.COMMENTS]: 0,
+  });
+  
+  const [currentScrollPosition, setCurrentScrollPosition] = useState(0);
 
   const [isMuted, setIsMuted] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [activeTab, setActiveTab] = useState(TAB_ROUTES.INGREDIENTS);
 
-  // Log IDs being used
-  // console.log(`RecipeDetailScreen: recipeId = ${recipeId}, userId = ${user?.id}`); // Reverted this line for now
+  // Debug logging helper for visibility changes
+  const logVisibilityChange = useRef(0);
 
-  // Fetch data
+  // Fetch recipe details
   const {
     data: recipeDetails,
     isLoading,
     error,
   } = useRecipeDetails(recipeId, user?.id);
-
-  // Log hook status
-  // console.log(`RecipeDetailScreen: useRecipeDetails status = ${status}, isLoading = ${isLoading}, error = ${error ? error.message : 'null'}, hasData = ${!!recipeDetails}`); // Reverted this line
-  // if (status === 'success' && recipeDetails) { // Reverted this line
-  //   console.log('RecipeDetailScreen: Received recipeDetails keys:', Object.keys(recipeDetails).join(', ')); // Reverted this line
-  // }
+  
+  // Measure tab bar position after render and when recipe details change
+  useEffect(() => {
+    if (!isLoading && recipeDetails) {
+      const measureTabBar = () => {
+        if (tabBarRef.current) {
+          tabBarRef.current.measure((x, y, width, height, pageX, pageY) => {
+            if (pageY > 0) {
+              setTabBarPosition(pageY);
+              setTabBarHeight(height);
+              console.log('Tab bar measured:', { position: pageY, height });
+            }
+          });
+        }
+      };
+      
+      // Measure after a delay to ensure layout is complete
+      const initialTimer = setTimeout(measureTabBar, 300);
+      
+      // Measure again after a longer delay as a backup
+      const backupTimer = setTimeout(measureTabBar, 1000);
+      
+      return () => {
+        clearTimeout(initialTimer);
+        clearTimeout(backupTimer);
+      };
+    }
+  }, [isLoading, recipeDetails]);
 
   // --- Optimistic updates for like/save --- 
   interface MutationContext {
@@ -84,11 +210,9 @@ export default function RecipeDetailScreen() {
       const { error } = await supabase.rpc('like_recipe', { recipe_id: recipeId }); 
       if (error) throw error; 
     },
-    // Optimistic update removed: backend does not provide per-user like state
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ['recipe', recipeId] });
       const previousDetails = queryClient.getQueryData<RecipeDetailsData>(['recipe', recipeId]);
-      // If backend adds per-user like state, optimistic update logic can be added here
       return { previousDetails };
     },
     onError: (_err, _vars, context) => {
@@ -105,11 +229,9 @@ export default function RecipeDetailScreen() {
       const { error } = await supabase.rpc('save_recipe', { recipe_id: recipeId }); 
       if (error) throw error; 
     },
-    // Optimistic update removed: backend does not provide per-user save state
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ['recipe', recipeId] });
       const previousDetails = queryClient.getQueryData<RecipeDetailsData>(['recipe', recipeId]);
-      // If backend adds per-user save state, optimistic update logic can be added here
       return { previousDetails };
     },
     onError: (_err, _vars, context) => {
@@ -123,7 +245,22 @@ export default function RecipeDetailScreen() {
   // --- End Optimistic Updates ---
 
   // --- Share Functionality ---
-  const handleShare = async () => { const shareUrl = recipeDetails?.video_url || 'https://yourapp.com'; try { const available = await Sharing.isAvailableAsync(); if (available) { await Sharing.shareAsync(shareUrl, { dialogTitle: `Check out this recipe: ${recipeDetails?.title || 'Recipe'}`, }); } else { Alert.alert('Sharing not available on this device'); } } catch (shareError: any) { console.error('Error sharing:', shareError); Alert.alert('Error', 'Could not share recipe.'); } };
+  const handleShare = async () => { 
+    const shareUrl = recipeDetails?.video_url || 'https://yourapp.com'; 
+    try { 
+      const available = await Sharing.isAvailableAsync(); 
+      if (available) { 
+        await Sharing.shareAsync(shareUrl, { 
+          dialogTitle: `Check out this recipe: ${recipeDetails?.title || 'Recipe'}`, 
+        }); 
+      } else { 
+        Alert.alert('Sharing not available on this device'); 
+      } 
+    } catch (shareError: any) { 
+      console.error('Error sharing:', shareError); 
+      Alert.alert('Error', 'Could not share recipe.'); 
+    } 
+  };
   // --- End Share ---
 
   // --- Video Player Logic ---
@@ -149,21 +286,21 @@ export default function RecipeDetailScreen() {
       console.error('Detail screen video load error:', status.error); 
     } 
   };
+  
   const toggleMute = () => { 
-    console.log('toggleMute called'); // Log 1: Function called
-    console.log('current isMuted state:', isMuted); // Log 2: Current state
     if (!videoRef.current) {
       console.error('toggleMute: videoRef.current is null or undefined');
       return; // Exit if no video ref
     }
     videoRef.current.setIsMutedAsync(!isMuted)
       .catch(e => console.error('setIsMutedAsync error:', e));
-    setIsMuted(prevMuted => {
-      console.log('Updating isMuted state from', prevMuted, 'to', !prevMuted); // Log 3: State update
-      return !prevMuted;
-    });
+    setIsMuted(prevMuted => !prevMuted);
   };
-  const handleError = (error: string) => { console.error(`RecipeDetailScreen ${recipeId}: Video onError event:`, error); setIsLoaded(false); }
+  
+  const handleError = (error: string) => { 
+    console.error(`RecipeDetailScreen ${recipeId}: Video onError event:`, error); 
+    setIsLoaded(false); 
+  };
   // --- End Video Player ---
 
   // Calculate pantry badge values using the same logic as IngredientsTab
@@ -177,8 +314,15 @@ export default function RecipeDetailScreen() {
       return recipeDetails.ingredients;
     }
   }, [recipeDetails]);
-  const matchedSet = React.useMemo(() => new Set((recipeDetails?.matched_ingredients || []).map(name => name.trim().toLowerCase())), [recipeDetails]);
-  const matchedCount = React.useMemo(() => ingredients.filter((ing: any) => matchedSet.has(ing.name?.trim().toLowerCase())).length, [ingredients, matchedSet]);
+  
+  const matchedSet = React.useMemo(() => 
+    new Set((recipeDetails?.matched_ingredients || []).map(name => name.trim().toLowerCase())), 
+    [recipeDetails]);
+    
+  const matchedCount = React.useMemo(() => 
+    ingredients.filter((ing: any) => matchedSet.has(ing.name?.trim().toLowerCase())).length, 
+    [ingredients, matchedSet]);
+    
   const totalCount = ingredients.length;
 
   // Prepare time information
@@ -186,20 +330,194 @@ export default function RecipeDetailScreen() {
   const cookTime = recipeDetails?.cook_time_minutes;
   const totalTime = (prepTime || 0) + (cookTime || 0);
 
+  // Comment button handler
+  const handleCommentPress = () => {
+    setActiveTab(TAB_ROUTES.COMMENTS);
+    
+    // Scroll down to show comments
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ y: HEADER_HEIGHT + 250, animated: true });
+    }, 100);
+  };
+  
+  // Handle tab content layout changes to measure their heights
+  const handleTabContentLayout = useCallback((tab: string, event: LayoutChangeEvent) => {
+    const { height } = event.nativeEvent.layout;
+    setTabContentHeights(prev => ({
+      ...prev,
+      [tab]: height
+    }));
+  }, []);
+
+  // Handle tab change to ensure proper scrolling
+  const handleTabChange = useCallback((tab: string) => {
+    // If we're already scrolled past the tab bar, adjust scroll position
+    if (currentScrollPosition > HEADER_HEIGHT + 250) {
+      scrollViewRef.current?.scrollTo({ 
+        y: HEADER_HEIGHT + 250, 
+        animated: true 
+      });
+    }
+  }, [currentScrollPosition]);
+  
+  // Handle scroll event to show/hide floating tab bar
+  const handleScroll = useCallback((event: any) => {
+    const scrollY = event.nativeEvent.contentOffset.y;
+    setCurrentScrollPosition(scrollY);
+    
+    // Log every 20th scroll position for debugging deep scrolling
+    if (Math.floor(scrollY) % 200 === 0) {
+      console.log(`Deep scroll check: scrollY=${scrollY.toFixed(0)}`);
+    }
+    
+    if (tabBarPosition > 0 && tabBarHeight > 0) {
+      // Original tab bar disappears from view calculation
+      // Account for device height to determine when tab bar is no longer visible
+      const windowHeight = Dimensions.get('window').height;
+      
+      // Calculate the bottom edge of the tab bar
+      const tabBarBottomPosition = tabBarPosition + tabBarHeight;
+      
+      // The point where the original tab bar's BOTTOM edge starts to exit the viewport
+      // We subtract a small buffer (20px) to show floating bar slightly before original disappears
+      const tabBarExitPoint = tabBarBottomPosition - windowHeight + 20;
+      
+      // Hide floating bar when very deep in content (user reading comments, etc.)
+      // Use a smaller threshold for the Comments tab specifically
+      const contentDeepPoint = tabBarBottomPosition + (activeTab === TAB_ROUTES.COMMENTS ? 150 : 600);
+      
+      // Show floating bar in the "middle zone" - after original tab bar exits viewport but before deep in content
+      const shouldShow = (scrollY > tabBarExitPoint) && (scrollY < contentDeepPoint);
+      
+      // Special handling for Comments tab - always hide when deep scrolling
+      if (activeTab === TAB_ROUTES.COMMENTS && scrollY > contentDeepPoint) {
+        if (shouldShowFloatingBar) {
+          setShouldShowFloatingBar(false);
+          console.log(`COMMENTS TAB OVERRIDE: Force hiding floating bar at scrollY=${scrollY.toFixed(0)}`);
+          Animated.timing(floatingTabBarVisible, {
+            toValue: 0,
+            duration: 150,
+            useNativeDriver: true
+          }).start();
+          return;
+        }
+      }
+      
+      // Force hide at deep scroll positions regardless of other conditions
+      if (scrollY > contentDeepPoint) {
+        // Ensure we hide the floating bar when scrolled deep
+        if (shouldShowFloatingBar) {
+          setShouldShowFloatingBar(false);
+          console.log(`FORCE HIDING at deep scroll: ${scrollY.toFixed(0)} > ${contentDeepPoint}`);
+          
+          // Immediately hide for deep scrolls
+          Animated.timing(floatingTabBarVisible, {
+            toValue: 0,
+            duration: 150,
+            useNativeDriver: true
+          }).start();
+        }
+        return; // Skip other logic when in deep scroll
+      }
+      
+      // Only animate if visibility state is changing
+      if (shouldShow !== shouldShowFloatingBar) {
+        setShouldShowFloatingBar(shouldShow);
+        console.log(`Visibility change: ${shouldShowFloatingBar} -> ${shouldShow}`);
+        console.log(`Scroll metrics: scrollY=${scrollY.toFixed(0)}, tabExit=${tabBarExitPoint.toFixed(0)}, contentDeep=${contentDeepPoint.toFixed(0)}`);
+        
+        // Use spring animation for more natural feel
+        if (shouldShow) {
+          // Show animation
+          floatingBarAnimating.current = true;
+          Animated.spring(floatingTabBarVisible, {
+            toValue: 1,
+            tension: 50,
+            friction: 7,
+            useNativeDriver: true
+          }).start(() => {
+            floatingBarAnimating.current = false;
+          });
+        } else {
+          // Hide animation - use timing for more predictable hiding
+          floatingBarAnimating.current = true;
+          Animated.timing(floatingTabBarVisible, {
+            toValue: 0,
+            duration: 150, 
+            useNativeDriver: true
+          }).start(() => {
+            floatingBarAnimating.current = false;
+          });
+        }
+      }
+    }
+  }, [shouldShowFloatingBar, floatingTabBarVisible, tabBarPosition, tabBarHeight, activeTab]);
+
+  // Render the active tab content
+  const renderTabContent = () => {
+    switch(activeTab) {
+      case TAB_ROUTES.INGREDIENTS:
+        return (
+          <View 
+            key="ingredients-tab"
+            onLayout={(e) => handleTabContentLayout(TAB_ROUTES.INGREDIENTS, e)}
+          >
+            <IngredientsTab />
+          </View>
+        );
+      case TAB_ROUTES.STEPS:
+        return (
+          <View 
+            key="steps-tab"
+            onLayout={(e) => handleTabContentLayout(TAB_ROUTES.STEPS, e)}
+          >
+            <StepsTab />
+          </View>
+        );
+      case TAB_ROUTES.MACROS:
+        return (
+          <View 
+            key="macros-tab"
+            onLayout={(e) => handleTabContentLayout(TAB_ROUTES.MACROS, e)}
+          >
+            <MacrosTab />
+          </View>
+        );
+      case TAB_ROUTES.COMMENTS:
+        return (
+          <View 
+            key="comments-tab"
+            onLayout={(e) => handleTabContentLayout(TAB_ROUTES.COMMENTS, e)}
+          >
+            <CommentsTab />
+          </View>
+        );
+      default:
+        return (
+          <View 
+            key="ingredients-tab-default"
+            onLayout={(e) => handleTabContentLayout(TAB_ROUTES.INGREDIENTS, e)}
+          >
+            <IngredientsTab />
+          </View>
+        );
+    }
+  };
+
   // --- Render Logic ---
   if (isLoading) {
-    // console.log('RecipeDetailScreen: Rendering Loading state'); // Reverted this line
     return (
       <View style={styles.centeredContainer}>
-        <ActivityIndicator size="large" />
+        <StatusBar barStyle="dark-content" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
   }
 
   if (error || !recipeDetails) {
-    // console.log(`RecipeDetailScreen: Rendering Error/NoData state (error: ${error ? error.message : 'null'}, !recipeDetails: ${!recipeDetails})`); // Reverted this line
     return (
       <View style={styles.centeredContainer}>
+        <StatusBar barStyle="dark-content" />
         <Text style={styles.errorText}>
           {error ? error : 'Could not load recipe details.'}
         </Text>
@@ -207,25 +525,13 @@ export default function RecipeDetailScreen() {
     );
   }
 
-  // console.log('RecipeDetailScreen: Rendering main content'); // Reverted this line
-  // Prepare item prop for ActionOverlay - ensure it conforms to RecipeItem where needed
-  const actionOverlayItemProps: RecipeItem & { likes?: number; saves?: number; liked?: boolean; saved?: boolean } = {
-    id: recipeDetails.recipe_id,
-    title: recipeDetails.title,
-    video: recipeDetails.video_url ?? '',
-    likes: recipeDetails.likes,
-    // No output_is_liked, output_is_saved, output_likes, etc.
-  };
-
-  const shareUrl = recipeDetails.video_url || 'https://yourapp.com';
-
   return (
-    // Using stickyHeaderIndices to attempt to keep tabs below header when scrolling
-    // Note: This might require specific styling or structure depending on exact behavior needed.
-    <ScrollView style={styles.screenContainer} showsVerticalScrollIndicator={false}>
-      {/* Header Section */}
+    <View style={styles.screenContainer}>
+      <StatusBar translucent backgroundColor="transparent" barStyle={currentScrollPosition > 50 ? "dark-content" : "light-content"} />
+      
+      {/* Fixed Video header */}
       <View style={styles.headerContainer}>
-        {recipeDetails.video_url ? (
+        {recipeDetails?.video_url ? (
           <Video
             ref={videoRef}
             source={{ uri: recipeDetails.video_url }}
@@ -250,7 +556,10 @@ export default function RecipeDetailScreen() {
         </TouchableOpacity>
 
         {/* Cart Icon with Badge - Placed top right */}
-        <TouchableOpacity style={styles.cartButtonContainer} onPress={() => navigation.navigate('MainTabs', { screen: 'GroceryList' })}> 
+        <TouchableOpacity 
+          style={styles.cartButtonContainer} 
+          onPress={() => navigation.navigate('MainTabs', { screen: 'GroceryList' })}
+        > 
           <Ionicons name="cart-outline" size={28} color={COLORS.white || '#FFF'} />
           {groceryList.length > 0 && (
             <View style={styles.badge}>
@@ -259,160 +568,195 @@ export default function RecipeDetailScreen() {
           )}
         </TouchableOpacity>
       </View>
+      
+      {/* Floating Tab Bar - appears when scrolled past original tab bar */}
+      <FloatingTabBar
+        tabs={Object.values(TAB_ROUTES)}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        visible={floatingTabBarVisible}
+      />
 
-      {/* NEW: Recipe Info Section (Title, Badge, Times) - Below video, above tabs */}
-      <View style={styles.recipeInfoSection}>
-        {/* Removed Author Info Row from ABOVE the title */}
+      {/* Scrollable Content Area */}
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { 
+            paddingBottom: activeTab === TAB_ROUTES.COMMENTS ? 0 : 80, // No extra padding for Comments tab
+          }
+        ]}
+        showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={[]} // Remove sticky header behavior
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        decelerationRate="fast"
+        snapToOffsets={undefined} // Remove snap behavior that causes sticking
+        snapToStart={false}
+        bounces={true}
+        overScrollMode="always"
+      >
+        {/* Recipe Info Section */}
+        <View style={styles.recipeInfoSection}>
+          <Text style={styles.recipeTitleText} numberOfLines={3} ellipsizeMode="tail">
+            {recipeDetails.title}
+          </Text>
 
-        <Text style={styles.recipeTitleText} numberOfLines={3} ellipsizeMode="tail">
-          {recipeDetails.title}
-        </Text>
+          {/* Author Info Row */}
+          {recipeDetails?.username && (
+            <View style={styles.authorInfoRow}>
+              {recipeDetails.avatar_url ? (
+                <Image 
+                  source={{ uri: recipeDetails.avatar_url }} 
+                  style={styles.authorAvatarImage}
+                />
+              ) : (
+                <View style={styles.authorAvatarPlaceholder}>
+                  <Ionicons name="person-outline" size={18} color={COLORS.primary || '#00796b'} />
+                </View>
+              )}
+              <Text style={styles.authorNameText}>
+                {recipeDetails.username || 'Unknown Author'}
+              </Text>
+            </View>
+          )}
 
-        {/* Moved Author Info Row BELOW the title */}
-        {recipeDetails?.username && (
-          <View style={styles.authorInfoRow}>
-            {recipeDetails.avatar_url ? (
-              <Image 
-                source={{ uri: recipeDetails.avatar_url }} 
-                style={styles.authorAvatarImage}
-              />
-            ) : (
-              <View style={styles.authorAvatarPlaceholder}>
-                <Ionicons name="person-outline" size={18} color={COLORS.primary || '#00796b'} />
-              </View>
-            )}
-            <Text style={styles.authorNameText}>
-              {recipeDetails.username || 'Unknown Author'}
+          {/* Pantry Badge Row */}
+          <View style={styles.pantryBadgeRow}>
+            <Ionicons name="restaurant-outline" style={styles.pantryBadgeIcon} />
+            <Text style={styles.pantryBadgeInfoText}>
+              {matchedCount}/{totalCount} Ingredients in pantry
             </Text>
           </View>
-        )}
 
-        {/* Subtle visual divider */}
-        <View style={styles.sectionDivider} />
+          {/* Time Info Row */}
+          <View style={styles.timeInfoRow}>
+            {prepTime !== null && <Text style={styles.timeDetailText}>Prep: {prepTime} min</Text>}
+            {cookTime !== null && <Text style={styles.timeDetailText}>Cook: {cookTime} min</Text>}
+            {totalTime > 0 && <Text style={styles.timeDetailText}>Total: {totalTime} min</Text>}
+          </View>
 
-        {/* NEW: Action Row (Like, Save, Comment, Share) */}
-        <View style={styles.actionRow}>
-          <TouchableOpacity 
-            style={styles.actionButton} 
-            onPress={() => likeMut.mutate()}
-          >
-            <Ionicons 
-              name="heart-outline" 
-              size={26} 
-              color={COLORS.primary} 
-            />
-            {recipeDetails.likes !== undefined && (
-              <Text style={styles.actionCount}>{recipeDetails.likes}</Text>
-            )}
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => saveMut.mutate()}
-          >
-            <Ionicons 
-              name="bookmark-outline" 
-              size={26} 
-              color={COLORS.primary}
-            />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => {
-              // Scroll to Comments tab via the Tab.Navigator
-              // This is a simplified approach - you may need to use a ref
-              // to the Tab.Navigator to programmatically switch tabs
-              if (recipeId) {
-                // Show the comments tab
-                // Note: Actual tab switching would require a ref to Tab.Navigator
-                // For now, we'll just log the intention
-                console.log('Navigate to Comments tab');
-              }
-            }}
-          >
-            <Ionicons 
-              name="chatbubble-outline" 
-              size={26} 
-              color={COLORS.primary}
-            />
-            {recipeDetails.comments_count !== undefined && (
-              <Text style={styles.actionCount}>{recipeDetails.comments_count}</Text>
-            )}
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={handleShare}
-          >
-            <Ionicons 
-              name="share-social-outline" 
-              size={26} 
-              color={COLORS.primary}
-            />
-          </TouchableOpacity>
+          {/* Divider before action row */}
+          <View style={[styles.sectionDivider, { marginTop: 16, marginBottom: 10 }]} />
+
+          {/* Action Row (Like, Save, Comment, Share) */}
+          <View style={styles.actionRow}>
+            <TouchableOpacity 
+              style={styles.actionButton} 
+              onPress={() => likeMut.mutate()}
+            >
+              <Ionicons 
+                name="heart-outline" 
+                size={26} 
+                color={COLORS.primary} 
+              />
+              {recipeDetails.likes !== undefined && (
+                <Text style={styles.actionCount}>{recipeDetails.likes}</Text>
+              )}
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => saveMut.mutate()}
+            >
+              <Ionicons 
+                name="bookmark-outline" 
+                size={26} 
+                color={COLORS.primary}
+              />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={handleCommentPress}
+            >
+              <Ionicons 
+                name="chatbubble-outline" 
+                size={26} 
+                color={COLORS.primary}
+              />
+              {recipeDetails.comments_count !== undefined && (
+                <Text style={styles.actionCount}>{recipeDetails.comments_count}</Text>
+              )}
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={handleShare}
+            >
+              <Ionicons 
+                name="share-social-outline" 
+                size={26} 
+                color={COLORS.primary}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
-        <View style={styles.pantryBadgeRow}>
-          <Ionicons name="restaurant-outline" style={styles.pantryBadgeIcon} />
-          <Text style={styles.pantryBadgeInfoText}>
-            {matchedCount}/{totalCount} Ingredients at pantry
-          </Text>
+        {/* Original Tab Navigator - Not sticky anymore */}
+        <View ref={tabBarRef} style={styles.tabNavigatorWrapper}>
+          <CustomTabNavigator 
+            activeTab={activeTab} 
+            setActiveTab={setActiveTab} 
+            tabs={Object.values(TAB_ROUTES)} 
+            tabContent={renderTabContent()}
+            onTabChange={handleTabChange}
+          />
         </View>
-        <View style={styles.timeInfoRow}>
-          {prepTime !== null && <Text style={styles.timeDetailText}>Prep: {prepTime} min</Text>}
-          {cookTime !== null && <Text style={styles.timeDetailText}>Cook: {cookTime} min</Text>}
-          {totalTime > 0 && <Text style={styles.timeDetailText}>Total: {totalTime} min</Text>}
-        </View>
-      </View>
-
-      {/* Tab Section - Wrapped in a View for sticky headers */}
-      {/* This View MUST NOT have flex: 1 if inside a ScrollView meant to scroll */}
-      <View style={styles.tabContainerWrapper}>
-        <Tab.Navigator
-          screenOptions={{
-            tabBarLabelStyle: { fontSize: 12, textTransform: 'capitalize' },
-            tabBarIndicatorStyle: { backgroundColor: COLORS.primary || '#00796b' }, 
-            tabBarStyle: { elevation: 0, shadowOpacity: 0, borderBottomWidth: 1, borderBottomColor: COLORS.border || '#eee' },
-            lazy: true, // Only render tabs when they become active
-            lazyPreloadDistance: 1, // Preload adjacent tabs
-          }}
-        >
-          <Tab.Screen 
-            name="Ingredients"
-            component={IngredientsTab} 
-            initialParams={{ id: recipeId }}
-          />
-          <Tab.Screen 
-            name="Steps" 
-            component={StepsTab} 
-            initialParams={{ id: recipeId }}
-          />
-          <Tab.Screen 
-            name="Macros" 
-            component={MacrosTab} 
-            initialParams={{ id: recipeId }}
-          />
-          <Tab.Screen 
-            name="Comments" 
-            component={CommentsTab} 
-            initialParams={{ id: recipeId }}
-          />
-        </Tab.Navigator>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screenContainer: { flex: 1, backgroundColor: COLORS.white || '#fff' },
-  centeredContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  errorText: { color: COLORS.error || 'red', textAlign: 'center' },
-  headerContainer: { height: HEADER_HEIGHT, backgroundColor: COLORS.black || '#000', position: 'relative', zIndex: 1 },
-  video: { ...StyleSheet.absoluteFillObject, zIndex: 0 },
-  videoPlaceholder: { justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.darkgray || '#222' },
-  muteButton: { position: 'absolute', top: 60, left: 15, zIndex: 12, padding: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20 },
-  cartButtonContainer: { position: 'absolute', top: 60, right: 15, zIndex: 12, padding: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20 },
+  screenContainer: {
+    flex: 1,
+    backgroundColor: COLORS.white || '#fff',
+  },
+  centeredContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: COLORS.error || 'red',
+    textAlign: 'center',
+  },
+  headerContainer: {
+    height: HEADER_HEIGHT,
+    backgroundColor: COLORS.black || '#000',
+    position: 'relative',
+    zIndex: 1,
+  },
+  video: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+  },
+  videoPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.darkgray || '#222',
+  },
+  muteButton: {
+    position: 'absolute',
+    top: 60,
+    left: 15,
+    zIndex: 12,
+    padding: 8,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 20,
+  },
+  cartButtonContainer: {
+    position: 'absolute',
+    top: 60,
+    right: 15,
+    zIndex: 12,
+    padding: 8,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 20,
+  },
   badge: {
     position: 'absolute',
     top: -4,
@@ -422,40 +766,50 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 2,
   },
-  badgeText: { color: COLORS.white || 'white', fontSize: 10, fontWeight: 'bold' },
-  actionOverlayPositioner: { position: 'absolute', bottom: 15, right: 0, zIndex: 11 },
+  badgeText: {
+    color: COLORS.white || 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
   recipeInfoSection: {
     backgroundColor: COLORS.white || '#fff',
     paddingHorizontal: 20,
     paddingVertical: 16,
+    paddingBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border || '#eee',
   },
   recipeTitleText: {
-    fontSize: 24, // Larger title
+    fontSize: 24,
     fontWeight: 'bold',
     color: COLORS.text || '#333',
-    marginBottom: 16, // Increased space below title (was 12)
-    textAlign: 'center', // Centered title
+    marginBottom: 16,
+    textAlign: 'center',
   },
   authorInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20, // Increased space below author row (was 12)
+    marginBottom: 16,
   },
-  authorAvatarImage: { // Style for actual image
-    width: 30, 
+  authorAvatarImage: {
+    width: 30,
     height: 30,
-    borderRadius: 15, 
+    borderRadius: 15,
     marginRight: 8,
   },
-  authorAvatarPlaceholder: { // Style for icon placeholder
-    width: 30, 
+  authorAvatarPlaceholder: {
+    width: 30,
     height: 30,
-    borderRadius: 15, 
+    borderRadius: 15,
     marginRight: 8,
-    backgroundColor: COLORS.surface || '#f0f0f0', 
+    backgroundColor: COLORS.surface || '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -470,7 +824,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20, // Increased from 16 for better separation from times
+    marginBottom: 16,
+    marginTop: 4,
   },
   pantryBadgeIcon: {
     fontSize: 18,
@@ -484,37 +839,32 @@ const styles = StyleSheet.create({
   },
   timeInfoRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around', // Space out time details
+    justifyContent: 'space-around',
     alignItems: 'center',
-    marginTop: 4, // Add a small top margin
+    marginTop: 4,
+    paddingBottom: 8,
   },
   timeDetailText: {
     color: COLORS.textSecondary || '#555',
     fontSize: 13,
     fontWeight: '500',
   },
-  tabContainerWrapper: {
-    minHeight: screenHeight * 0.6, // Use 60% of the screen height as minimum
-    backgroundColor: COLORS.white || '#fff',
-  },
-  // NEW: Add subtle divider styling
   sectionDivider: {
     height: 1,
     backgroundColor: COLORS.border || '#eaeaea',
-    marginHorizontal: 40, // Smaller than full width for subtle effect
+    marginHorizontal: 40,
     marginTop: 4,
     marginBottom: 16,
-    opacity: 0.7, // Subtle appearance
+    opacity: 0.7,
   },
-  // Action Row Styles
   actionRow: {
     flexDirection: 'row',
-    justifyContent: 'space-evenly', 
+    justifyContent: 'space-evenly',
     alignItems: 'center',
-    paddingVertical: 8, // Reduced from 12
-    marginBottom: 24, // Increased from 20 for more separation from pantry
-    // Remove bottom border since we have a divider below
-    borderBottomWidth: 0, // Changed from 1
+    paddingVertical: 6,
+    paddingBottom: 2,
+    marginBottom: 0,
+    borderBottomWidth: 0,
     borderColor: COLORS.border || '#eaeaea',
   },
   actionButton: {
@@ -522,13 +872,55 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 10, // Increased from 8
-    minWidth: 70, // Increased from 60 for more space
+    paddingVertical: 6,
+    minWidth: 70,
   },
   actionCount: {
-    marginLeft: 8, // Increased from 6
+    marginLeft: 8,
     fontSize: 14,
     fontWeight: '500',
     color: COLORS.textSecondary || '#666',
+  },
+  // Custom Tab Navigator
+  tabNavigatorWrapper: {
+    backgroundColor: COLORS.white,
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  customTabContainer: {
+    width: '100%',
+  },
+  tabBarContainer: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border || '#eaeaea',
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeTabButton: {
+    borderBottomWidth: 2,
+    borderBottomColor: COLORS.primary || '#00796b',
+  },
+  tabButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.textSecondary || '#666',
+    textTransform: 'capitalize',
+  },
+  activeTabButtonText: {
+    color: COLORS.primary || '#00796b',
+    fontWeight: '600',
+  },
+  tabContentContainer: {
+    // No padding/margin here since individual tab components have their own
   },
 }); 

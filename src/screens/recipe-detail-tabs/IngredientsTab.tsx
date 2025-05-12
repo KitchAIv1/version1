@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useState } from 'react';
-import { View, ScrollView, Text, ActivityIndicator, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRecipeDetails } from '../../hooks/useRecipeDetails';
 import { useAuth } from '../../providers/AuthProvider';
@@ -28,8 +28,6 @@ export default function IngredientsTab() {
       console.log('IngredientsTab - useRecipeDetails response for 5380a8c1-c8de-4e20-a7ed-1d9062a7916d:', {
         matched_ingredients: recipeDetails?.matched_ingredients,
         missing_ingredient_names: recipeDetails?.missing_ingredient_names,
-        // If you also have a raw missing_ingredients field from the hook, log it too:
-        // missing_ingredients_raw: recipeDetails?.missing_ingredients, 
         full_recipeDetails: recipeDetails ? { ...recipeDetails } : null // Log a shallow copy to see all fields if needed
       });
     }
@@ -90,101 +88,90 @@ export default function IngredientsTab() {
 
   return (
     <View key={`ingredients-tab-${forceRenderKey}`} style={styles.container} className="flex-1 bg-white">
-      <ScrollView 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <View style={styles.headerContainer}>
-          <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>
-              {totalIngredientsCount} Ingredients
-            </Text>
-          </View>
-        </View>
+      <View style={styles.headerContainer}>
+        <Text style={styles.headerTitle}>
+          {totalIngredientsCount} Ingredients
+        </Text>
+        
+        <Text style={styles.matchSummary}>
+          {matchedSet.size} available in your pantry
+        </Text>
+      </View>
 
-        {ingredients.length > 0 ? (
-          <View style={styles.ingredientsContainer}>
-            <View style={styles.ingredientsList}>
-              {ingredients.map((ing, index) => {
-                const ingName = ing.name?.trim().toLowerCase();
-                const matched = matchedSet.has(ingName);
-                const missing = missingSet.has(ingName);
-                return (
-                  <View 
-                    key={`ingredient-${ing.name}-${index}`} 
-                    style={[
-                      styles.ingredientRow,
-                      index === ingredients.length - 1 ? null : styles.ingredientBorder
-                    ]}
-                  >
-                    <IngredientRow
-                      ing={ing}
-                      matched={matched}
-                      missing={missing}
-                      {...(missing ? { onAddItem: handleAddSingleItemToGrocery } : {})}
-                    />
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-        ) : (
-          <View style={styles.emptyContainer}>
-            <Feather name="info" size={24} color="#6b7280" />
-            <Text style={styles.emptyText}>No ingredients listed for this recipe yet.</Text>
-          </View>
-        )}
-      </ScrollView>
+      {ingredients.length > 0 ? (
+        <View style={styles.ingredientsContainer}>
+          {ingredients.map((ing, index) => {
+            const ingName = ing.name?.trim().toLowerCase();
+            const matched = matchedSet.has(ingName);
+            const missing = missingSet.has(ingName);
+            return (
+              <View 
+                key={`ingredient-${recipeId}-${ing.name}-${index}`} 
+                style={[
+                  styles.ingredientCard,
+                  index === ingredients.length - 1 ? null : styles.cardMargin
+                ]}
+              >
+                <IngredientRow
+                  ing={ing}
+                  matched={matched}
+                  missing={missing}
+                  {...(missing ? { onAddItem: handleAddSingleItemToGrocery } : {})}
+                />
+              </View>
+            );
+          })}
+        </View>
+      ) : (
+        <View style={styles.emptyContainer}>
+          <Feather name="info" size={24} color="#6b7280" />
+          <Text style={styles.emptyText}>No ingredients listed for this recipe yet.</Text>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     backgroundColor: '#fff',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 40, // Smaller bottom padding - we'll use flexGrow to fill space
+    paddingHorizontal: 20,
+    paddingTop: 15,
+    paddingBottom: 20,
   },
   headerContainer: {
-    backgroundColor: '#f9fafb',
-    paddingTop: 24,
     paddingBottom: 16,
-    marginHorizontal: -24,
-    paddingHorizontal: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  headerTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1f2937',
-  },
-  ingredientsContainer: {
-    paddingTop: 16,
-    paddingBottom: 24,
-  },
-  ingredientsList: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  ingredientRow: {
-    paddingVertical: 4,
-  },
-  ingredientBorder: {
+    marginBottom: 8, 
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  matchSummary: {
+    fontSize: 15,
+    color: '#4b5563',
+    marginTop: 4,
+  },
+  ingredientsContainer: {
+    paddingTop: 8,
+    paddingBottom: 24,
+  },
+  ingredientCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2.5,
+    elevation: 2,
+  },
+  cardMargin: {
+    marginBottom: 12,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -198,10 +185,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   centered: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#fff',
+    paddingVertical: 40,
   },
   errorText: {
     color: 'red',
