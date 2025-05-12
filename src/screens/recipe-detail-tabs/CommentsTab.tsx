@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -6,10 +6,13 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Image
+  Image,
+  Keyboard,
+  Dimensions,
+  Animated,
+  SafeAreaView
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRoute } from '@react-navigation/native';
@@ -34,6 +37,11 @@ export default function CommentsTab() {
   const { user } = useAuth();
   const [commentText, setCommentText] = useState('');
   const queryClient = useQueryClient();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const inputRef = useRef<TextInput>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const animatedPosition = useRef(new Animated.Value(0)).current;
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   
   // Use React Query to fetch comments
   const {
@@ -116,6 +124,55 @@ export default function CommentsTab() {
     }
   };
 
+  // Handle keyboard event listeners
+  useEffect(() => {
+    function keyboardWillShow(e: any) {
+      const keyboardHeight = e.endCoordinates.height;
+      setKeyboardHeight(keyboardHeight);
+      setIsKeyboardVisible(true);
+      
+      // Animate the position
+      Animated.timing(animatedPosition, {
+        toValue: -keyboardHeight,
+        duration: Platform.OS === 'ios' ? 250 : 100,
+        useNativeDriver: false,
+      }).start();
+      
+      // Scroll to bottom with a slight delay
+      setTimeout(() => {
+        if (scrollViewRef.current) {
+          scrollViewRef.current.scrollToEnd({ animated: true });
+        }
+      }, 250);
+    }
+
+    function keyboardWillHide() {
+      setIsKeyboardVisible(false);
+      setKeyboardHeight(0);
+      
+      // Animate back to original position
+      Animated.timing(animatedPosition, {
+        toValue: 0,
+        duration: Platform.OS === 'ios' ? 250 : 100,
+        useNativeDriver: false,
+      }).start();
+    }
+    
+    // Platform specific listeners
+    const keyboardWillShowListener = Platform.OS === 'ios' 
+      ? Keyboard.addListener('keyboardWillShow', keyboardWillShow)
+      : Keyboard.addListener('keyboardDidShow', keyboardWillShow);
+      
+    const keyboardWillHideListener = Platform.OS === 'ios'
+      ? Keyboard.addListener('keyboardWillHide', keyboardWillHide)
+      : Keyboard.addListener('keyboardDidHide', keyboardWillHide);
+    
+    return () => {
+      keyboardWillShowListener.remove();
+      keyboardWillHideListener.remove();
+    };
+  }, [animatedPosition]);
+
   if (isLoading) {
     return (
       <View style={styles.centered}>
@@ -135,76 +192,97 @@ export default function CommentsTab() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={100}
-    >
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {comments && comments.length > 0 ? (
-          comments.map((comment) => (
-            <View key={comment.id} style={styles.commentItem}>
-              <View style={styles.commentHeader}>
-                {comment.avatar_url ? (
-                  <Image 
-                    source={{ uri: comment.avatar_url }} 
-                    style={styles.avatar} 
-                  />
-                ) : (
-                  <View style={styles.avatarPlaceholder}>
-                    <Feather name="user" size={16} color={COLORS.primary} />
-                  </View>
-                )}
-                <View style={styles.commentInfo}>
-                  <Text style={styles.username}>{comment.username || 'Anonymous'}</Text>
-                  <Text style={styles.timestamp}>{formatCommentDate(comment.created_at)}</Text>
-                </View>
-              </View>
-              <Text style={styles.commentText}>{comment.comment_text}</Text>
-            </View>
-          ))
-        ) : (
-          <View style={styles.emptyState}>
-            <Feather name="message-circle" size={24} color={COLORS.textSecondary} />
-            <Text style={styles.emptyText}>No comments yet. Be the first to comment!</Text>
-          </View>
-        )}
-      </ScrollView>
-
-      {/* Comment input section */}
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Add a comment..."
-          value={commentText}
-          onChangeText={setCommentText}
-          multiline={true}
-          maxLength={500}
-        />
-        <TouchableOpacity 
-          style={[
-            styles.postButton, 
-            !commentText.trim() && styles.disabledButton
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.scrollView}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: isKeyboardVisible ? keyboardHeight + 80 : 100 }
           ]}
-          onPress={handlePostComment}
-          disabled={!commentText.trim() || postCommentMutation.isPending}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          {postCommentMutation.isPending ? (
-            <ActivityIndicator size="small" color="#fff" />
+          {comments && comments.length > 0 ? (
+            comments.map((comment) => (
+              <View key={comment.id} style={styles.commentItem}>
+                <View style={styles.commentHeader}>
+                  {comment.avatar_url ? (
+                    <Image 
+                      source={{ uri: comment.avatar_url }} 
+                      style={styles.avatar} 
+                    />
+                  ) : (
+                    <View style={styles.avatarPlaceholder}>
+                      <Feather name="user" size={16} color={COLORS.primary} />
+                    </View>
+                  )}
+                  <View style={styles.commentInfo}>
+                    <Text style={styles.username}>{comment.username || 'Anonymous'}</Text>
+                    <Text style={styles.timestamp}>{formatCommentDate(comment.created_at)}</Text>
+                  </View>
+                </View>
+                <Text style={styles.commentText}>{comment.comment_text}</Text>
+              </View>
+            ))
           ) : (
-            <Feather name="send" size={18} color="#fff" />
+            <View style={styles.emptyState}>
+              <Feather name="message-circle" size={24} color={COLORS.textSecondary} />
+              <Text style={styles.emptyText}>No comments yet. Be the first to comment!</Text>
+            </View>
           )}
-        </TouchableOpacity>
+        </ScrollView>
+
+        {/* Input field with animated position */}
+        <Animated.View style={[
+          styles.inputContainer,
+          { 
+            transform: [{ translateY: animatedPosition }],
+            borderTopColor: isKeyboardVisible ? COLORS.primary : COLORS.border, 
+          }
+        ]}>
+          <TextInput
+            ref={inputRef}
+            style={styles.input}
+            placeholder="Add a comment..."
+            value={commentText}
+            onChangeText={setCommentText}
+            multiline={true}
+            maxLength={500}
+            onFocus={() => {
+              if (scrollViewRef.current) {
+                setTimeout(() => {
+                  scrollViewRef.current?.scrollToEnd({ animated: true });
+                }, 100);
+              }
+            }}
+          />
+          <TouchableOpacity 
+            style={[
+              styles.postButton, 
+              !commentText.trim() && styles.disabledButton
+            ]}
+            onPress={handlePostComment}
+            disabled={!commentText.trim() || postCommentMutation.isPending}
+          >
+            {postCommentMutation.isPending ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Feather name="send" size={18} color="#fff" />
+            )}
+          </TouchableOpacity>
+        </Animated.View>
       </View>
-    </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.white || '#fff',
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.white || '#fff',
@@ -227,7 +305,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 20,
-    paddingBottom: 16,
   },
   emptyState: {
     flex: 1,
@@ -290,23 +367,34 @@ const styles = StyleSheet.create({
     paddingLeft: 44, // Align with username
   },
   inputContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border || '#eee',
-    backgroundColor: COLORS.white || '#fff',
+    borderTopWidth: 2,
+    backgroundColor: COLORS.white || '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 16,
+    zIndex: 1000,
   },
   input: {
     flex: 1,
-    backgroundColor: COLORS.surface || '#f5f5f5',
+    backgroundColor: '#f0f0f0',
     borderRadius: 20,
     paddingVertical: 12,
     paddingHorizontal: 16,
     fontSize: 15,
     maxHeight: 100,
     color: COLORS.text || '#333',
+    borderWidth: 1,
+    borderColor: COLORS.border || '#e0e0e0',
   },
   postButton: {
     marginLeft: 12,
