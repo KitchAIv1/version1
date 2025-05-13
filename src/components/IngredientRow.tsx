@@ -8,10 +8,11 @@ type Props = {
   matched: boolean;
   missing: boolean;
   isAdded?: boolean;
+  recipeName?: string | null;
   onAddItem?: (item: GroceryItemInput) => Promise<void>;
 };
 
-export default function IngredientRow({ ing, matched, missing, isAdded, onAddItem }: Props) {
+export default function IngredientRow({ ing, matched, missing, isAdded, recipeName, onAddItem }: Props) {
   const handleAddItem = async () => {
     if (!ing.name) {
       Alert.alert("Error", "Ingredient name is missing.");
@@ -21,6 +22,7 @@ export default function IngredientRow({ ing, matched, missing, isAdded, onAddIte
       item_name: ing.name,
       quantity: ing.qty ? parseFloat(ing.qty) : null,
       unit: ing.unit || null,
+      recipeName: recipeName,
     };
     if (isNaN(itemToAdd.quantity as number)) {
       itemToAdd.quantity = 1;

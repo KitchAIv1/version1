@@ -108,6 +108,7 @@ export default function IngredientsTab() {
                   matched={matched}
                   missing={missing}
                   isAdded={isEffectivelyAdded}
+                  recipeName={recipeDetails?.title}
                   {...(missing && !isInGroceryList ? { onAddItem: handleAddSingleItemToGrocery } : {})} 
                 />
               </View>

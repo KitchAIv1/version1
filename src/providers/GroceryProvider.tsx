@@ -10,6 +10,7 @@ export interface GroceryItem {
   quantity: number | null;
   unit: string | null;
   created_at?: string;
+  recipe_name?: string | null;
   is_checked?: boolean;
 }
 
@@ -17,6 +18,7 @@ export interface GroceryItemInput {
   item_name: string;
   quantity?: number | null;
   unit?: string | null;
+  recipeName?: string | null;
 }
 
 // --- Context Value Interface ---
@@ -125,12 +127,13 @@ export const GroceryProvider: React.FC<GroceryProviderProps> = ({ children }) =>
       setError("User ID not available to add grocery item.");
       throw new Error("User ID not available to add grocery item.");
     }
-    const { item_name, quantity, unit } = item;
+    const { item_name, quantity, unit, recipeName } = item;
     const itemPayload = {
       user_id: uid,
       item_name,
       quantity: quantity !== undefined ? quantity : 1,
       unit: unit !== undefined ? unit : 'units',
+      recipe_name: recipeName !== undefined ? recipeName : null,
       is_checked: false,
     };
     setIsLoading(true);

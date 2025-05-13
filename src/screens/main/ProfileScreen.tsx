@@ -7,8 +7,9 @@ import {
   ActivityIndicator,
   FlatList,
   StyleSheet,
+  Alert,
 } from 'react-native';
-import { useQuery, QueryKey } from '@tanstack/react-query';
+import { useQuery, QueryKey, useQueryClient } from '@tanstack/react-query';
 import { Tabs, MaterialTabBar } from 'react-native-collapsible-tab-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -117,7 +118,7 @@ const useProfile = () => {
 // -----------------------------------------------------------------------------
 // Components
 // -----------------------------------------------------------------------------
-const Header: React.FC<{ profile: ProfileData }> = ({ profile }) => {
+const Header: React.FC<{ profile: ProfileData; onMenuPress?: () => void }> = ({ profile, onMenuPress }) => {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
@@ -126,7 +127,7 @@ const Header: React.FC<{ profile: ProfileData }> = ({ profile }) => {
         <TouchableOpacity style={styles.iconBtn}>
           <Icon name="add-box" size={26} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.iconBtn}>
+        <TouchableOpacity style={styles.iconBtn} onPress={onMenuPress}>
           <Icon name="menu" size={26} color="#fff" />
         </TouchableOpacity>
       </View>
@@ -173,11 +174,45 @@ const Bio: React.FC<{ profile: ProfileData }> = ({ profile }) => (
 // Screen
 // -----------------------------------------------------------------------------
 export const ProfileScreen: React.FC = () => {
-  const { user } = useAuth(); // Get user here for handleEditProfilePress
+  const { user } = useAuth();
   const { data: profile, isLoading: profileLoading, isError: profileError } = useProfile();
   const [savedItems, setSavedItems] = React.useState<any[]>([]);
   const [activityItems, setActivityItems] = React.useState<any[]>([]);
   const navigation = useNavigation<ProfileNavigationProp>();
+  const queryClient = useQueryClient(); // Get query client instance
+
+  // --- Sign Out Handler ---
+  const handleSignOut = async () => {
+    Alert.alert(
+      "Sign Out",
+      "Are you sure you want to sign out?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Sign Out",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const { error } = await supabase.auth.signOut();
+              if (error) {
+                throw error;
+              }
+              // Clear cache AFTER successful sign out
+              queryClient.clear(); 
+              console.log('User signed out, navigating to Login');
+              // Navigate to Login screen - Ensure 'Login' is the correct route name
+              // If using nested navigators, might need navigation.navigate('AuthStack', { screen: 'Login' });
+              navigation.navigate('Login' as any); // Use 'as any' for now if type checking is complex
+            } catch (signOutError: any) {
+              console.error('Error signing out:', signOutError);
+              Alert.alert('Sign Out Failed', signOutError.message || 'Could not sign out. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+  // --- End Sign Out Handler ---
 
   if (profileLoading) return <Loader />;
   
@@ -205,7 +240,7 @@ export const ProfileScreen: React.FC = () => {
 
   const renderHeader = () => (
     <View>
-      <Header profile={profile} /> 
+      <Header profile={profile} onMenuPress={handleSignOut} /> 
       <AvatarRow profile={profile} postsCount={profile.videos?.length ?? 0} />
       <Bio profile={profile} />
       {/* Add Edit Profile Button */}
