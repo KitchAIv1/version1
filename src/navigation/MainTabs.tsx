@@ -44,7 +44,6 @@ const MainTabs = () => {
       <Tab.Screen name="Feed" component={FeedScreen} />
       <Tab.Screen name="Pantry" component={MyStockScreen} />
       {/* Discover, Create screens are fully removed for this test */}
-      <Tab.Screen name="Profile" component={ProfileScreen} />
       <Tab.Screen 
         name="GroceryList" 
         component={GroceryListScreen}
@@ -52,6 +51,7 @@ const MainTabs = () => {
           tabBarLabel: 'Grocery',
         }}
       />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, Text, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
 import { FlashList, ViewToken } from '@shopify/flash-list';
 import { useFeed } from '../../hooks/useFeed';
 import RecipeCard from '../../components/RecipeCard';
@@ -113,76 +113,57 @@ export default function FeedScreen() {
     },
   });
 
-  if (feedError) {
-    return (
-      <View style={styles.container} onLayout={handleContainerLayout}>
-        <Text style={styles.errorText}>Error loading feed: {feedError.message}</Text>
-      </View>
-    );
-  }
-
-  if (isLoading || containerHeight === null) {
-    return (
-      <View style={styles.container} onLayout={handleContainerLayout}>
-        <ActivityIndicator size="large" color="#FFFFFF" />
-      </View>
-    );
-  }
-  
-  if (!isLoading && itemsToRender.length === 0 && !feedError) {
-    return (
-      <View style={styles.container} onLayout={handleContainerLayout}>
-        <Text style={styles.emptyText}>No recipes found.</Text>
-      </View>
-    );
-  }
-
-  if (itemHeight <= 0 && itemsToRender.length > 0) {
-    return (
-      <View style={styles.container} onLayout={handleContainerLayout}>
-        <Text style={styles.errorText}>Container height not determined for list.</Text>
-        <ActivityIndicator size="large" color="#FFFFFF" />
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.container} onLayout={handleContainerLayout}>
-      {itemHeight > 0 && itemsToRender.length > 0 ? (
-        <View style={styles.flashListContainer}>
-          <FlashList<FeedItem>
-            data={itemsToRender}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item, index }) => (
-              <RecipeCard
-                item={{
-                  ...item,
-                  onLike: () => likeMut.mutate(item.id),
-                  onSave: () => saveMut.mutate(item.id),
-                }}
-                isActive={index === currentIndex}
-                containerHeight={itemHeight}
-              />
-            )}
-            estimatedItemSize={itemHeight}
-            pagingEnabled
-            disableIntervalMomentum
-            showsVerticalScrollIndicator={false}
-            viewabilityConfig={viewabilityConfig}
-            onViewableItemsChanged={onViewableItemsChanged}
-            extraData={currentIndex}
-          />
-        </View>
-      ) : (
-        <View style={styles.centeredMessageContainer}>
-          <Text style={styles.emptyText}>No feed items to display.</Text>
-        </View>
-      )}
-    </View>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="black" />
+      <View style={styles.container} onLayout={handleContainerLayout}>
+        {isLoading || containerHeight === null ? (
+          <ActivityIndicator size="large" color="#FFFFFF" />
+        ) : feedError ? (
+          <Text style={styles.errorText}>Error loading feed: {feedError.message}</Text>
+        ) : itemsToRender.length === 0 ? (
+          <Text style={styles.emptyText}>No recipes found.</Text>
+        ) : itemHeight <= 0 ? (
+          <View>
+            <Text style={styles.errorText}>Container height not determined for list.</Text>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+          </View>
+        ) : (
+          <View style={styles.flashListContainer}>
+            <FlashList<FeedItem>
+              data={itemsToRender}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item, index }) => (
+                <RecipeCard
+                  item={{
+                    ...item,
+                    onLike: () => likeMut.mutate(item.id),
+                    onSave: () => saveMut.mutate(item.id),
+                  }}
+                  isActive={index === currentIndex}
+                  containerHeight={itemHeight}
+                />
+              )}
+              estimatedItemSize={itemHeight}
+              pagingEnabled
+              disableIntervalMomentum
+              showsVerticalScrollIndicator={false}
+              viewabilityConfig={viewabilityConfig}
+              onViewableItemsChanged={onViewableItemsChanged}
+              extraData={currentIndex}
+            />
+          </View>
+        )}
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+    safeArea: {
+        flex: 1,
+        backgroundColor: 'black',
+    },
     container: {
         flex: 1,
         backgroundColor: 'black',
@@ -195,6 +176,7 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 16,
         textAlign: 'center',
+        padding: 20,
     },
     errorText: {
         color: 'red',

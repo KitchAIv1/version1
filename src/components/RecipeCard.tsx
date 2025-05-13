@@ -1,6 +1,6 @@
 // RecipeCard component implementation will go here
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, DimensionValue, Image, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, StyleSheet, DimensionValue, Image, TouchableWithoutFeedback, TouchableOpacity } from 'react-native';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -10,6 +10,8 @@ import { RecipeItem } from '../types'; // Import from central types
 import { MainStackParamList } from '../navigation/types'; // Import MainStackParamList
 import { prefetchRecipeDetails } from '../hooks/useRecipeDetails';
 import { useAuth } from '../providers/AuthProvider';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
 
 // Remove local interface definition
 // interface RecipeItem { ... }
@@ -160,38 +162,64 @@ export default function RecipeCard({ item, isActive, containerHeight }: RecipeCa
           progressUpdateIntervalMillis={1000} 
         />
         
-        {/* New Combined Overlay Wrapper */}
-        <View style={styles.overlayWrapper}>
-          {/* Left Side: Text Info */}
-          <View style={styles.textInfoContainer}>
-            <View style={styles.creatorInfoContainer}>
-              {item.creatorAvatarUrl ? (
-                <Image 
-                  source={{ uri: item.creatorAvatarUrl }}
-                  style={styles.avatar}
-                />
-              ) : (
-                <View style={[styles.avatar, styles.avatarPlaceholder]} />
-              )}
-              <Text style={styles.usernameText} numberOfLines={1}>{item.userName || 'Unknown User'}</Text>
-            </View>
-            <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-            {item.pantryMatchPct !== undefined && (
-              <Text style={styles.pantryMatch}>
-                {item.pantryMatchPct}% pantry match
-              </Text>
+        {/* Gradient overlay to make text more readable */}
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)']}
+          style={styles.gradient}
+        />
+        
+        {/* User info at top */}
+        <View style={styles.userInfoContainer}>
+          <TouchableOpacity 
+            style={styles.userTouchable}
+            // Removing navigation to Profile since it's not properly defined in the navigation types
+            // We'll leave the touchable for UI consistency
+          >
+            {item.creatorAvatarUrl ? (
+              <Image 
+                source={{ uri: item.creatorAvatarUrl }}
+                style={styles.avatar}
+              />
+            ) : (
+              <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                <Feather name="user" size={16} color="#ffffff" />
+              </View>
             )}
-          </View>
-
-          {/* Right Side: Action Buttons */}
+            <Text style={styles.usernameText} numberOfLines={1}>
+              {item.userName || 'Unknown User'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        
+        {/* Recipe info at bottom */}
+        <View style={styles.recipeInfoContainer}>
+          <TouchableOpacity 
+            style={styles.recipeTitleContainer} 
+            onPress={handleNavigateToDetail}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+            
+            {item.pantryMatchPct !== undefined && (
+              <View style={styles.pantryMatchContainer}>
+                <Feather name="check-circle" size={14} color="#22c55e" style={styles.matchIcon} />
+                <Text style={styles.pantryMatch}>
+                  {item.pantryMatchPct}% pantry match
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          
+          {/* Action overlay */}
           {item.onLike && item.onSave && (
-            // ActionOverlay is now positioned by flexbox (justifyContent: space-between)
-            <ActionOverlay 
-              item={item} 
-              onLike={item.onLike} 
-              onSave={item.onSave} 
-              onMorePress={handleNavigateToDetail}
-            />
+            <View style={styles.actionOverlayContainer}>
+              <ActionOverlay 
+                item={item} 
+                onLike={item.onLike} 
+                onSave={item.onSave} 
+                onMorePress={handleNavigateToDetail}
+              />
+            </View>
           )}
         </View>
       </View>
@@ -199,59 +227,103 @@ export default function RecipeCard({ item, isActive, containerHeight }: RecipeCa
   );
 }
 
-// Basic styling
+// Updated styling
 const styles = StyleSheet.create({
   container: {
     width: '100%' as DimensionValue,
     backgroundColor: 'black',
     overflow: 'hidden',
+    position: 'relative',
   },
-  overlayWrapper: { // New wrapper for all overlay content
+  gradient: {
     position: 'absolute',
-    bottom: 20,
-    left: 16,
-    right: 16,
-    zIndex: 10,
-    flexDirection: 'row',       // Arrange text and actions horizontally
-    justifyContent: 'space-between', // Push text left, actions right
-    alignItems: 'flex-end',     // Align items to the bottom of the wrapper
-    backgroundColor: 'rgba(0,0,0,0.6)', // Slightly darker background
-    padding: 12, 
-    borderRadius: 10, 
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '50%',
+    zIndex: 1,
   },
-  textInfoContainer: { // Container for left-side text elements
-    flexShrink: 1, // Allow text container to shrink if needed, prevent pushing actions off-screen
-    marginRight: 8, // Add some space between text and actions
+  userInfoContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 2,
+    paddingTop: 16,
+    paddingHorizontal: 16,
   },
-  creatorInfoContainer: {
+  userTouchable: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 20,
   },
   avatar: {
     width: 32,
     height: 32,
     borderRadius: 16,
     marginRight: 8,
-    backgroundColor: '#555',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   avatarPlaceholder: {
-    backgroundColor: '#444',
+    backgroundColor: 'rgba(100,100,100,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   usernameText: {
     color: 'white',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 'bold',
-    flexShrink: 1, // Allow username to shrink/wrap if long
+    flexShrink: 1,
+  },
+  recipeInfoContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 2,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  recipeTitleContainer: {
+    flex: 1,
+    marginRight: 16,
   },
   title: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  pantryMatchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  matchIcon: {
+    marginRight: 4,
   },
   pantryMatch: {
-    color: 'white',
-    fontSize: 14,
+    color: '#22c55e',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  actionOverlayContainer: {
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginBottom: 8,
   },
 }); 

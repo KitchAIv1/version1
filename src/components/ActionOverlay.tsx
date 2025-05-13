@@ -17,37 +17,73 @@ export default function ActionOverlay({ item, onLike, onSave, onMorePress }: Act
   const isSaved = item.saved === true;
 
   return (
-    <View className="items-center">
-      <TouchableOpacity onPress={onLike} className="items-center mb-6">
-        <AntDesign name={isLiked ? 'heart' : 'hearto'} size={38} color="#fff" />
+    <View style={styles.container}>
+      <TouchableOpacity onPress={onLike} style={styles.actionButton}>
+        <View style={styles.iconContainer}>
+          <AntDesign name={isLiked ? 'heart' : 'hearto'} size={30} color="#fff" />
+        </View>
         {/* Ensure item.likes is a number before rendering and cast to string */}
         {typeof item.likes === 'number' && (
-          <Text className="text-white mt-1 font-semibold">{String(item.likes)}</Text>
+          <Text style={styles.countText}>{String(item.likes)}</Text>
         )}
       </TouchableOpacity>
-      <TouchableOpacity onPress={onSave} className="items-center mb-6">
-        {/* Use fill prop for Feather bookmark when saved */}
-        <Feather
-          name="bookmark"
-          size={34}
-          color="#fff" // Always white outline
-          fill={isSaved ? '#fff' : 'none'} // Fill white when saved
-        />
+      
+      <TouchableOpacity onPress={onSave} style={styles.actionButton}>
+        <View style={styles.iconContainer}>
+          <Feather
+            name="bookmark"
+            size={28}
+            color="#fff" // Always white outline
+            // The fill prop doesn't work with Feather directly, so we need a different approach
+            style={isSaved ? styles.filledIcon : undefined}
+          />
+        </View>
         {/* Ensure item.saves is a number before rendering and cast to string */}
         {typeof item.saves === 'number' && (
-          <Text className="text-white mt-1 font-semibold">{String(item.saves)}</Text>
+          <Text style={styles.countText}>{String(item.saves)}</Text>
         )}
       </TouchableOpacity>
       
       {/* More Button (conditionally rendered) */}
       {onMorePress && (
-        <TouchableOpacity onPress={onMorePress} className="items-center">
-          <Feather name="more-horizontal" size={34} color="#fff" />
+        <TouchableOpacity onPress={onMorePress} style={styles.actionButton}>
+          <View style={styles.iconContainer}>
+            <Feather name="more-horizontal" size={28} color="#fff" />
+          </View>
         </TouchableOpacity>
       )}
     </View>
   );
 }
 
-// Remove StyleSheet for positioning
-// const styles = StyleSheet.create({ ... }); 
+const styles = StyleSheet.create({
+  container: {
+    alignItems: 'center',
+  },
+  actionButton: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  iconContainer: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  filledIcon: {
+    backgroundColor: '#fff',
+    color: '#000',
+    borderRadius: 2,
+  },
+  countText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  }
+}); 

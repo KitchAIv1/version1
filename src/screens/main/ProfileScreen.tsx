@@ -20,6 +20,7 @@ import { useNavigation } from '@react-navigation/native'; // Import useNavigatio
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // Import navigation type
 import { MainStackParamList } from '../../navigation/types'; // Import param list
 import { useAuth } from '../../providers/AuthProvider'; // Import useAuth
+import { Feather } from '@expo/vector-icons';
 
 // Define types for profile and post data
 interface VideoPostData { 
@@ -252,15 +253,18 @@ export const ProfileScreen: React.FC = () => {
     </View>
   );
 
-  // Update renderItem to use ProfileRecipeCard
+  // Update renderItem to use ProfileRecipeCard with navigation
   const renderProfileCardItem = ({ item }: { item: VideoPostData }) => (
-    <ProfileRecipeCard item={item} />
+    <ProfileRecipeCard 
+      item={item}
+      onPress={() => navigation.navigate('RecipeDetail', { id: item.recipe_id })} 
+    />
   );
 
   return (
     <Tabs.Container 
       renderHeader={renderHeader} 
-      headerHeight={320} // Adjust if needed after layout changes
+      headerHeight={320} 
       renderTabBar={props => (
         <MaterialTabBar
           {...props}
@@ -275,24 +279,29 @@ export const ProfileScreen: React.FC = () => {
         {profile.videos && profile.videos.length > 0 ? (
           <Tabs.FlatList
             data={profile.videos} 
-            numColumns={2} // Changed to 2 columns
+            numColumns={2}
             keyExtractor={(item) => item.recipe_id}
-            renderItem={renderProfileCardItem} // Use the new render function
-            contentContainerStyle={styles.listContentContainer} // Keep or adjust this style
+            renderItem={renderProfileCardItem} 
+            contentContainerStyle={styles.listContentContainer}
+            showsVerticalScrollIndicator={false}
+            initialNumToRender={6}
+            columnWrapperStyle={styles.columnWrapper} // Add column wrapper style for more control
           />
         ) : (
           <Empty label="No uploads yet" />
         )}
       </Tabs.Tab>
       <Tabs.Tab name="Saved" label={`Saved (${profile.saved_recipes?.length ?? 0})`}>
-        {/* Use Tabs.FlatList with ProfileRecipeCard for consistency */}
         {profile.saved_recipes && profile.saved_recipes.length > 0 ? (
           <Tabs.FlatList
             data={profile.saved_recipes} 
             numColumns={2} 
-            keyExtractor={(item) => item.recipe_id} // Use recipe_id
-            renderItem={renderProfileCardItem} // Reuse the same render item
-            contentContainerStyle={styles.listContentContainer} 
+            keyExtractor={(item) => item.recipe_id}
+            renderItem={renderProfileCardItem}
+            contentContainerStyle={styles.listContentContainer}
+            showsVerticalScrollIndicator={false}
+            initialNumToRender={6}
+            columnWrapperStyle={styles.columnWrapper} // Add column wrapper style for more control
           />
         ) : (
           <Empty label="No saved recipes yet" />
@@ -317,7 +326,15 @@ const ErrorMsg: React.FC<{ message: string }> = ({ message }) => (
   <View style={styles.center}><Text>{message}</Text></View>
 );
 const Empty: React.FC<{ label: string }> = ({ label }) => (
-  <View style={styles.center}><Text>{label}</Text></View>
+  <View style={styles.emptyContainer}>
+    <Feather name="book-open" size={48} color="#cbd5e1" style={styles.emptyIcon} />
+    <Text style={styles.emptyText}>{label}</Text>
+    <Text style={styles.emptySubText}>
+      {label.includes("uploads") 
+        ? "Share your culinary creations with the world."
+        : "Bookmark recipes you'd like to try later."}
+    </Text>
+  </View>
 );
 
 // -----------------------------------------------------------------------------
@@ -372,8 +389,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   listContentContainer: {
-    padding: 8, // Adjust overall padding for the grid
-    alignItems: 'center', // Center items if needed, or remove if using margins
+    paddingHorizontal: 6, // Match card margin for consistent spacing
+    paddingTop: 8,
+    paddingBottom: 24, // More bottom space
+  },
+  columnWrapper: {
+    justifyContent: 'space-around', // More evenly distributed cards
   },
   editButtonContainer: {
     paddingHorizontal: 16,
@@ -393,6 +414,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
     color: '#333',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  emptyIcon: {
+    marginBottom: 16,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  emptySubText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
   },
 });
 
