@@ -161,6 +161,7 @@ export default function RecipeDetailScreen() {
   const [isMuted, setIsMuted] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState(TAB_ROUTES.INGREDIENTS);
+  const [videoPlayerError, setVideoPlayerError] = useState<string | null>(null);
 
   // Debug logging helper for visibility changes
   const logVisibilityChange = useRef(0);
@@ -182,6 +183,12 @@ export default function RecipeDetailScreen() {
     error,
   } = useRecipeDetails(recipeId, user?.id);
   
+  // Effect to reset video error when video_url changes
+  useEffect(() => {
+    setVideoPlayerError(null); // Clear previous errors when new video data comes in
+    setIsLoaded(false); // Reset loaded state for the new video
+  }, [recipeDetails?.video_url]);
+
   // Measure tab bar position after render and when recipe details change
   useEffect(() => {
     if (!isLoading && recipeDetails) {
@@ -316,6 +323,7 @@ export default function RecipeDetailScreen() {
   
   const handleError = (error: string) => { 
     console.error(`RecipeDetailScreen ${recipeId}: Video onError event:`, error); 
+    setVideoPlayerError("Video playback failed. Please check your connection or try again later."); // Set user-friendly error
     setIsLoaded(false); 
   };
   // --- End Video Player ---
@@ -548,24 +556,41 @@ export default function RecipeDetailScreen() {
       
       {/* Fixed Video header */}
       <View style={styles.headerContainer}>
-        {recipeDetails?.video_url ? (
-          <Video
-            ref={videoRef}
-            source={{ uri: recipeDetails.video_url }}
-            style={styles.video}
-            resizeMode={ResizeMode.COVER}
-            isLooping
-            isMuted={isMuted}
-            shouldPlay // Autoplay
-            onLoad={handleLoad}
-            onError={handleError}
-            pointerEvents="none"
-          />
-        ) : (
-          <View style={[styles.video, styles.videoPlaceholder]}>
-            <Text style={{ color: '#ccc' }}>Video not available</Text>
-          </View>
-        )}
+        {(() => { // Immediately invoked function expression to allow logging & error display
+          if (videoPlayerError) {
+            return (
+              <View style={[styles.video, styles.videoPlaceholder]}>
+                <Ionicons name="alert-circle-outline" size={48} color="#FF9800" />
+                <Text style={styles.videoErrorText}>{videoPlayerError}</Text>
+              </View>
+            );
+          }
+          if (recipeDetails?.video_url) {
+            console.log("RecipeDetailScreen: Attempting to play video_url:", recipeDetails.video_url); 
+            return (
+              <Video
+                ref={videoRef}
+                source={{ uri: recipeDetails.video_url }}
+                style={styles.video}
+                resizeMode={ResizeMode.COVER}
+                isLooping
+                isMuted={isMuted}
+                shouldPlay // Autoplay
+                onLoad={handleLoad}
+                onError={handleError}
+                pointerEvents="none"
+              />
+            );
+          } else {
+            console.log("RecipeDetailScreen: video_url is not available."); 
+            return (
+              <View style={[styles.video, styles.videoPlaceholder]}>
+                <Ionicons name="videocam-off-outline" size={48} color="#ccc" />
+                <Text style={{ color: '#ccc' }}>Video not available</Text>
+              </View>
+            );
+          }
+        })()}
 
         {/* Header Overlays (Mute button, Pantry Match, Actions) */}
         <TouchableOpacity style={styles.muteButton} onPress={toggleMute}>
@@ -757,6 +782,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: COLORS.darkgray || '#222',
+  },
+  videoErrorText: {
+    color: '#FF9800',
+    marginTop: 10,
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
   muteButton: {
     position: 'absolute',

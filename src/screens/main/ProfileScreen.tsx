@@ -44,6 +44,13 @@ interface ProfileData {
 
 const ACTIVE_COLOR = '#22c55e'; // Defined active color
 
+// Props for Header component to include onAddPress
+interface HeaderProps {
+  profile: ProfileData;
+  onMenuPress?: () => void;
+  onAddPress?: () => void; // New prop for add button
+}
+
 // -----------------------------------------------------------------------------
 // Hooks (data)
 // -----------------------------------------------------------------------------
@@ -119,13 +126,13 @@ const useProfile = () => {
 // -----------------------------------------------------------------------------
 // Components
 // -----------------------------------------------------------------------------
-const Header: React.FC<{ profile: ProfileData; onMenuPress?: () => void }> = ({ profile, onMenuPress }) => {
+const Header: React.FC<HeaderProps> = ({ profile, onMenuPress, onAddPress }) => {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
       <Text style={styles.username}>{profile.username}</Text>
       <View style={styles.headerActions}>
-        <TouchableOpacity style={styles.iconBtn}>
+        <TouchableOpacity style={styles.iconBtn} onPress={onAddPress}>
           <Icon name="add-box" size={26} color="#fff" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.iconBtn} onPress={onMenuPress}>
@@ -181,6 +188,12 @@ export const ProfileScreen: React.FC = () => {
   const [activityItems, setActivityItems] = React.useState<any[]>([]);
   const navigation = useNavigation<ProfileNavigationProp>();
   const queryClient = useQueryClient(); // Get query client instance
+
+  // --- Navigation Handler for Add Recipe --- (New Handler)
+  const handleAddRecipePress = () => {
+    navigation.navigate('VideoRecipeUploader');
+  };
+  // --- End Navigation Handler for Add Recipe ---
 
   // --- Sign Out Handler ---
   const handleSignOut = async () => {
@@ -241,7 +254,7 @@ export const ProfileScreen: React.FC = () => {
 
   const renderHeader = () => (
     <View>
-      <Header profile={profile} onMenuPress={handleSignOut} /> 
+      <Header profile={profile} onMenuPress={handleSignOut} onAddPress={handleAddRecipePress} /> 
       <AvatarRow profile={profile} postsCount={profile.videos?.length ?? 0} />
       <Bio profile={profile} />
       {/* Add Edit Profile Button */}
