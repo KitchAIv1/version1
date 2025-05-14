@@ -57,10 +57,12 @@ export const fetchRecipeDetails = async (recipeId: string, userId?: string) => {
     throw new Error('Recipe not found');
   }
   
-  // Clean up preparation_steps (remove extra quotes and trim)
+  // Log raw and cleaned preparation steps for debugging
+  console.log(`[fetchRecipeDetails] Raw data.preparation_steps for recipe ${recipeId}:`, JSON.stringify(data.preparation_steps));
   const cleanedSteps = (data.preparation_steps || []).map(
     (step: string) => step.replace(/^"+|"+$/g, '').trim()
   );
+  console.log(`[fetchRecipeDetails] Cleaned preparation_steps for recipe ${recipeId}:`, JSON.stringify(cleanedSteps));
   
   // Return data including the new is_saved_by_user field (assuming RPC provides it)
   return {
@@ -108,8 +110,8 @@ export const fetchPantryMatch = async (recipeId: string, userId: string) => {
 export const prefetchRecipeDetails = async (queryClient: any, recipeId: string, userId?: string) => {
   // Prefetch recipe details
   await queryClient.prefetchQuery({
-    queryKey: ['recipeDetails', recipeId],
-    queryFn: () => fetchRecipeDetails(recipeId),
+    queryKey: ['recipeDetails', recipeId, userId],
+    queryFn: () => fetchRecipeDetails(recipeId, userId),
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
@@ -131,7 +133,9 @@ export const useRecipeDetails = (recipeId: string | undefined, userId?: string):
       {
         queryKey: ['recipeDetails', recipeId, userId], // Add userId to queryKey
         queryFn: () => fetchRecipeDetails(recipeId!, userId), // Pass userId here
-        enabled: !!recipeId, // Still enabled even if userId is missing, fetchRecipeDetails handles it
+        // Ensure query is enabled only when both recipeId and userId are available,
+        // because the RPC get_recipe_details(p_recipe_id, p_user_id) expects both.
+        enabled: !!recipeId && typeof userId !== 'undefined', 
         staleTime: 10 * 60 * 1000, 
         gcTime: 30 * 60 * 1000,
       },

@@ -6,6 +6,7 @@ import RecipeDetailScreen from '../screens/main/RecipeDetailScreen'; // Uncommen
 // import PantryScanningScreen from '../screens/pantry/PantryScanningScreen'; // Commented out
 import EditProfileScreen from '../screens/EditProfileScreen'; // Uncommented
 import VideoRecipeUploaderScreen from '../screens/recipe/VideoRecipeUploaderScreen';
+import EditRecipeScreen from '../screens/recipe/EditRecipeScreen'; // Import EditRecipeScreen
 import { MainStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -36,6 +37,14 @@ const MainStack = () => (
         headerShown: true,
         title: 'Upload Recipe',
       }}
+    />
+    <Stack.Screen 
+      name="EditRecipe" 
+      component={EditRecipeScreen} 
+      options={{ 
+        headerShown: true, 
+        title: 'Edit Recipe' // Default title, screen will override
+      }} 
     />
     {/* Add other stack screens like Settings here */}
   </Stack.Navigator>

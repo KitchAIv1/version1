@@ -16,6 +16,7 @@ type EditProfileRouteParams = {
   initialProfileData?: { 
     bio?: string | null;
     avatar_url?: string | null;
+    username?: string | null; // Add username to route params
   };
   userId?: string;
 };
@@ -43,13 +44,17 @@ const EditProfileScreen = ({ navigation, route }: any) => { // Using any tempora
       return;
     }
 
+    // Retrieve username from initialProfileData, with fallback
+    const usernameToUpdate = initialProfileData?.username || 'testuser@example.com';
+
     setSaving(true);
     try {
       // Call the RPC function to update the profile
       // Ensure the RPC 'update_profile' exists and accepts these parameters
       const { error } = await supabase.rpc('update_profile', {
-        avatar_url: avatarUrl, // Make sure param names match RPC definition
-        bio: bio,
+        p_avatar_url: avatarUrl, // Use p_ prefix
+        p_bio: bio,              // Use p_ prefix
+        p_username: usernameToUpdate, // Use p_ prefix
         // Pass p_user_id if the RPC needs it explicitly (often uses auth.uid() internally)
         // p_user_id: userId 
       });
@@ -58,7 +63,8 @@ const EditProfileScreen = ({ navigation, route }: any) => { // Using any tempora
 
       Alert.alert("Profile Updated", "Your profile has been saved.", [
         { text: "OK", onPress: () => {
-            queryClient.invalidateQueries({ queryKey: ['profile'] }); // Invalidate query
+            // Use the specific query key that ProfileScreen uses
+            queryClient.invalidateQueries({ queryKey: ['profile', userId] }); 
             navigation.goBack();
           } 
         },

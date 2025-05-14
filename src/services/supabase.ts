@@ -5,14 +5,13 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON;
 
-if (!supabaseUrl) {
-  console.warn('Supabase URL environment variable (EXPO_PUBLIC_SUPABASE_URL) is not set. Check your .env file.');
-  // Alert.alert('Configuration Error', 'Supabase URL is not configured. Please ensure EXPO_PUBLIC_SUPABASE_URL is set in your .env file.');
-}
+// Log the Supabase URL and Anon Key to verify them at runtime
+console.log('[SupabaseClient] Initializing with URL:', supabaseUrl);
+console.log('[SupabaseClient] Initializing with Anon Key (from EXPO_PUBLIC_SUPABASE_ANON):', supabaseAnonKey ? supabaseAnonKey.substring(0, 10) + '...' : 'undefined');
 
-if (!supabaseAnonKey) {
-  console.warn('Supabase Anon Key environment variable (EXPO_PUBLIC_SUPABASE_ANON) is not set. Check your .env file.');
-  // Alert.alert('Configuration Error', 'Supabase Anon Key is not configured. Please ensure EXPO_PUBLIC_SUPABASE_ANON is set in your .env file.');
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('[SupabaseClient] Supabase URL or Anon Key (EXPO_PUBLIC_SUPABASE_ANON) is missing. Check environment variables.');
+  // You might want to throw an error here or handle it in a way that alerts the developer
 }
 
 // The createClient function expects the URL and key to be strings.

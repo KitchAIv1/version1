@@ -34,8 +34,14 @@ export type EditProfileParams = {
   initialProfileData?: {
     bio?: string | null;
     avatar_url?: string | null;
+    username?: string | null;
   };
   userId?: string; // User ID might be needed if RPC doesn't use auth.uid()
+};
+
+// Params for EditRecipeScreen
+export type EditRecipeParams = {
+  recipeId: string;
 };
 
 // For the main application stack (after login)
@@ -46,6 +52,7 @@ export type MainStackParamList = {
   PantryScan: undefined; // Add PantryScan screen
   EditProfile: EditProfileParams; // Added EditProfile screen
   VideoRecipeUploader: undefined; // Add VideoRecipeUploader screen
+  EditRecipe: EditRecipeParams; // Add EditRecipe route
   // Add other stack screens here if needed (e.g., Settings)
 };
 

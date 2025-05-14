@@ -1,0 +1,469 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  ScrollView,
+  TouchableOpacity,
+  Switch,
+  Alert,
+  ActivityIndicator,
+  Image,
+  Platform,
+} from 'react-native';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { MainStackParamList } from '../../navigation/types'; // Adjust path as needed
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import * as ImagePicker from 'expo-image-picker';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../../services/supabase'; // Adjust path as needed
+import { useEditableRecipeDetails, RecipeEditableData, Ingredient } from '../../hooks/useEditableRecipeDetails'; // Adjust path
+import { decode } from 'base64-arraybuffer';
+import { useAuth } from '../../providers/AuthProvider'; // Import useAuth
+import * as FileSystem from 'expo-file-system'; // Import expo-file-system
+
+// Reusable CollapsibleCard (can be moved to a shared components folder)
+const CollapsibleCard: React.FC<{ title: string; children: React.ReactNode; defaultCollapsed?: boolean }> = ({ title, children, defaultCollapsed = false }) => {
+  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
+  return (
+    <View style={styles.cardContainer}>
+      <TouchableOpacity onPress={() => setIsCollapsed(!isCollapsed)} style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>{title}</Text>
+        <Icon name={isCollapsed ? "expand-more" : "expand-less"} size={24} color="#333" />
+      </TouchableOpacity>
+      {!isCollapsed && <View style={styles.cardContent}>{children}</View>}
+    </View>
+  );
+};
+
+// Available diet tags (can be imported from a constants file)
+const DIET_TAGS_OPTIONS = [
+  'Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 'Keto', 'Paleo', 'Low-Carb', 'High-Protein',
+];
+
+type EditRecipeScreenProps = NativeStackScreenProps<MainStackParamList, 'EditRecipe'>; // Assuming 'EditRecipe' is the route name
+
+const EditRecipeScreen: React.FC<EditRecipeScreenProps> = ({ route, navigation }) => {
+  const { recipeId } = route.params; // Get recipeId from navigation params
+  const queryClient = useQueryClient();
+  const { user } = useAuth(); // Get user from useAuth
+
+  const { data: initialRecipeData, isLoading: isLoadingDetails, isError: isErrorDetails, error: errorDetails } = useEditableRecipeDetails(recipeId);
+
+  // Form state
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [ingredients, setIngredients] = useState<Ingredient[]>([{ name: '', quantity: '', unit: '' }]);
+  const [preparationSteps, setPreparationSteps] = useState<string[]>(['']);
+  const [dietTags, setDietTags] = useState<string[]>([]);
+  const [prepTimeMinutes, setPrepTimeMinutes] = useState('');
+  const [cookTimeMinutes, setCookTimeMinutes] = useState('');
+  const [servings, setServings] = useState('');
+  const [isPublic, setIsPublic] = useState(true);
+  const [currentThumbnailUrl, setCurrentThumbnailUrl] = useState<string | null>(null);
+  const [newLocalThumbnailUri, setNewLocalThumbnailUri] = useState<string | null>(null);
+  
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0); // For thumbnail upload if needed
+
+  // --- Effect to populate form when initialRecipeData loads & set screen title --- 
+  useEffect(() => {
+    if (initialRecipeData) {
+      setTitle(initialRecipeData.title || '');
+      setDescription(initialRecipeData.description || '');
+      setIngredients(initialRecipeData.ingredients.length > 0 ? initialRecipeData.ingredients : [{ name: '', quantity: '', unit: '' }]);
+      setPreparationSteps(initialRecipeData.preparation_steps.length > 0 ? initialRecipeData.preparation_steps : ['']);
+      setDietTags(initialRecipeData.diet_tags || []);
+      setPrepTimeMinutes(initialRecipeData.prep_time_minutes?.toString() || '');
+      setCookTimeMinutes(initialRecipeData.cook_time_minutes?.toString() || '');
+      setServings(initialRecipeData.servings?.toString() || '');
+      setIsPublic(initialRecipeData.is_public);
+      setCurrentThumbnailUrl(initialRecipeData.thumbnail_url);
+      setNewLocalThumbnailUri(null); // Reset any previously selected new thumbnail
+
+      // Set dynamic screen title
+      if (initialRecipeData.title) {
+        navigation.setOptions({ title: `Editing: ${initialRecipeData.title}` });
+      } else {
+        navigation.setOptions({ title: 'Edit Recipe' }); // Fallback title
+      }
+    }
+  }, [initialRecipeData, navigation]);
+
+  // --- Handlers for Ingredients (similar to VideoUploaderScreen) ---
+  const handleIngredientChange = (index: number, field: keyof Ingredient, value: string) => {
+    const newIngredients = [...ingredients];
+    newIngredients[index] = { ...newIngredients[index], [field]: value };
+    setIngredients(newIngredients);
+  };
+  const handleAddIngredient = () => setIngredients([...ingredients, { name: '', quantity: '', unit: '' }]);
+  const handleRemoveIngredient = (indexToRemove: number) => {
+    if (ingredients.length === 1) {
+      setIngredients([{ name: '', quantity: '', unit: '' }]);
+      return;
+    }
+    setIngredients(ingredients.filter((_, index) => index !== indexToRemove));
+  };
+
+  // --- Handlers for Preparation Steps (similar to VideoUploaderScreen) ---
+  const handleStepChange = (index: number, value: string) => {
+    const newSteps = [...preparationSteps];
+    newSteps[index] = value;
+    setPreparationSteps(newSteps);
+  };
+  const handleAddStep = () => setPreparationSteps([...preparationSteps, '']);
+  const handleRemoveStep = (indexToRemove: number) => {
+    if (preparationSteps.length === 1) {
+      setPreparationSteps(['']);
+      return;
+    }
+    setPreparationSteps(preparationSteps.filter((_, index) => index !== indexToRemove));
+  };
+
+  // --- Handler for Diet Tags ---
+  const handleTagToggle = (tag: string) => {
+    setDietTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  };
+
+  // --- Handler for Thumbnail Selection ---
+  const handleSelectThumbnail = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Camera roll permission is needed to select a thumbnail.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: 'images',
+      allowsEditing: true,
+      aspect: [16, 9], // Or your desired aspect ratio for thumbnails
+      quality: 0.8,
+      base64: true, // Request base64 for upload
+    });
+
+    if (!result.canceled && result.assets && result.assets[0]) {
+      setNewLocalThumbnailUri(result.assets[0].uri);
+      setCurrentThumbnailUrl(result.assets[0].uri); // Show local URI immediately for preview
+    }
+  };
+
+  // --- Main Save Function ---
+  const handleSaveRecipe = async () => {
+    if (!initialRecipeData) {
+      Alert.alert('Error', 'Original recipe data not loaded.');
+      return;
+    }
+    if (!title.trim()) {
+      Alert.alert('Validation Error', 'Please enter a recipe title.');
+      return;
+    }
+    // Add more validations for other fields as needed (e.g., times, servings, ingredients, steps)
+
+    setIsUpdating(true);
+    setUploadProgress(0);
+    let finalThumbnailUrl = currentThumbnailUrl; // Start with the existing or initially set thumbnail
+
+    try {
+      // --- REMOVING Diagnostic Step: Check if bucket is accessible (client now seems to init correctly) ---
+      // try {
+      //   console.log("[EditRecipeScreen] Attempting to get details for bucket: recipe-thumbnails");
+      //   const { data: bucketData, error: bucketError } = await supabase
+      //     .storage
+      //     .getBucket('recipe-thumbnails');
+      // 
+      //   if (bucketError) {
+      //     console.error("[EditRecipeScreen] Error fetching bucket details:", JSON.stringify(bucketError, null, 2));
+      //   } else {
+      //     console.log("[EditRecipeScreen] Successfully fetched bucket details:", JSON.stringify(bucketData, null, 2));
+      //   }
+      // } catch (e:any) {
+      //   console.error("[EditRecipeScreen] Exception during getBucket test:", e.message);
+      // }
+      // --- End REMOVING Diagnostic Step ---
+
+      // 1. Upload new thumbnail if one was selected
+      if (newLocalThumbnailUri && newLocalThumbnailUri !== initialRecipeData.thumbnail_url) {
+        const localUri = newLocalThumbnailUri;
+        const fileExt = localUri.split('.').pop()?.toLowerCase() || 'jpg';
+        const fileName = `recipe-thumbnails/${initialRecipeData.recipe_id}/${Date.now()}.${fileExt}`;
+        const contentType = `image/${fileExt}`;
+
+        console.log(`Uploading new thumbnail: ${fileName}`);
+        setUploadProgress(0.1);
+
+        // Read file as base64 (similar to useVideoUploader or AvatarEditorAndBio)
+        const response = await fetch(localUri);
+        const blob = await response.blob(); 
+        // For Supabase, often direct ArrayBuffer or FormData is preferred over base64 string for upload.
+        // If using base64 string, use FileSystem.readAsStringAsync(localUri, { encoding: FileSystem.EncodingType.Base64 });
+        // then decode using base64-arraybuffer for supabase.storage.upload.
+        // For simplicity here, assuming blob upload (adjust if using base64 string method)
+
+        // TODO: Refactor this part to use a robust base64/ArrayBuffer upload like in useVideoUploader
+        // For now, placeholder for direct blob upload if supported by your Supabase client version or specific setup
+        // The example below assumes a direct `decode(base64)` approach might be used after reading as base64 string
+        
+        let fileDataForUpload: ArrayBuffer;
+        if (Platform.OS === 'web') { // FormData approach for web
+           const formData = new FormData();
+           formData.append('file', blob);
+           // Note: Supabase might require direct ArrayBuffer for non-form-data uploads
+           // This part is highly dependent on the exact upload method chosen
+           // For now, let's assume we will get an ArrayBuffer for consistency
+           const arrBuffer = await blob.arrayBuffer();
+           fileDataForUpload = arrBuffer; // Placeholder
+        } else {
+             // For mobile, fetch and convert to ArrayBuffer or use FileSystem.readAsStringAsync for base64
+            const base64 = await convertUriToBase64(localUri);
+            fileDataForUpload = decode(base64);
+        }
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('recipe_thumbnails') // Assuming a dedicated bucket or a path in an existing one
+          .upload(fileName, fileDataForUpload, { contentType, upsert: true }); // Upsert true to overwrite if same path (e.g. user re-uploads for same recipe)
+
+        setUploadProgress(0.5);
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage.from('recipe_thumbnails').getPublicUrl(fileName);
+        finalThumbnailUrl = publicUrlData.publicUrl;
+        console.log('New thumbnail uploaded:', finalThumbnailUrl);
+      }
+
+      // 2. Prepare data for RPC call
+      const updatedRecipePayload = {
+        p_recipe_id: initialRecipeData.recipe_id,
+        p_title: title.trim(),
+        p_description: description.trim(),
+        p_video_url: initialRecipeData.video_url, // Pass original video URL as it's not changed here
+        p_thumbnail_url: finalThumbnailUrl,
+        p_ingredients: ingredients.filter(ing => ing.name.trim() !== ''), // Clean empty ingredients
+        p_diet_tags: dietTags,
+        p_preparation_steps: preparationSteps.filter(step => step.trim() !== ''), // Clean empty steps
+        p_prep_time_minutes: parseInt(prepTimeMinutes) || null,
+        p_cook_time_minutes: parseInt(cookTimeMinutes) || null,
+        p_servings: parseInt(servings) || null,
+        p_is_public: isPublic,
+      };
+      console.log('Updating recipe with payload:', updatedRecipePayload);
+      setUploadProgress(0.75);
+
+      // 3. Call the update RPC
+      const { error: updateRpcError } = await supabase.rpc('update_recipe_details', updatedRecipePayload);
+      if (updateRpcError) throw updateRpcError;
+
+      setUploadProgress(1);
+      Alert.alert('Success', 'Recipe updated successfully!');
+      
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['editableRecipeDetails', recipeId] });
+      queryClient.invalidateQueries({ queryKey: ['recipeDetails', recipeId] }); // For the detail view screen
+      if (user) { // Invalidate profile query if user exists
+        queryClient.invalidateQueries({ queryKey: ['profile', user.id] }); 
+      }
+      
+      navigation.goBack();
+
+    } catch (error: any) {
+      console.error('Failed to save recipe:', error);
+      Alert.alert('Error', error.message || 'Could not update recipe.');
+    } finally {
+      setIsUpdating(false);
+      setUploadProgress(0);
+    }
+  };
+
+  // Helper for converting URI to base64 on mobile
+  async function convertUriToBase64(uri: string): Promise<string> {
+    if (Platform.OS === 'web') {
+      // For web, if the uri is a blob uri, fetching and converting to base64 is more complex
+      // and might not be necessary if uploading as Blob/File. 
+      // This function is primarily for mobile native URI to base64 for direct ArrayBuffer upload.
+      // If direct blob/file upload is used for web, this conversion step might be skipped.
+      console.warn('convertUriToBase64 called on web, ensure this is intended or handle web uploads differently.');
+      // Fallback for web: try to fetch and convert, assuming it's a fetchable URI
+      try {
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve( (reader.result as string).split(',')[1] ); // Get base64 part
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } catch (e) {
+        console.error("Web URI to Base64 conversion failed:", e);
+        throw new Error("Failed to convert web URI to Base64");
+      }
+    }
+    // For mobile (iOS/Android)
+    try {
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      return base64;
+    } catch (e) {
+      console.error('Failed to read file as base64:', e);
+      throw e;
+    }
+  }
+
+
+  // --- Render Loading/Error States --- 
+  if (isLoadingDetails) {
+    return <View style={styles.centered}><ActivityIndicator size="large" /></View>;
+  }
+  if (isErrorDetails) {
+    return <View style={styles.centered}><Text>Error loading recipe details: {errorDetails?.message}</Text></View>;
+  }
+  if (!initialRecipeData) {
+    return <View style={styles.centered}><Text>Recipe not found.</Text></View>;
+  }
+
+  // --- Main Render --- 
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContentContainer}>
+      <Text style={styles.screenTitle}>Edit Recipe</Text>
+
+      <CollapsibleCard title="General Details" defaultCollapsed={false}>
+        <TextInput placeholder="Recipe Title" value={title} onChangeText={setTitle} style={styles.input} />
+        <TextInput placeholder="Description (optional)" value={description} onChangeText={setDescription} style={styles.inputMulti} multiline numberOfLines={4} />
+      </CollapsibleCard>
+
+      <CollapsibleCard title="Timings & Servings">
+        <TextInput placeholder="Prep Time (minutes)" value={prepTimeMinutes} onChangeText={setPrepTimeMinutes} style={styles.input} keyboardType="numeric" />
+        <TextInput placeholder="Cook Time (minutes)" value={cookTimeMinutes} onChangeText={setCookTimeMinutes} style={styles.input} keyboardType="numeric" />
+        <TextInput placeholder="Servings" value={servings} onChangeText={setServings} style={styles.input} keyboardType="numeric" />
+      </CollapsibleCard>
+
+      <CollapsibleCard title="Thumbnail">
+        <View style={styles.thumbnailContainer}>
+          {(currentThumbnailUrl || newLocalThumbnailUri) ? (
+            <Image source={{ uri: newLocalThumbnailUri || currentThumbnailUrl! }} style={styles.thumbnailPreview} />
+          ) : (
+            <View style={styles.thumbnailPlaceholder}><Icon name="image" size={50} color="#ccc" /></View>
+          )}
+          <TouchableOpacity style={styles.button} onPress={handleSelectThumbnail}>
+            <Text style={styles.buttonText}>Change Thumbnail</Text>
+          </TouchableOpacity>
+        </View>
+      </CollapsibleCard>
+      
+      <CollapsibleCard title={`Ingredients (${ingredients.length})`}>
+        {ingredients.map((ing, index) => (
+          <View key={index} style={styles.listItemContainer}>
+            <TextInput placeholder="Name (e.g., Flour)" value={ing.name} onChangeText={val => handleIngredientChange(index, 'name', val)} style={styles.inputFlex} />
+            <TextInput placeholder="Qty" value={ing.quantity} onChangeText={val => handleIngredientChange(index, 'quantity', val)} style={styles.inputQty} keyboardType="numeric"/>
+            <TextInput placeholder="Unit (e.g., cup)" value={ing.unit} onChangeText={val => handleIngredientChange(index, 'unit', val)} style={styles.inputUnit} />
+            <TouchableOpacity onPress={() => handleRemoveIngredient(index)} style={styles.removeButton}>
+              <Icon name="remove-circle-outline" size={24} color="#ff6347" />
+            </TouchableOpacity>
+          </View>
+        ))}
+        <TouchableOpacity style={styles.addButton} onPress={handleAddIngredient}>
+          <Icon name="add-circle-outline" size={26} color="#22c55e" />
+          <Text style={styles.addButtonText}>Add Ingredient</Text>
+        </TouchableOpacity>
+      </CollapsibleCard>
+
+      <CollapsibleCard title={`Preparation Steps (${preparationSteps.length})`}>
+        {preparationSteps.map((step, index) => (
+          <View key={index} style={styles.listItemContainer}>
+            <Text style={styles.stepNumber}>{index + 1}.</Text>
+            <TextInput placeholder="Describe step" value={step} onChangeText={val => handleStepChange(index, val)} style={styles.inputFlexMulti} multiline />
+            <TouchableOpacity onPress={() => handleRemoveStep(index)} style={styles.removeButtonPadding}>
+              <Icon name="remove-circle-outline" size={24} color="#ff6347" />
+            </TouchableOpacity>
+          </View>
+        ))}
+        <TouchableOpacity style={styles.addButton} onPress={handleAddStep}>
+          <Icon name="add-circle-outline" size={26} color="#22c55e" />
+          <Text style={styles.addButtonText}>Add Step</Text>
+        </TouchableOpacity>
+      </CollapsibleCard>
+
+      <CollapsibleCard title="Dietary Tags">
+        <View style={styles.tagsContainer}>
+          {DIET_TAGS_OPTIONS.map(tag => (
+            <TouchableOpacity 
+              key={tag} 
+              style={[styles.tag, dietTags.includes(tag) && styles.tagSelected]} 
+              onPress={() => handleTagToggle(tag)}
+            >
+              <Text style={[styles.tagText, dietTags.includes(tag) && styles.tagTextSelected]}>{tag}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </CollapsibleCard>
+
+      <CollapsibleCard title="Visibility">
+        <View style={styles.switchContainer}>
+          <Text>Make Recipe Public</Text>
+          <Switch value={isPublic} onValueChange={setIsPublic} />
+        </View>
+      </CollapsibleCard>
+
+      <TouchableOpacity 
+        style={[styles.saveButton, isUpdating && styles.saveButtonDisabled]}
+        onPress={handleSaveRecipe} 
+        disabled={isUpdating}
+      >
+        {isUpdating ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.saveButtonText}>Save Changes</Text>
+        )}
+      </TouchableOpacity>
+      {isUpdating && uploadProgress > 0 && uploadProgress < 1 && (
+        <View style={styles.progressBarContainer}>
+            <View style={[styles.progressBar, { width: `${uploadProgress * 100}%` }]} />
+            <Text style={styles.progressText}>{`Uploading... ${(uploadProgress * 100).toFixed(0)}%`}</Text>
+        </View>
+      )}
+
+    </ScrollView>
+  );
+};
+
+// Basic Styles - Adapt from VideoUploaderScreen or create new ones
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#f8f8f8' },
+  scrollContentContainer: { paddingBottom: 100 }, // Ensure space for save button
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  screenTitle: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginVertical: 16, color: '#333' },
+  cardContainer: { backgroundColor: '#fff', marginHorizontal: 12, marginVertical: 8, borderRadius: 8, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  cardTitle: { fontSize: 16, fontWeight: '600', color: '#444' },
+  cardContent: { padding: 12 },
+  input: { borderWidth: 1, borderColor: '#ddd', padding: 10, borderRadius: 6, marginBottom: 12, backgroundColor: '#fff' },
+  inputMulti: { borderWidth: 1, borderColor: '#ddd', padding: 10, borderRadius: 6, marginBottom: 12, minHeight: 80, textAlignVertical: 'top', backgroundColor: '#fff' },
+  listItemContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  inputFlex: { flex: 1, borderWidth: 1, borderColor: '#ddd', padding: 8, borderRadius: 6, marginRight: 8 },
+  inputFlexMulti: { flex: 1, borderWidth: 1, borderColor: '#ddd', padding: 8, borderRadius: 6, marginRight: 8, minHeight: 60, textAlignVertical: 'top' },
+  inputQty: { width: 60, borderWidth: 1, borderColor: '#ddd', padding: 8, borderRadius: 6, marginRight: 8, textAlign: 'center' }, 
+  inputUnit: { flex: 0.8, borderWidth: 1, borderColor: '#ddd', padding: 8, borderRadius: 6, marginRight: 8 }, 
+  removeButton: { padding: 4 }, // Minimal padding around icon
+  removeButtonPadding: { padding: 8 }, // For step remove consistency
+  addButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, marginTop: 8, borderRadius: 6, borderWidth: 1, borderColor: '#22c55e' }, 
+  addButtonText: { color: '#22c55e', marginLeft: 8, fontWeight: '600' },
+  stepNumber: { marginRight: 8, fontSize: 15, color: '#555' }, 
+  tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 },
+  tag: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15, borderWidth: 1, borderColor: '#ccc', marginRight: 8, marginBottom: 8 },
+  tagSelected: { backgroundColor: '#22c55e', borderColor: '#22c55e' },
+  tagText: { color: '#555' },
+  tagTextSelected: { color: '#fff' },
+  switchContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
+  thumbnailContainer: { alignItems: 'center', marginVertical: 10 },
+  thumbnailPreview: { width: 200, height: 112.5, borderRadius: 6, marginBottom: 10, backgroundColor: '#eee' }, // 16:9 aspect ratio
+  thumbnailPlaceholder: { width: 200, height: 112.5, borderRadius: 6, marginBottom: 10, backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' },
+  button: { backgroundColor: '#22c55e', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 6, alignItems: 'center' },
+  buttonText: { color: '#fff', fontWeight: 'bold' },
+  saveButton: { backgroundColor: '#10B981', paddingVertical: 14, marginHorizontal: 16, marginTop: 24, borderRadius: 8, alignItems: 'center' },
+  saveButtonDisabled: { backgroundColor: '#A3A3A3' },
+  saveButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  progressBarContainer: { marginHorizontal:16, marginTop: 10, height: 20, backgroundColor: '#e0e0e0', borderRadius: 10, overflow: 'hidden', justifyContent: 'center' },
+  progressBar: { height: '100%', backgroundColor: '#22c55e' },
+  progressText: { position: 'absolute', alignSelf: 'center', color: '#333', fontWeight: 'bold' }
+});
+
+export default EditRecipeScreen; 

@@ -1,42 +1,30 @@
 import React from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { useRoute } from '@react-navigation/native';
-import { useRecipeDetails } from '../../hooks/useRecipeDetails';
+import { View, Text, StyleSheet } from 'react-native';
 import { COLORS } from '../../constants/theme';
 
-export default function StepsTab() {
-  const route = useRoute<any>();
-  const recipeId = route.params?.id;
-  const { data: recipeDetails, isLoading, error } = useRecipeDetails(recipeId);
+interface StepsTabProps {
+  steps: string[] | undefined | null;
+}
 
-  if (isLoading) {
-    return <View style={styles.centered}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
+export default function StepsTab({ steps }: StepsTabProps) {
+  if (!steps || steps.length === 0) {
+    return (
+      <View style={[styles.container, styles.centeredFeedback]}>
+        <Text style={styles.infoText}>No preparation steps available for this recipe.</Text>
+      </View>
+    );
   }
-
-  if (error || !recipeDetails || !recipeDetails.preparation_steps) {
-    return <View style={styles.centered}><Text style={styles.errorText}>Could not load preparation steps.</Text></View>;
-  }
-
-  const cleanedSteps = recipeDetails.preparation_steps.map(step => 
-    step.replace(/^\s*\d+[.)]*\s*/, '')
-  );
 
   return (
     <View style={styles.container}>
-      {cleanedSteps.length > 0 ? (
-        <View style={styles.stepsListContainer}>
-          {cleanedSteps.map((step, idx) => (
-            <View key={`${recipeId}-step-${idx}-${step.substring(0, 10)}`} style={styles.stepContainer}>
-              <Text style={styles.stepNumber}>{`${idx + 1}.`}</Text>
-              <Text style={styles.stepText}>{step}</Text>
-            </View>
-          ))}
-        </View>
-      ) : (
-        <View style={styles.centeredFeedback}>
-          <Text style={styles.infoText}>No preparation steps available for this recipe.</Text>
-        </View>
-      )}
+      <View style={styles.stepsListContainer}>
+        {steps.map((step, idx) => (
+          <View key={`step-${idx}-${step.substring(0, 10)}`} style={styles.stepContainer}>
+            <Text style={styles.stepNumber}>{`${idx + 1}.`}</Text>
+            <Text style={styles.stepText}>{step}</Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -47,20 +35,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 20,
     paddingBottom: 30,
+    flex: 1,
   },
   stepsListContainer: {
     paddingBottom: 24, 
-  },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.white || '#fff',
-    padding: 30,
-  },
-  errorText: {
-    color: COLORS.error || 'red',
-    fontSize: 16,
-    textAlign: 'center',
   },
   stepContainer: {
     flexDirection: 'row',
@@ -82,9 +60,9 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   centeredFeedback: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 50,
   },
   infoText: {
     fontSize: 16,

@@ -75,6 +75,7 @@ const useProfile = () => {
         throw new Error('Profile data not found.'); 
       }
       
+      console.log('[useProfile] rawData from RPC:', JSON.stringify(rawData, null, 2)); // Log the raw data
       const profileDataBackend = rawData as any;
       
       // Map uploaded recipes (from backend 'recipes' to frontend 'videos')
@@ -143,22 +144,28 @@ const Header: React.FC<HeaderProps> = ({ profile, onMenuPress, onAddPress }) => 
   );
 };
 
-const AvatarRow: React.FC<{ profile: ProfileData; postsCount: number }> = ({ profile, postsCount }) => (
-  <View style={styles.avatarRow}>
-    {profile.avatar_url ? (
-      <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-    ) : (
-      <View style={styles.avatarPlaceholder}>
-        <Icon name="person" size={36} color="#a3a3a3" />
+const AvatarRow: React.FC<{ profile: ProfileData; postsCount: number }> = ({ profile, postsCount }) => {
+  console.log(`[AvatarRow] Rendering. Avatar URL: ${profile.avatar_url}, Timestamp: ${Date.now()}`);
+  return (
+    <View style={styles.avatarRow}>
+      {profile.avatar_url ? (
+        <Image 
+          source={{ uri: `${profile.avatar_url}?cache=${Date.now()}` }} 
+          style={styles.avatar} 
+        />
+      ) : (
+        <View style={styles.avatarPlaceholder}>
+          <Icon name="person" size={36} color="#a3a3a3" />
+        </View>
+      )}
+      <View style={styles.statsRow}>
+        <Stat label="Posts" value={postsCount} />
+        <Stat label="Followers" value={profile.followers ?? 0} />
+        <Stat label="Following" value={profile.following ?? 0} />
       </View>
-    )}
-    <View style={styles.statsRow}>
-      <Stat label="Posts" value={postsCount} />
-      <Stat label="Followers" value={profile.followers ?? 0} />
-      <Stat label="Following" value={profile.following ?? 0} />
     </View>
-  </View>
-);
+  );
+};
 
 const Stat: React.FC<{ label: string; value: number }> = ({ label, value }) => (
   <View style={{ alignItems: 'center' }}>
@@ -234,6 +241,8 @@ export const ProfileScreen: React.FC = () => {
     return <ErrorMsg message="Could not load profile" />;
   }
 
+  console.log(`[ProfileScreen] Rendering. Avatar URL from useProfile: ${profile?.avatar_url}, Timestamp: ${Date.now()}`);
+
   // Add handler for navigating to Edit Profile
   const handleEditProfilePress = () => {
     const userIdToPass = (profile as any)?.id || user?.id; 
@@ -245,10 +254,10 @@ export const ProfileScreen: React.FC = () => {
       // Pass only the data EditProfileScreen expects
       initialProfileData: {
         bio: profile.bio,
-        avatar_url: profile.avatar_url
-        // username might be fetched within EditProfileScreen or passed differently if needed
+        avatar_url: profile.avatar_url,
+        username: profile.username // Pass the username
       },
-      userId: userIdToPass
+      userId: userIdToPass // Ensure userId is also passed if EditProfileScreen needs it directly
     });
   };
 

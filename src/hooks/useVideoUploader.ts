@@ -69,15 +69,15 @@ export const useVideoUploader = ({
     return true; 
   };
 
-  const selectMedia = async (mediaType: ImagePicker.MediaTypeOptions, setUri: (uri: string | null) => void) => {
+  const selectMedia = async (mediaTypeValue: ImagePicker.MediaType, setUri: (uri: string | null) => void) => {
     const hasPermission = await requestMediaLibraryPermissions();
     if (!hasPermission) return;
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: mediaType,
-        allowsEditing: mediaType === ImagePicker.MediaTypeOptions.Images,
-        aspect: mediaType === ImagePicker.MediaTypeOptions.Images ? [4, 3] : undefined,
+        mediaTypes: mediaTypeValue,
+        allowsEditing: mediaTypeValue === 'images',
+        aspect: mediaTypeValue === 'images' ? [4, 3] : undefined,
         quality: 0.8, 
       });
 
@@ -88,15 +88,15 @@ export const useVideoUploader = ({
         setUri(null); 
       }
     } catch (err: any) {
-      console.error(`Error selecting media (${mediaType}):`, err);
+      console.error(`Error selecting media (${mediaTypeValue}):`, err);
       setError(err.message || 'Failed to select media.');
       setUri(null);
       if (onUploadError) onUploadError(err.message || 'Failed to select media.');
     }
   };
 
-  const selectVideo = () => selectMedia(ImagePicker.MediaTypeOptions.Videos, setVideoUri);
-  const selectThumbnail = () => selectMedia(ImagePicker.MediaTypeOptions.Images, setThumbnailUri);
+  const selectVideo = () => selectMedia('videos', setVideoUri);
+  const selectThumbnail = () => selectMedia('images', setThumbnailUri);
 
   const uploadRecipe = async (metadata: RecipeMetadataForEdgeFunction) => {
     if (!videoUri) {

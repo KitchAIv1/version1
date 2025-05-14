@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, Image, StyleSheet, Dimensions, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, Image, StyleSheet, Dimensions, TouchableOpacity, Animated, Alert } from 'react-native';
 import { COLORS } from '../constants/theme'; // Assuming you have a theme file
 import { Feather } from '@expo/vector-icons'; // Add Feather icons for subtle enhancements
+import { useNavigation } from '@react-navigation/native'; // Added useNavigation
+import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // Added NativeStackNavigationProp
+import { MainStackParamList } from '../navigation/types'; // Added MainStackParamList
 
 interface ProfileRecipeCardProps {
   item: {
@@ -38,6 +41,9 @@ const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = ({ item, onPress }) 
   // Add animation for card press feedback
   const [scaleAnim] = useState(new Animated.Value(1));
   
+  // Initialize navigation
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
       toValue: 0.97,
@@ -54,6 +60,44 @@ const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = ({ item, onPress }) 
       tension: 40,
       useNativeDriver: true
     }).start();
+  };
+
+  const handleMenuPress = () => {
+    Alert.alert(
+      `Options for "${item.recipe_name}"`,
+      'What would you like to do?',
+      [
+        {
+          text: 'Edit Recipe',
+          onPress: () => {
+            navigation.navigate('EditRecipe', { recipeId: item.recipe_id });
+          },
+        },
+        {
+          text: 'Delete Recipe',
+          onPress: () => {
+            Alert.alert(
+              'Confirm Delete',
+              `Are you sure you want to delete "${item.recipe_name}"? This action cannot be undone.`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete',
+                  onPress: () => console.log(`TODO: Implement delete for recipe ID: ${item.recipe_id}`),
+                  style: 'destructive',
+                },
+              ]
+            );
+          },
+          style: 'default', // Or 'destructive' if you want it red
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   return (
@@ -76,6 +120,9 @@ const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = ({ item, onPress }) 
             onError={(e) => console.error(`[ProfileRecipeCard] Image load error for ${item.recipe_name}:`, e.nativeEvent.error)}
           />
           {/* Optional overlay gradient could go here */}
+          <TouchableOpacity onPress={handleMenuPress} style={styles.menuButton}>
+            <Feather name="more-vertical" size={22} color={COLORS.white || '#fff'} />
+          </TouchableOpacity>
         </View>
         
         <View style={styles.infoContainer}>
@@ -146,6 +193,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textSecondary || '#777',
   },
+  menuButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.4)', // Semi-transparent background for better visibility
+    padding: 6,
+    borderRadius: 15, // Circular background
+  }
 });
 
 export default ProfileRecipeCard; 

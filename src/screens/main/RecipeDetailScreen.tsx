@@ -496,7 +496,7 @@ export default function RecipeDetailScreen() {
             key="steps-tab"
             onLayout={(e) => handleTabContentLayout(TAB_ROUTES.STEPS, e)}
           >
-            <StepsTab />
+            <StepsTab steps={recipeDetails?.preparation_steps} />
           </View>
         );
       case TAB_ROUTES.MACROS:
