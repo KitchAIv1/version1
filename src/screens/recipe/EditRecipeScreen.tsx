@@ -164,70 +164,62 @@ const EditRecipeScreen: React.FC<EditRecipeScreenProps> = ({ route, navigation }
     let finalThumbnailUrl = currentThumbnailUrl; // Start with the existing or initially set thumbnail
 
     try {
-      // --- REMOVING Diagnostic Step: Check if bucket is accessible (client now seems to init correctly) ---
-      // try {
-      //   console.log("[EditRecipeScreen] Attempting to get details for bucket: recipe-thumbnails");
-      //   const { data: bucketData, error: bucketError } = await supabase
-      //     .storage
-      //     .getBucket('recipe-thumbnails');
-      // 
-      //   if (bucketError) {
-      //     console.error("[EditRecipeScreen] Error fetching bucket details:", JSON.stringify(bucketError, null, 2));
-      //   } else {
-      //     console.log("[EditRecipeScreen] Successfully fetched bucket details:", JSON.stringify(bucketData, null, 2));
-      //   }
-      // } catch (e:any) {
-      //   console.error("[EditRecipeScreen] Exception during getBucket test:", e.message);
-      // }
-      // --- End REMOVING Diagnostic Step ---
-
-      // 1. Upload new thumbnail if one was selected
+      // 1. Handle thumbnail upload if a new one was selected
       if (newLocalThumbnailUri && newLocalThumbnailUri !== initialRecipeData.thumbnail_url) {
+        console.log('New thumbnail selected, attempting upload:', newLocalThumbnailUri);
+        setUploadProgress(0.25);
         const localUri = newLocalThumbnailUri;
         const fileExt = localUri.split('.').pop()?.toLowerCase() || 'jpg';
-        const fileName = `recipe-thumbnails/${initialRecipeData.recipe_id}/${Date.now()}.${fileExt}`;
-        const contentType = `image/${fileExt}`;
-
-        console.log(`Uploading new thumbnail: ${fileName}`);
-        setUploadProgress(0.1);
-
-        // Read file as base64 (similar to useVideoUploader or AvatarEditorAndBio)
-        const response = await fetch(localUri);
-        const blob = await response.blob(); 
-        // For Supabase, often direct ArrayBuffer or FormData is preferred over base64 string for upload.
-        // If using base64 string, use FileSystem.readAsStringAsync(localUri, { encoding: FileSystem.EncodingType.Base64 });
-        // then decode using base64-arraybuffer for supabase.storage.upload.
-        // For simplicity here, assuming blob upload (adjust if using base64 string method)
-
-        // TODO: Refactor this part to use a robust base64/ArrayBuffer upload like in useVideoUploader
-        // For now, placeholder for direct blob upload if supported by your Supabase client version or specific setup
-        // The example below assumes a direct `decode(base64)` approach might be used after reading as base64 string
+        const fileName = `recipe-thumb-${recipeId}-${Date.now()}.${fileExt}`;
         
-        let fileDataForUpload: ArrayBuffer;
-        if (Platform.OS === 'web') { // FormData approach for web
-           const formData = new FormData();
-           formData.append('file', blob);
-           // Note: Supabase might require direct ArrayBuffer for non-form-data uploads
-           // This part is highly dependent on the exact upload method chosen
-           // For now, let's assume we will get an ArrayBuffer for consistency
-           const arrBuffer = await blob.arrayBuffer();
-           fileDataForUpload = arrBuffer; // Placeholder
+        // Ensure 'file' is ArrayBuffer
+        let file: ArrayBuffer;
+        if (Platform.OS === 'web' && localUri.startsWith('blob:')) {
+          // For web, convert blob URI to ArrayBuffer
+          const response = await fetch(localUri);
+          file = await response.arrayBuffer();
         } else {
-             // For mobile, fetch and convert to ArrayBuffer or use FileSystem.readAsStringAsync for base64
-            const base64 = await convertUriToBase64(localUri);
-            fileDataForUpload = decode(base64);
+          // For native, convert file URI to ArrayBuffer via base64
+          const base64 = await convertUriToBase64(localUri);
+          file = Uint8Array.from(atob(base64), c => c.charCodeAt(0)).buffer;
         }
         
+        const filePath = `${user?.id || 'public'}/${fileName}`;
+        console.log(`Uploading to path: ${filePath}`);
+
         const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('recipe_thumbnails') // Assuming a dedicated bucket or a path in an existing one
-          .upload(fileName, fileDataForUpload, { contentType, upsert: true }); // Upsert true to overwrite if same path (e.g. user re-uploads for same recipe)
+          .from('recipe-thumbnails')
+          .upload(filePath, file, { // Use the 'file' directly which should be ArrayBuffer
+            cacheControl: '3600',
+            upsert: true, // Important for replacing existing thumbnail if any
+            contentType: fileExt === 'jpg' ? 'image/jpeg' : `image/${fileExt}`, // Ensure correct content type
+          });
+
+        if (uploadError) {
+          console.error('Thumbnail upload error:', uploadError);
+          // Attempt to get bucket details for more context if primary upload fails
+          try {
+            const { data: bucketData, error: bucketError } = await supabase.storage.getBucket('recipe-thumbnails');
+            if (bucketError) {
+              console.error('Failed to get bucket details after upload error:', bucketError);
+            } else {
+              console.log('Bucket details (recipe-thumbnails):', bucketData);
+            }
+          } catch (e) {
+            console.error('Error fetching bucket details:', e);
+          }
+          throw new Error(`Failed to upload thumbnail: ${JSON.stringify(uploadError)}`);
+        }
 
         setUploadProgress(0.5);
-        if (uploadError) throw uploadError;
-
-        const { data: publicUrlData } = supabase.storage.from('recipe_thumbnails').getPublicUrl(fileName);
-        finalThumbnailUrl = publicUrlData.publicUrl;
-        console.log('New thumbnail uploaded:', finalThumbnailUrl);
+        if (uploadData) {
+          const { data: publicUrlData } = supabase.storage.from('recipe-thumbnails').getPublicUrl(filePath);
+          finalThumbnailUrl = publicUrlData.publicUrl;
+          console.log('Thumbnail uploaded and public URL obtained:', finalThumbnailUrl);
+        } else {
+          // This case should ideally be caught by uploadError, but as a fallback:
+          console.warn('Thumbnail upload returned no data and no error. Using original thumbnail URL.');
+        }
       }
 
       // 2. Prepare data for RPC call
