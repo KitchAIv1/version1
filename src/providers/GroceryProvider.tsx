@@ -157,28 +157,37 @@ export const GroceryProvider: React.FC<GroceryProviderProps> = ({ children }) =>
 
   const removeGroceryItem = async (itemId: string, userIdToRemove?: string): Promise<void> => {
     const uid = userIdToRemove || currentUserId;
+    console.log(`[GroceryProvider] removeGroceryItem: Initiated for item ID: ${itemId}, User ID: ${uid}`);
     if (!uid) {
+      console.error('[GroceryProvider] removeGroceryItem: Aborted - User ID not available.');
       setError("User ID not available to remove grocery item.");
       throw new Error("User ID not available to remove grocery item.");
     }
     setIsLoading(true);
     setError(null);
     try {
+      console.log(`[GroceryProvider] removeGroceryItem: Attempting to delete item ID: ${itemId} from Supabase.`);
       const { error: deleteError } = await supabase
         .from('grocery_list')
         .delete()
         .eq('user_id', uid)
         .eq('id', itemId);
+
       if (deleteError) {
+        console.error(`[GroceryProvider] removeGroceryItem: Supabase delete error for item ID: ${itemId}`, deleteError);
         setError(deleteError.message || "Failed to remove item.");
         throw deleteError;
       }
+      console.log(`[GroceryProvider] removeGroceryItem: Successfully deleted item ID: ${itemId} from Supabase. Now refetching list.`);
       await fetchGroceryList(uid);
+      console.log(`[GroceryProvider] removeGroceryItem: Finished refetching list after deleting item ID: ${itemId}.`);
     } catch (err: any) {
+      console.error(`[GroceryProvider] removeGroceryItem: Catch block error for item ID: ${itemId}`, err);
       setError(err.message || "An unexpected error occurred while removing item.");
       throw err;
     } finally {
       setIsLoading(false);
+      console.log(`[GroceryProvider] removeGroceryItem: Finally block executed for item ID: ${itemId}.`);
     }
   };
   

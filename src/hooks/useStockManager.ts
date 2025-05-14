@@ -5,6 +5,8 @@ import { Camera, CameraView, useCameraPermissions, PermissionStatus } from 'expo
 import * as ImagePicker from 'expo-image-picker'; // For image picking if needed for testing or other features
 import { decode } from 'base64-arraybuffer'; // For handling base64 for Supabase storage if applicable
 // import { StockItem, UnitOption } from '../types'; // Assuming types are defined elsewhere
+import { useQueryClient } from '@tanstack/react-query'; // Added
+import { useGroceryContext, GroceryItem } from '../providers/GroceryProvider'; // Added GroceryProvider imports
 
 // Define basic types within the hook for now, can be moved to a types file later
 export interface StockItem {
@@ -99,6 +101,8 @@ const parseRecognizedQuantity = (recognizedQty: string): { quantity: number, uni
 export const useStockManager = () => {
   const [stockData, setStockData] = useState<StockItem[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
+  const queryClient = useQueryClient(); // Added
+  const { groceryList, removeGroceryItem: removeGroceryItemFromList } = useGroceryContext(); // Get grocery context
 
   // Loading states
   const [isLoading, setIsLoading] = useState(false);
@@ -247,10 +251,39 @@ export const useStockManager = () => {
       }
       const { error: saveDbError } = response;
       if (saveDbError) throw saveDbError;
-      console.log('[useStockManager] Item saved successfully. Refreshing stock...');
-      await fetchStock(userId);
-      setIsSaving(false);
-      closeManualModal(); // Close modal on successful save
+      console.log('[useStockManager] Item saved successfully. Refreshing stock and invalidating pantryMatch...');
+      fetchStock(); // Refresh local stock data
+      queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+
+      // New: Check and remove from grocery list
+      const savedPantryItemName = itemToSave.item_name.trim().toLowerCase();
+      console.log(`[useStockManager-GroceryDebug] Pantry item saved: '${savedPantryItemName}'`);
+      console.log(`[useStockManager-GroceryDebug] Current grocery list (length: ${groceryList.length}):`, JSON.stringify(groceryList.map(gItem => ({id: gItem.id, name: gItem.item_name}))));
+
+      // Find ALL matching grocery items
+      const matchedGroceryItems = groceryList.filter(gItem => {
+        const normalizedGroceryItemName = gItem.item_name.trim().toLowerCase();
+        // console.log(`[useStockManager-GroceryDebug] Comparing pantry:'${savedPantryItemName}' vs grocery:'${normalizedGroceryItemName}'`);
+        return normalizedGroceryItemName.includes(savedPantryItemName);
+      });
+
+      if (matchedGroceryItems.length > 0) {
+        console.log(`[useStockManager-GroceryDebug] ${matchedGroceryItems.length} MATCH(ES) FOUND for '${savedPantryItemName}'. Attempting removal for each.`);
+        for (const matchedItem of matchedGroceryItems) {
+          console.log(`[useStockManager-GroceryDebug] Attempting removal for Grocery Item: '${matchedItem.item_name}' (ID: ${matchedItem.id})`);
+          try {
+            await removeGroceryItemFromList(matchedItem.id, userId);
+            console.log(`[useStockManager-GroceryDebug] Successfully called removeGroceryItemFromList for ID: ${matchedItem.id}`);
+          } catch (removalError) {
+            console.error(`[useStockManager-GroceryDebug] Error calling removeGroceryItemFromList for ID: ${matchedItem.id}:`, removalError);
+          }
+        }
+      } else {
+        console.log(`[useStockManager-GroceryDebug] NO MATCH found for '${savedPantryItemName}' in the grocery list.`);
+      }
+
+      closeManualModal();
       return true;
     } catch (err: any) {
       console.error('[useStockManager] Error saving item:', err);
@@ -297,6 +330,39 @@ export const useStockManager = () => {
 
         console.log('[useStockManager] Scanned items saved successfully. Refreshing stock...');
         await fetchStock(userId); // Refresh stock
+        queryClient.invalidateQueries({ queryKey: ['pantryMatch'] }); // Invalidate pantry match for details screen
+        queryClient.invalidateQueries({ queryKey: ['feed'] });      // Invalidate feed for badges
+
+        // New: Check and remove from grocery list for each saved item
+        console.log('[useStockManager-GroceryDebug-Scanner] Scanned items saved. Now checking grocery list for each item...');
+        for (const pantryItem of itemsToUpsert) {
+          const pantryItemName = pantryItem.item_name.trim().toLowerCase();
+          console.log(`[useStockManager-GroceryDebug-Scanner] Checking pantry item: '${pantryItemName}' against grocery list.`);
+          console.log(`[useStockManager-GroceryDebug-Scanner] Current grocery list (length: ${groceryList.length}):`, JSON.stringify(groceryList.map(gItem => ({id: gItem.id, name: gItem.item_name}))));
+
+          // Find ALL matching grocery items for the current scanned pantry item
+          const matchedGroceryItemsForScanned = groceryList.filter(gItem => {
+            const normalizedGroceryItemName = gItem.item_name.trim().toLowerCase();
+            // console.log(`[useStockManager-GroceryDebug-Scanner] Comparing pantry:'${pantryItemName}' vs grocery:'${normalizedGroceryItemName}'`);
+            return normalizedGroceryItemName.includes(pantryItemName);
+          });
+
+          if (matchedGroceryItemsForScanned.length > 0) {
+            console.log(`[useStockManager-GroceryDebug-Scanner] ${matchedGroceryItemsForScanned.length} MATCH(ES) FOUND for scanned item '${pantryItemName}'. Attempting removal for each.`);
+            for (const matchedItem of matchedGroceryItemsForScanned) {
+              console.log(`[useStockManager-GroceryDebug-Scanner] Attempting removal for Grocery Item: '${matchedItem.item_name}' (ID: ${matchedItem.id})`);
+              try {
+                await removeGroceryItemFromList(matchedItem.id, userId);
+                console.log(`[useStockManager-GroceryDebug-Scanner] Successfully called removeGroceryItemFromList for ID: ${matchedItem.id}`);
+              } catch (removalError) {
+                console.error(`[useStockManager-GroceryDebug-Scanner] Error calling removeGroceryItemFromList for ID: ${matchedItem.id}:`, removalError);
+              }
+            }
+          } else {
+            console.log(`[useStockManager-GroceryDebug-Scanner] NO MATCH found for scanned item '${pantryItemName}' in the grocery list.`);
+          }
+        }
+
         setIsSaving(false);
         return true;
 
@@ -312,39 +378,35 @@ export const useStockManager = () => {
 
   // Delete Stock Item
   const deleteStockItem = async (itemToDelete: StockItem) => {
-    if (!userId || !itemToDelete.id && !itemToDelete.item_name) {
-      setDeleteError("User or Item ID/Name not available. Cannot delete item.");
-      Alert.alert("Error", "User session or item identifier not found. Cannot delete item.");
+    if (!userId || !itemToDelete.id) {
+      setDeleteError("User ID or item ID missing. Cannot delete item.");
+      Alert.alert("Error", "User or item details missing. Cannot delete.");
       return false;
     }
     setIsDeleting(true);
     setDeleteError(null);
-    
+    console.log('[useStockManager] Deleting item:', itemToDelete);
     try {
-      let query = supabase.from('stock').delete().eq('user_id', userId);
-      // Prefer ID for deletion if available
-      if (itemToDelete.id) {
-        console.log(`[useStockManager] Deleting item by ID: ${itemToDelete.id}`);
-        query = query.eq('id', itemToDelete.id); 
-      } else {
-        console.log(`[useStockManager] Deleting item by name: ${itemToDelete.item_name}`);
-        query = query.eq('item_name', itemToDelete.item_name);
-      }
-      
-      const { error: deleteDbError } = await query;
+      const { error: deleteDbError } = await supabase
+        .from('stock')
+        .delete()
+        .match({ id: itemToDelete.id, user_id: userId });
+
       if (deleteDbError) throw deleteDbError;
-
-      console.log('[useStockManager] Item deleted successfully. Refreshing stock...');
-      await fetchStock(userId);
-      setIsDeleting(false);
+      
+      console.log('[useStockManager] Item deleted successfully. Refreshing stock and invalidating pantryMatch...');
+      fetchStock(); // Refresh local stock data
+      queryClient.invalidateQueries({ queryKey: ['pantryMatch'] }); // Added invalidation
+      queryClient.invalidateQueries({ queryKey: ['feed'] }); // Also invalidate feed to update badges there
+      // No modal to close here usually, deletion happens from the list
       return true;
-
     } catch (err: any) {
-      console.error('[useStockManager] Error deleting item:', err);
-      setDeleteError(err.message || 'Failed to delete item.');
-      Alert.alert("Error deleting item", err.message);
-      setIsDeleting(false);
+      console.error("[useStockManager] Error deleting item:", err);
+      setDeleteError(err.message || "Failed to delete item.");
+      Alert.alert("Delete Error", err.message || "Could not delete the item. Please try again.");
       return false;
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -435,37 +497,23 @@ export const useStockManager = () => {
 
   // Combined handler for camera capture, recognition, and showing confirmation
   const handleCaptureAndProcessImage = async (base64Image: string) => {
-    console.log('!!!!!! [useStockManager] DIAGNOSTIC: handleCaptureAndProcessImage WAS CALLED! base64Image present:', !!base64Image);
-    Alert.alert(
-      'DIAGNOSTIC ALERT FROM useStockManager',
-      'handleCaptureAndProcessImage was unexpectedly called. This means old code is running or there is an unexpected trigger.'
-    );
-    // Temporarily disable the entire function to see if it's being called
-    if (true) { // Ensure this path is taken
-        setIsRecognizing(false); // Make sure any loading state is turned off
-        setRecognitionError('Diagnostic: handleCaptureAndProcessImage was called but then aborted.');
-        return; 
+    setIsRecognizing(true);
+    setRecognitionError(null);
+
+    const recognizedItems = await recognizeItemsFromImage(base64Image);
+
+    if (recognizedItems) {
+      if (recognizedItems.length > 0) {
+        console.log('[useStockManager] Items recognized, opening confirmation modal:', recognizedItems);
+        openStockConfirmationModal(recognizedItems);
+      } else {
+        console.log('[useStockManager] No items recognized by recognizeItemsFromImage (empty array).');
+        Alert.alert("No Items Recognized", "Could not find any items in the image. Try again?");
+      }
+    } else {
+      console.log('[useStockManager] Image recognition returned null or failed.');
     }
-
-    // Original logic (now effectively disabled by the return above):
-    // console.log('[useStockManager] handleCaptureAndProcessImage: Closing camera first.');
-    // closeCamera(); // Call this at the beginning as per user's new structure
-
-    const recognizedPreparedItems = await recognizeItemsFromImage(base64Image);
-
-    if (recognizedPreparedItems && recognizedPreparedItems.length > 0) {
-      // console.log('[useStockManager] Items recognized, opening confirmation modal:', recognizedPreparedItems);
-      openStockConfirmationModal(recognizedPreparedItems);
-      closeCamera(); // Added this back as per one of the prior states that seemed logical
-    } else if (recognizedPreparedItems === null) {
-      // Error supposedly handled and alerted by recognizeItemsFromImage.
-      // console.log('[useStockManager] Recognition returned null (error expected to be handled in recognizeItemsFromImage).');
-      closeCamera();
-    } else { // recognizedItems is an empty array
-      // console.log('[useStockManager] No items recognized by recognizeItemsFromImage.');
-      Alert.alert("No Items Recognized", "Could not find any items in the image. Try again?");
-      closeCamera();
-    }
+    setIsRecognizing(false);
   };
 
   // Camera Permission Handling
