@@ -72,12 +72,8 @@ export default function RecipeCard({ item, isActive, containerHeight }: RecipeCa
     useCallback(() => {
       const managePlayback = async () => {
         if (isActive && isLoaded && videoRef.current) {
-          // Screen focused
-          // console.log(`RecipeCard ${item.id} (useFocusEffect - focus): Active & Loaded - Playing with fade attempt`);
           try {
-            await videoRef.current.setIsMutedAsync(true);
             await videoRef.current.playAsync();
-            await videoRef.current.setIsMutedAsync(false);
           } catch (e) {
             console.error(`RecipeCard ${item.id}: Error in focus effect (play/fade)`, e);
           }
@@ -144,6 +140,27 @@ export default function RecipeCard({ item, isActive, containerHeight }: RecipeCa
     });
   };
 
+  // New handler for navigating to RecipeDetail with Comments tab active
+  const handleNavigateToComments = async () => {
+    console.log(`Navigating to RecipeDetail (Comments) for ID: ${item.id}`);
+    let seekTime = 0;
+    try {
+      const status = await videoRef.current?.getStatusAsync();
+      if (status && status.isLoaded) {
+        seekTime = status.positionMillis;
+      }
+    } catch (error) {
+      console.warn(`RecipeCard ${item.id}: Could not get video status for seek time`, error);
+    }
+    // Navigate to RecipeDetail, specifying the 'Comments' tab
+    // Assuming 'Comments' is the string value used by RecipeDetailScreen's TAB_ROUTES.COMMENTS
+    navigation.navigate('RecipeDetail', { 
+      id: item.id,
+      initialSeekTime: seekTime,
+      initialTab: 'Comments' // Pass the target tab name
+    });
+  };
+
   const containerStyle = {
     height: containerHeight,
   };
@@ -157,6 +174,7 @@ export default function RecipeCard({ item, isActive, containerHeight }: RecipeCa
           resizeMode={ResizeMode.COVER}
           style={StyleSheet.absoluteFill}
           isLooping
+          isMuted={false}
           onLoad={handleLoad}
           onError={handleError}
           progressUpdateIntervalMillis={1000} 
@@ -168,55 +186,59 @@ export default function RecipeCard({ item, isActive, containerHeight }: RecipeCa
           style={styles.gradient}
         />
         
-        {/* User info at top */}
-        <View style={styles.userInfoContainer}>
-          <TouchableOpacity 
-            style={styles.userTouchable}
-            // Removing navigation to Profile since it's not properly defined in the navigation types
-            // We'll leave the touchable for UI consistency
-          >
-            {item.creatorAvatarUrl ? (
-              <Image 
-                source={{ uri: item.creatorAvatarUrl }}
-                style={styles.avatar}
-              />
-            ) : (
-              <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                <Feather name="user" size={16} color="#ffffff" />
-              </View>
-            )}
-            <Text style={styles.usernameText} numberOfLines={1}>
-              {item.userName || 'Unknown User'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-        
         {/* Recipe info at bottom */}
         <View style={styles.recipeInfoContainer}>
-          <TouchableOpacity 
-            style={styles.recipeTitleContainer} 
-            onPress={handleNavigateToDetail}
-            activeOpacity={0.9}
-          >
-            <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-            
-            {item.pantryMatchPct !== undefined && (
-              <View style={styles.pantryMatchContainer}>
-                <Feather name="check-circle" size={14} color="#22c55e" style={styles.matchIcon} />
-                <Text style={styles.pantryMatch}>
-                  {item.pantryMatchPct}% pantry match
+          {/* New container for left-side content */}
+          <View style={styles.leftContentContainer}>
+            <TouchableOpacity 
+              style={styles.recipeTitleContainer} 
+              onPress={handleNavigateToDetail}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+              
+              {item.pantryMatchPct !== undefined && (
+                <View style={styles.pantryMatchContainer}>
+                  <Feather name="check-circle" size={14} color="#22c55e" style={styles.matchIcon} />
+                  <Text style={styles.pantryMatch}>
+                    {item.pantryMatchPct}% pantry match
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* MOVED User info here, inside leftContentContainer */}
+            <View style={styles.userInfoContainer}>
+              <TouchableOpacity 
+                style={styles.userTouchable}
+                // Removing navigation to Profile since it's not properly defined in the navigation types
+                // We'll leave the touchable for UI consistency
+              >
+                {item.creatorAvatarUrl ? (
+                  <Image 
+                    source={{ uri: item.creatorAvatarUrl }}
+                    style={styles.avatar}
+                  />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                    <Feather name="user" size={16} color="#ffffff" />
+                  </View>
+                )}
+                <Text style={styles.usernameText} numberOfLines={1}>
+                  {item.userName || 'Unknown User'}
                 </Text>
-              </View>
-            )}
-          </TouchableOpacity>
+              </TouchableOpacity>
+            </View>
+          </View>
           
-          {/* Action overlay */}
+          {/* Action overlay (now a sibling to leftContentContainer) */}
           {item.onLike && item.onSave && (
             <View style={styles.actionOverlayContainer}>
               <ActionOverlay 
                 item={item} 
                 onLike={item.onLike} 
                 onSave={item.onSave} 
+                onCommentPress={handleNavigateToComments}
                 onMorePress={handleNavigateToDetail}
               />
             </View>
@@ -244,22 +266,15 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   userInfoContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
     zIndex: 2,
-    paddingTop: 16,
-    paddingHorizontal: 16,
+    marginTop: 8,
+    paddingHorizontal: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   userTouchable: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    borderRadius: 20,
   },
   avatar: {
     width: 32,
@@ -285,15 +300,19 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
     zIndex: 2,
-    padding: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    flexDirection: 'row', // Added for side-by-side layout
+    justifyContent: 'space-between', // Added
+    alignItems: 'flex-end', // Align items (left block and actions) to the bottom of this container
+  },
+  leftContentContainer: { // New style for the left block
+    flex: 1, // Take available space
+    marginRight: 8, // Space between left content and actions
   },
   recipeTitleContainer: {
-    flex: 1,
-    marginRight: 16,
+    marginBottom: 8,
   },
   title: {
     color: 'white',
@@ -307,11 +326,7 @@ const styles = StyleSheet.create({
   pantryMatchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(34, 197, 94, 0.15)',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
+    marginTop: 4,
   },
   matchIcon: {
     marginRight: 4,
@@ -322,8 +337,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   actionOverlayContainer: {
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginBottom: 8,
+    // alignItems: 'center', // Removed or adjust: actions are now in a row
+    // justifyContent: 'flex-end', // Removed or adjust
+    // marginBottom: 8, // Removed or adjust, alignment handled by recipeInfoContainer
+    // Add specific alignment for items within action overlay if needed
+    // For example, to keep icons vertically centered if their container is taller:
+    // justifyContent: 'center', 
   },
 }); 

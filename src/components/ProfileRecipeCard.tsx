@@ -5,6 +5,9 @@ import { Feather } from '@expo/vector-icons'; // Add Feather icons for subtle en
 import { useNavigation } from '@react-navigation/native'; // Added useNavigation
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // Added NativeStackNavigationProp
 import { MainStackParamList } from '../navigation/types'; // Added MainStackParamList
+import { useMutation, useQueryClient } from '@tanstack/react-query'; // Added for mutations
+import { supabase } from '../services/supabase'; // Added for Supabase client
+import { useAuth } from '../providers/AuthProvider'; // Added to get user ID
 
 interface ProfileRecipeCardProps {
   item: {
@@ -43,6 +46,32 @@ const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = ({ item, onPress }) 
   
   // Initialize navigation
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const queryClient = useQueryClient(); // Added queryClient
+  const { user } = useAuth(); // Added useAuth to get user
+
+  const deleteRecipeMut = useMutation({
+    mutationFn: async (recipeIdToDelete: string) => {
+      const { error } = await supabase.rpc('delete_recipe', { p_recipe_id: recipeIdToDelete });
+      if (error) {
+        console.error('Error deleting recipe:', error);
+        throw new Error(error.message || 'Failed to delete recipe.');
+      }
+      return recipeIdToDelete;
+    },
+    onSuccess: (deletedRecipeId) => {
+      Alert.alert('Success', `Recipe "${item.recipe_name}" deleted successfully.`);
+      // Invalidate queries to refresh the profile screen's recipe list
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
+      }
+      // Optionally, you might want to invalidate other queries if the deletion affects other parts of the app
+      // queryClient.invalidateQueries({ queryKey: ['feed'] }); // Example
+      console.log(`Recipe ${deletedRecipeId} deleted, invalidated profile query for user ${user?.id}`);
+    },
+    onError: (error: Error) => {
+      Alert.alert('Error', error.message || 'Could not delete the recipe. Please try again.');
+    },
+  });
 
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
@@ -76,20 +105,10 @@ const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = ({ item, onPress }) 
         {
           text: 'Delete Recipe',
           onPress: () => {
-            Alert.alert(
-              'Confirm Delete',
-              `Are you sure you want to delete "${item.recipe_name}"? This action cannot be undone.`,
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Delete',
-                  onPress: () => console.log(`TODO: Implement delete for recipe ID: ${item.recipe_id}`),
-                  style: 'destructive',
-                },
-              ]
-            );
+            // Call the mutation to delete the recipe
+            deleteRecipeMut.mutate(item.recipe_id);
           },
-          style: 'default', // Or 'destructive' if you want it red
+          style: 'destructive',
         },
         {
           text: 'Cancel',

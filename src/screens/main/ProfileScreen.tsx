@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24, // More bottom space
   },
   columnWrapper: {
-    justifyContent: 'space-around', // More evenly distributed cards
+    justifyContent: 'flex-start', // Align items to the start of the row
   },
   editButtonContainer: {
     paddingHorizontal: 16,

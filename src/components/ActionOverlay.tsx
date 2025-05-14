@@ -5,13 +5,14 @@ import { RecipeItem } from '../types'; // Adjust path if necessary
 
 // Define props more explicitly
 interface ActionOverlayProps {
-  item: RecipeItem & { likes?: number; saves?: number; liked?: boolean; saved?: boolean }; // Ensure needed fields exist
+  item: RecipeItem & { likes?: number; saves?: number; liked?: boolean; saved?: boolean; commentsCount?: number }; // Added commentsCount
   onLike: () => void;
   onSave: () => void;
+  onCommentPress?: () => void; // Added onCommentPress
   onMorePress?: () => void; // Add optional prop for the more button
 }
 
-export default function ActionOverlay({ item, onLike, onSave, onMorePress }: ActionOverlayProps) {
+export default function ActionOverlay({ item, onLike, onSave, onCommentPress, onMorePress }: ActionOverlayProps) {
   // Ensure boolean values for clarity, defaulting to false if undefined
   const isLiked = item.liked === true;
   const isSaved = item.saved === true;
@@ -43,6 +44,19 @@ export default function ActionOverlay({ item, onLike, onSave, onMorePress }: Act
           <Text style={styles.countText}>{String(item.saves)}</Text>
         )}
       </TouchableOpacity>
+      
+      {/* Comment Button (conditionally rendered if onCommentPress is provided) */}
+      {onCommentPress && (
+        <TouchableOpacity onPress={onCommentPress} style={styles.actionButton}>
+          <View style={styles.iconContainer}>
+            <Feather name="message-square" size={28} color="#fff" />
+          </View>
+          {/* Ensure item.commentsCount is a number before rendering and cast to string */}
+          {typeof item.commentsCount === 'number' && (
+            <Text style={styles.countText}>{String(item.commentsCount)}</Text>
+          )}
+        </TouchableOpacity>
+      )}
       
       {/* More Button (conditionally rendered) */}
       {onMorePress && (

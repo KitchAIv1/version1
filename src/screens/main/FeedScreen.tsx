@@ -1,11 +1,13 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { View, ActivityIndicator, Text, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { View, ActivityIndicator, Text, StyleSheet, StatusBar, Dimensions } from 'react-native';
 import { FlashList, ViewToken } from '@shopify/flash-list';
 import { useFeed } from '../../hooks/useFeed';
 import RecipeCard from '../../components/RecipeCard';
 import { supabase } from '../../services/supabase';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { FeedItem } from '../../hooks/useFeed';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '../../providers/AuthProvider';
 
 interface MutationContext {
   previousFeed?: FeedItem[];
@@ -19,23 +21,24 @@ export default function FeedScreen() {
   } = useFeed();
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [containerHeight, setContainerHeight] = useState<number | null>(null);
+  const [layoutReady, setLayoutReady] = useState(false);
+  const [itemHeight, setItemHeight] = useState(0);
+  const insets = useSafeAreaInsets();
+  const windowDims = Dimensions.get('window');
+
+  useEffect(() => {
+    console.log('FeedScreen Insets:', JSON.stringify(insets), 'WindowHeight:', windowDims.height, 'WindowWidth:', windowDims.width);
+  }, [insets, windowDims]);
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: Array<ViewToken> }) => {
       const validViewableItems = viewableItems.filter(item => item.isViewable && item.index !== null);
-
       if (validViewableItems.length > 0) {
         const newIndex = validViewableItems[0].index!;
         setCurrentIndex(prevIndex => {
-          if (prevIndex !== newIndex) {
-            console.log(`FeedScreen: onViewableItemsChanged - Setting new current index: ${newIndex} (was ${prevIndex})`);
-            return newIndex;
-          }
+          if (prevIndex !== newIndex) { return newIndex; }
           return prevIndex;
         });
-      } else {
-        console.log('FeedScreen: onViewableItemsChanged - No valid viewable items.');
       }
     },
     []
@@ -46,17 +49,26 @@ export default function FeedScreen() {
     waitForInteraction: true,
   }).current;
 
-  const itemHeight = containerHeight ? Math.floor(containerHeight) : 0;
-  const itemsToRender: FeedItem[] = feedItems || [];
-
   const handleContainerLayout = (event: any) => {
-    const { height, width } = event.nativeEvent.layout;
-    if (height > 0 && containerHeight === null) {
-      console.log(`FeedScreen container layout - Height: ${height}, Width: ${width}`);
-      setContainerHeight(height);
+    const measuredHeight = event.nativeEvent.layout.height;
+    if (measuredHeight > 0) {
+      console.log('FeedScreen onLayout (containerForLayout) fired. Measured Height:', measuredHeight);
+      setItemHeight(Math.floor(measuredHeight));
+      if (!layoutReady) {
+        setLayoutReady(true);
+      }
     }
   };
+  
+  useEffect(() => {
+    if (itemHeight > 0) {
+        console.log(`FeedScreen: itemHeight set from layout: ${itemHeight}`);
+    }
+  }, [itemHeight]);
+  
 
+  const itemsToRender: FeedItem[] = feedItems || [];
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const likeMut = useMutation<void, Error, string, MutationContext>({
@@ -114,22 +126,27 @@ export default function FeedScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="black" />
-      <View style={styles.container} onLayout={handleContainerLayout}>
-        {isLoading || containerHeight === null ? (
-          <ActivityIndicator size="large" color="#FFFFFF" />
+    <SafeAreaView style={styles.safeAreaOuter} edges={['left', 'right']}>
+      <StatusBar 
+        barStyle="light-content"
+        backgroundColor="transparent" 
+        translucent={true} 
+      />
+      <View style={styles.containerForLayout} onLayout={handleContainerLayout}>
+        {isLoading || itemHeight <= 0 ? (
+          <View style={styles.centeredMessageContainer}>
+            <ActivityIndicator size="large" color="#666" />
+          </View>
         ) : feedError ? (
-          <Text style={styles.errorText}>Error loading feed: {feedError.message}</Text>
+          <View style={styles.centeredMessageContainer}>
+            <Text style={styles.errorText}>Error loading feed: {feedError.message}</Text>
+          </View>
         ) : itemsToRender.length === 0 ? (
-          <Text style={styles.emptyText}>No recipes found.</Text>
-        ) : itemHeight <= 0 ? (
-          <View>
-            <Text style={styles.errorText}>Container height not determined for list.</Text>
-            <ActivityIndicator size="large" color="#FFFFFF" />
+          <View style={styles.centeredMessageContainer}>
+            <Text style={styles.emptyText}>No recipes found.</Text>
           </View>
         ) : (
-          <View style={styles.flashListContainer}>
+          <View style={styles.flashListContainer}> 
             <FlashList<FeedItem>
               data={itemsToRender}
               keyExtractor={(item) => item.id}
@@ -151,6 +168,9 @@ export default function FeedScreen() {
               viewabilityConfig={viewabilityConfig}
               onViewableItemsChanged={onViewableItemsChanged}
               extraData={currentIndex}
+              overrideItemLayout={(layout) => {
+                layout.size = itemHeight;
+              }}
             />
           </View>
         )}
@@ -160,33 +180,32 @@ export default function FeedScreen() {
 }
 
 const styles = StyleSheet.create({
-    safeArea: {
+    safeAreaOuter: {
         flex: 1,
-        backgroundColor: 'black',
+        backgroundColor: 'transparent',
     },
-    container: {
+    containerForLayout: {
         flex: 1,
-        backgroundColor: 'black',
+        backgroundColor: 'transparent',
     },
     flashListContainer: {
         flex: 1,
         width: '100%',
     },
-    emptyText: {
-        color: 'white',
-        fontSize: 16,
-        textAlign: 'center',
-        padding: 20,
-    },
-    errorText: {
-        color: 'red',
-        fontSize: 16,
-        padding: 20,
-        textAlign: 'center',
-    },
     centeredMessageContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-    }
+        padding: 20,
+    },
+    emptyText: {
+        color: '#666',
+        fontSize: 16,
+        textAlign: 'center',
+    },
+    errorText: {
+        color: 'red',
+        fontSize: 16,
+        textAlign: 'center',
+    },
 }); 

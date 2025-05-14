@@ -27,6 +27,7 @@ export type MainTabsParamList = {
 export type RecipeDetailParams = {
   id: string;
   initialSeekTime?: number; // Optional: time in ms to seek video initially
+  initialTab?: string; // Added for specifying initial tab
 };
 
 // Type for the Edit Profile screen parameters

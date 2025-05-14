@@ -12,7 +12,7 @@ export interface RecipeItem {
   creatorAvatarUrl?: string | null;  // Maps from out_creator_avatar_url, allow null based on RPC data
   // Add other fields returned by RPC if needed:
   // comments?: any;          // Maps from output_comments
-  // commentsCount?: number;  // Maps from output_comments_count
+  commentsCount?: number;  // Maps from output_comments_count
   // feedType?: string;       // Maps from output_feed_type
   // createdAt?: string;      // Maps from output_created_at
   // userId?: string;         // Maps from output_user_id

@@ -102,6 +102,7 @@ export const useFeed = () =>
           pantryMatchPct: pantryMatchPct,
           _userIngredientsCount: userIngredients,
           _totalIngredientsCount: totalIngredients,
+          commentsCount: item.output_comments_count,
         };
       });
 

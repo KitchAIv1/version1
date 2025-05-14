@@ -133,6 +133,7 @@ export default function RecipeDetailScreen() {
   const queryClient = useQueryClient();
   const recipeId = route.params?.id;
   const initialSeekTime = route.params?.initialSeekTime ?? 0;
+  const initialTabFromParams = route.params?.initialTab; // Read the initialTab param
   const videoRef = useRef<Video>(null);
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { groceryList, fetchGroceryList } = useGroceryManager();
@@ -158,9 +159,15 @@ export default function RecipeDetailScreen() {
   
   const [currentScrollPosition, setCurrentScrollPosition] = useState(0);
 
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [activeTab, setActiveTab] = useState(TAB_ROUTES.INGREDIENTS);
+  // Set initial activeTab based on route param or default to Ingredients
+  const [activeTab, setActiveTab] = useState(() => {
+    if (initialTabFromParams && Object.values(TAB_ROUTES).includes(initialTabFromParams as (typeof TAB_ROUTES)[keyof typeof TAB_ROUTES])) {
+      return initialTabFromParams as (typeof TAB_ROUTES)[keyof typeof TAB_ROUTES];
+    }
+    return TAB_ROUTES.INGREDIENTS;
+  });
   const [videoPlayerError, setVideoPlayerError] = useState<string | null>(null);
 
   // Debug logging helper for visibility changes
@@ -297,15 +304,18 @@ export default function RecipeDetailScreen() {
 
   const handleLoad = async (status: AVPlaybackStatus) => { // Make handleLoad async
     if (status.isLoaded) {
-      if (videoRef.current && initialSeekTime > 0) {
-        try {
-          console.log(`RecipeDetailScreen: Attempting to seek to ${initialSeekTime}ms`);
-          await videoRef.current.setPositionAsync(initialSeekTime);
-        } catch (e) {
-          console.error(`RecipeDetailScreen: Error setting position to ${initialSeekTime}ms`, e);
+      console.log(`RecipeDetailScreen ${recipeId}: Video loaded. Initial seek: ${initialSeekTime}ms. IsMuted: ${isMuted}`);
+      setIsLoaded(true);
+      if (videoRef.current) {
+        // Apply initial seek time if provided
+        if (initialSeekTime > 0) {
+          await videoRef.current.playFromPositionAsync(initialSeekTime, { toleranceMillisBefore: 100, toleranceMillisAfter: 100 });
+        } else {
+          await videoRef.current.playAsync(); // Autoplay if no seek time
         }
+        // Ensure video respects the current isMuted state upon loading and playing
+        await videoRef.current.setIsMutedAsync(isMuted);
       }
-      setIsLoaded(true); // Set isLoaded after attempting to seek
     } else if (status.error) { 
       console.error('Detail screen video load error:', status.error); 
     } 
@@ -568,18 +578,21 @@ export default function RecipeDetailScreen() {
           if (recipeDetails?.video_url) {
             console.log("RecipeDetailScreen: Attempting to play video_url:", recipeDetails.video_url); 
             return (
-              <Video
-                ref={videoRef}
-                source={{ uri: recipeDetails.video_url }}
-                style={styles.video}
-                resizeMode={ResizeMode.COVER}
-                isLooping
-                isMuted={isMuted}
-                shouldPlay // Autoplay
-                onLoad={handleLoad}
-                onError={handleError}
-                pointerEvents="none"
-              />
+              <View style={styles.videoContainer}>
+                <Video
+                  ref={videoRef}
+                  style={styles.videoPlayer}
+                  source={{ uri: recipeDetails.video_url }}
+                  useNativeControls={false} // Using custom controls
+                  resizeMode={ResizeMode.COVER}
+                  isLooping
+                  onLoad={handleLoad} // Use the updated handleLoad
+                  onError={handleError}
+                  progressUpdateIntervalMillis={500}
+                  isMuted={isMuted} // Bind to isMuted state
+                  // shouldPlay // Consider if autoplay is desired immediately on component mount vs. on load
+                />
+              </View>
             );
           } else {
             console.log("RecipeDetailScreen: video_url is not available."); 
@@ -972,5 +985,13 @@ const styles = StyleSheet.create({
   },
   tabContentContainer: {
     // No padding/margin here since individual tab components have their own
+  },
+  videoContainer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+  },
+  videoPlayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
   },
 }); 
