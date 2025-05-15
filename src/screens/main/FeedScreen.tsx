@@ -8,6 +8,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { FeedItem } from '../../hooks/useFeed';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../providers/AuthProvider';
+import { useIsFocused } from '@react-navigation/native';
 
 interface MutationContext {
   previousFeed?: FeedItem[];
@@ -19,6 +20,7 @@ export default function FeedScreen() {
     isLoading,
     error: feedError,
   } = useFeed();
+  const isFeedScreenFocused = useIsFocused();
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [layoutReady, setLayoutReady] = useState(false);
@@ -159,6 +161,7 @@ export default function FeedScreen() {
                   }}
                   isActive={index === currentIndex}
                   containerHeight={itemHeight}
+                  isScreenFocused={isFeedScreenFocused}
                 />
               )}
               estimatedItemSize={itemHeight}
@@ -167,7 +170,7 @@ export default function FeedScreen() {
               showsVerticalScrollIndicator={false}
               viewabilityConfig={viewabilityConfig}
               onViewableItemsChanged={onViewableItemsChanged}
-              extraData={currentIndex}
+              extraData={{ currentIndex, isFeedScreenFocused }}
               overrideItemLayout={(layout) => {
                 layout.size = itemHeight;
               }}

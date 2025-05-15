@@ -1,8 +1,8 @@
 // RecipeCard component implementation will go here
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, DimensionValue, Image, TouchableWithoutFeedback, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, DimensionValue, Image, TouchableWithoutFeedback, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation /*, useFocusEffect */ } from '@react-navigation/native'; // Commented out useFocusEffect
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useQueryClient } from '@tanstack/react-query';
 import ActionOverlay from './ActionOverlay';
@@ -11,7 +11,8 @@ import { MainStackParamList } from '../navigation/types'; // Import MainStackPar
 import { prefetchRecipeDetails } from '../hooks/useRecipeDetails';
 import { useAuth } from '../providers/AuthProvider';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Added
 
 // Remove local interface definition
 // interface RecipeItem { ... }
@@ -20,100 +21,78 @@ interface RecipeCardProps {
   item: RecipeItem;
   isActive: boolean;
   containerHeight: number;
+  isScreenFocused: boolean;
 }
 
 // Define the specific navigation prop type for this screen's context
-type RecipeCardNavigationProp = NativeStackNavigationProp<MainStackParamList, 'RecipeDetail'>;
+type RecipeCardNavigationProp = NativeStackNavigationProp<MainStackParamList, 'RecipeDetail' | 'SearchScreen'>;
 
-export default function RecipeCard({ item, isActive, containerHeight }: RecipeCardProps) {
+export default function RecipeCard({ item, isActive, containerHeight, isScreenFocused }: RecipeCardProps) {
+  // Log the item prop to debug potential string rendering issues
+  // console.log(`[RecipeCard DEBUG] Rendering item: ${item.id}, title: ${item.title}`);
+  // console.log(JSON.stringify(item, null, 2)); // UNCOMMENTED to debug error
+
   const videoRef = useRef<Video>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isPrefetched, setIsPrefetched] = useState(false);
-  const navigation = useNavigation<RecipeCardNavigationProp>(); // Get navigation object
+  const [isBuffering, setIsBuffering] = useState(false);
+  const navigation = useNavigation<RecipeCardNavigationProp>();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets(); // Added
+
+  // Removed useEffect and useFocusEffect for play/pause logic
+  // The shouldPlay prop on the Video component will now manage this.
 
   useEffect(() => {
-    const videoElement = videoRef.current;
-    // console.log(`RecipeCard ${item.id} - Effect: isActive: ${isActive}, isLoaded: ${isLoaded}`); // Reduced logging
-
-    if (!videoElement) {
-      return;
-    }
-    if (isActive) {
-      if (isLoaded) {
-        videoElement.playAsync().catch(e => console.error(`Play error for ${item.id}: ${e.message}`, e));
-        
-        // Prefetch data when video becomes active and visible
-        if (!isPrefetched && item.id) {
-          prefetchRecipeDetails(queryClient, item.id, user?.id)
+    if (isActive && isScreenFocused && isLoaded && !isPrefetched && item.id) {
+        prefetchRecipeDetails(queryClient, item.id, user?.id)
             .then(() => setIsPrefetched(true))
             .catch(e => console.error(`Prefetch error for ${item.id}:`, e));
-        }
-      } 
-    } else { 
-      if (isLoaded) { 
-        videoElement.pauseAsync().catch(e => console.error(`Pause error for ${item.id}: ${e.message}`, e));
-      }
     }
-    return () => {
-      const currentVideoElement = videoRef.current;
-      if (currentVideoElement) {
-        currentVideoElement.getStatusAsync().then(status => {
-          if (status.isLoaded && status.isPlaying) {
-             currentVideoElement.pauseAsync().catch(e => console.error(`Cleanup pause error for ${item.id}: ${e.message}`,e));
-          }
-        }).catch(e => console.error(`Cleanup getStatus error for ${item.id}: ${e.message}`, e));
-      }
-    };
-  }, [isActive, isLoaded, item.id, isPrefetched, queryClient, user?.id]);
+  }, [isActive, isScreenFocused, isLoaded, isPrefetched, item.id, queryClient, user?.id]);
 
-  useFocusEffect(
-    useCallback(() => {
-      const managePlayback = async () => {
-        if (isActive && isLoaded && videoRef.current) {
-          try {
-            await videoRef.current.playAsync();
-          } catch (e) {
-            console.error(`RecipeCard ${item.id}: Error in focus effect (play/fade)`, e);
-          }
-        }
-      };
-
-      managePlayback();
-
-      return () => {
-        // Screen blurred
-        const pauseOnBlur = async () => {
-          if (isActive && isLoaded && videoRef.current) {
-            // console.log(`RecipeCard ${item.id} (useFocusEffect - blur): Active & Loaded - Pausing`);
-            try {
-              await videoRef.current.pauseAsync();
-            } catch (e) {
-              console.error(`RecipeCard ${item.id}: Error in focus effect (pause)`, e);
-            }
-          }
-        };
-        pauseOnBlur();
-      };
-    }, [isActive, isLoaded, item.id]) // Dependencies for useCallback
-  );
 
   const handleLoad = (status: AVPlaybackStatus) => {
     if (status.isLoaded) {
       if (!isLoaded) { setIsLoaded(true); }
+      setIsBuffering(false);
     } else if (status.error) {
       console.error(`RecipeCard ${item.id}: Video load error from onLoad:`, status.error);
-      setIsLoaded(false); 
+      setIsLoaded(false);
+      setIsBuffering(false);
     }
   };
   
   const handleError = (error: string) => {
     console.error(`RecipeCard ${item.id}: Video onError event:`, error);
     setIsLoaded(false);
+    setIsBuffering(false);
   }
 
-  // Handler for touch events to trigger prefetching
+  const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
+    if (!status.isLoaded) {
+      if (isActive && isScreenFocused) {
+         setIsBuffering(true); 
+      }
+      setIsLoaded(false);
+      return;
+    }
+    setIsLoaded(true);
+    if (isActive && isScreenFocused) {
+      if (status.isBuffering) {
+        setIsBuffering(true);
+      } else {
+        setIsBuffering(false);
+      }
+      if (status.isPlaying && status.isBuffering) {
+          setIsBuffering(true);
+      }
+    } else {
+        setIsBuffering(false);
+    }
+  };
+
   const handlePressIn = useCallback(() => {
     if (item.id && !isPrefetched) {
       prefetchRecipeDetails(queryClient, item.id, user?.id)
@@ -122,7 +101,6 @@ export default function RecipeCard({ item, isActive, containerHeight }: RecipeCa
     }
   }, [item.id, isPrefetched, queryClient, user?.id]);
 
-  // Handler for navigating to detail screen
   const handleNavigateToDetail = async () => {
     console.log(`Navigating to RecipeDetail for ID: ${item.id}`);
     let seekTime = 0;
@@ -140,7 +118,6 @@ export default function RecipeCard({ item, isActive, containerHeight }: RecipeCa
     });
   };
 
-  // New handler for navigating to RecipeDetail with Comments tab active
   const handleNavigateToComments = async () => {
     console.log(`Navigating to RecipeDetail (Comments) for ID: ${item.id}`);
     let seekTime = 0;
@@ -152,17 +129,25 @@ export default function RecipeCard({ item, isActive, containerHeight }: RecipeCa
     } catch (error) {
       console.warn(`RecipeCard ${item.id}: Could not get video status for seek time`, error);
     }
-    // Navigate to RecipeDetail, specifying the 'Comments' tab
-    // Assuming 'Comments' is the string value used by RecipeDetailScreen's TAB_ROUTES.COMMENTS
     navigation.navigate('RecipeDetail', { 
       id: item.id,
       initialSeekTime: seekTime,
-      initialTab: 'Comments' // Pass the target tab name
+      initialTab: 'Comments'
     });
+  };
+
+  const handleNavigateToSearch = () => {
+    navigation.navigate('SearchScreen');
   };
 
   const containerStyle = {
     height: containerHeight,
+  };
+
+  // Dynamic style for topOverlayContainer based on insets
+  const topOverlayContainerStyle = {
+    ...styles.topOverlayContainer,
+    top: insets.top + 16, // Adjust top position based on safe area
   };
 
   return (
@@ -175,45 +160,63 @@ export default function RecipeCard({ item, isActive, containerHeight }: RecipeCa
           style={StyleSheet.absoluteFill}
           isLooping
           isMuted={false}
+          shouldPlay={isActive && isScreenFocused}
           onLoad={handleLoad}
           onError={handleError}
-          progressUpdateIntervalMillis={1000} 
+          progressUpdateIntervalMillis={500}
+          onPlaybackStatusUpdate={isActive && isScreenFocused ? onPlaybackStatusUpdate : undefined}
         />
+
+        <View style={topOverlayContainerStyle}> 
+          {item.pantryMatchPct !== undefined ? (
+            <View style={styles.pantryMatchBadge}>
+              <Feather name="check-circle" size={16} color="white" style={{ marginRight: 5 }} />
+              <Text style={styles.pantryMatchBadgeText}>
+                {`${item.pantryMatchPct || 0}`}% match
+              </Text>
+            </View>
+          ) : <View />}
+
+          <TouchableOpacity 
+            style={styles.filterButton} 
+            onPress={() => console.log('Filter pressed')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.filterButtonText}>Filter</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.searchButton} 
+            onPress={handleNavigateToSearch}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="search" size={24} color="white" />
+          </TouchableOpacity>
+        </View>
         
-        {/* Gradient overlay to make text more readable */}
+        {isActive && isScreenFocused && isBuffering && (
+          <View style={styles.bufferingOverlay}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+          </View>
+        )}
+        
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)']}
           style={styles.gradient}
         />
         
-        {/* Recipe info at bottom */}
         <View style={styles.recipeInfoContainer}>
-          {/* New container for left-side content */}
           <View style={styles.leftContentContainer}>
             <TouchableOpacity 
               style={styles.recipeTitleContainer} 
               onPress={handleNavigateToDetail}
               activeOpacity={0.9}
             >
-              <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-              
-              {item.pantryMatchPct !== undefined && (
-                <View style={styles.pantryMatchContainer}>
-                  <Feather name="check-circle" size={14} color="#22c55e" style={styles.matchIcon} />
-                  <Text style={styles.pantryMatch}>
-                    {item.pantryMatchPct}% pantry match
-                  </Text>
-                </View>
-              )}
+              <Text style={styles.title} numberOfLines={2}>{item.title || ''}</Text>
             </TouchableOpacity>
 
-            {/* MOVED User info here, inside leftContentContainer */}
             <View style={styles.userInfoContainer}>
-              <TouchableOpacity 
-                style={styles.userTouchable}
-                // Removing navigation to Profile since it's not properly defined in the navigation types
-                // We'll leave the touchable for UI consistency
-              >
+              <TouchableOpacity style={styles.userTouchable}>
                 {item.creatorAvatarUrl ? (
                   <Image 
                     source={{ uri: item.creatorAvatarUrl }}
@@ -230,118 +233,158 @@ export default function RecipeCard({ item, isActive, containerHeight }: RecipeCa
               </TouchableOpacity>
             </View>
           </View>
-          
-          {/* Action overlay (now a sibling to leftContentContainer) */}
-          {item.onLike && item.onSave && (
-            <View style={styles.actionOverlayContainer}>
-              <ActionOverlay 
-                item={item} 
-                onLike={item.onLike} 
-                onSave={item.onSave} 
-                onCommentPress={handleNavigateToComments}
-                onMorePress={handleNavigateToDetail}
-              />
-            </View>
-          )}
         </View>
+
+        {item.onLike && item.onSave && (
+          <View style={styles.actionOverlayContainer}>
+            <ActionOverlay 
+              item={item} 
+              onLike={item.onLike} 
+              onSave={item.onSave} 
+              onCommentPress={handleNavigateToComments}
+              onMorePress={handleNavigateToDetail}
+            />
+          </View>
+        )}
       </View>
     </TouchableWithoutFeedback>
   );
 }
 
-// Updated styling
 const styles = StyleSheet.create({
   container: {
-    width: '100%' as DimensionValue,
-    backgroundColor: 'black',
-    overflow: 'hidden',
-    position: 'relative',
+    width: '100%',
+    backgroundColor: 'black', 
+    justifyContent: 'flex-end', 
+    alignItems: 'center', 
+  },
+  bufferingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    zIndex: 5, 
+  },
+  topOverlayContainer: { 
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 10, 
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+  },
+  pantryMatchBadge: { // No longer absolute position within this container
+    backgroundColor: '#22c55e',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14, 
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  pantryMatchBadgeText: {
+    color: 'white',
+    fontSize: 14, 
+    fontWeight: '600',
+  },
+  filterButton: { // No longer absolute position within this container
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    marginHorizontal: 12,
+  },
+  filterButtonText: {
+    color: 'white',
+    fontSize: 16,
+  },
+  searchButton: { // No longer absolute position within this container
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    padding: 6,
+    borderRadius: 20, 
   },
   gradient: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: '50%',
+    height: '40%', 
     zIndex: 1,
   },
+  recipeInfoContainer: {
+    position: 'absolute',
+    bottom: 0, 
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+    zIndex: 2, 
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end', 
+  },
+  leftContentContainer: {
+    flex: 1, 
+    marginRight: 8, 
+  },
+  recipeTitleContainer: {
+    marginBottom: 8, 
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: 'white',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 10,
+  },
+  pantryMatchContainer: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  matchIcon: { 
+  },
+  pantryMatch: { 
+    fontSize: 12,
+    color: '#DCFCE7',
+  },
   userInfoContainer: {
-    zIndex: 2,
-    marginTop: 8,
-    paddingHorizontal: 0,
     flexDirection: 'row',
     alignItems: 'center',
   },
   userTouchable: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 4, 
   },
   avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     marginRight: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.3)',
   },
   avatarPlaceholder: {
-    backgroundColor: 'rgba(100,100,100,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   usernameText: {
-    color: 'white',
     fontSize: 14,
-    fontWeight: 'bold',
-    flexShrink: 1,
-  },
-  recipeInfoContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    zIndex: 2,
-    flexDirection: 'row', // Added for side-by-side layout
-    justifyContent: 'space-between', // Added
-    alignItems: 'flex-end', // Align items (left block and actions) to the bottom of this container
-  },
-  leftContentContainer: { // New style for the left block
-    flex: 1, // Take available space
-    marginRight: 8, // Space between left content and actions
-  },
-  recipeTitleContainer: {
-    marginBottom: 8,
-  },
-  title: {
     color: 'white',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    fontWeight: '500',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
-  pantryMatchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  matchIcon: {
-    marginRight: 4,
-  },
-  pantryMatch: {
-    color: '#22c55e',
-    fontSize: 12,
-    fontWeight: '600',
-  },
   actionOverlayContainer: {
-    // alignItems: 'center', // Removed or adjust: actions are now in a row
-    // justifyContent: 'flex-end', // Removed or adjust
-    // marginBottom: 8, // Removed or adjust, alignment handled by recipeInfoContainer
-    // Add specific alignment for items within action overlay if needed
-    // For example, to keep icons vertically centered if their container is taller:
-    // justifyContent: 'center', 
+    position: 'absolute', 
+    top: 0,              
+    bottom: 0,             
+    right: 16,             
+    justifyContent: 'center', 
+    zIndex: 3,             
+    paddingTop: 120,
   },
 }); 

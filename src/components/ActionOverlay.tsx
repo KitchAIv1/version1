@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 20,
   },
   iconContainer: {
     width: 42,

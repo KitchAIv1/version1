@@ -114,13 +114,14 @@ export default function MyStockScreen({ navigation }) {
             if (session?.user) {
                 setUserId(session.user.id);
             } else {
-                console.error("MyStockScreen: No user session found.");
-                Alert.alert("Error", "User session not found. Please log in again.");
-                navigation.navigate('Login'); // Redirect if no user
+                console.warn("MyStockScreen: No user session found. User might be logging out or not logged in.");
+                setUserId(null); // Ensure userId is null if no session
+                // Alert.alert("Error", "User session not found. Please log in again."); // Consider removing
+                // navigation.navigate('Login'); // REMOVE THIS LINE
             }
         };
         getUser();
-    }, [navigation]);
+    }, []); // Dependency array changed, assuming navigation was only for the removed line.
 
     // Fetch Stock Data - MODIFIED to read from 'stock' table
     const fetchStock = useCallback(async (currentUserId) => {

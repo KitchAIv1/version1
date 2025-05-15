@@ -25,6 +25,8 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { v4 as uuidv4 } from 'uuid';
 import 'react-native-get-random-values'; // Import this before uuid
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../../providers/AuthProvider';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BRAND_PRIMARY = '#10B981';
@@ -83,6 +85,8 @@ const DIET_TAGS_OPTIONS = [
 
 const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({ navigation: navPropFromProps }) => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList, 'VideoRecipeUploader'>>();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
   
   // Animation values
   const fadeAnim = useState(new Animated.Value(0))[0];
@@ -107,6 +111,12 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({ n
   const onUploadSuccessHandler = (response: any) => {
     const recipeId = response?.recipeId;
     Alert.alert('Success', 'Recipe uploaded successfully!');
+
+    if (user?.id) {
+      queryClient.invalidateQueries({ queryKey: ['userRecipesForPlanner', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
+    }
+
     // Clear form state
     setTitle('');
     setDescription('');

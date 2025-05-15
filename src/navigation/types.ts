@@ -54,6 +54,11 @@ export type MainStackParamList = {
   EditProfile: EditProfileParams; // Added EditProfile screen
   VideoRecipeUploader: undefined; // Add VideoRecipeUploader screen
   EditRecipe: EditRecipeParams; // Add EditRecipe route
+  SearchScreen: undefined; // Added SearchScreen for the new top bar icon
+  OnboardingStep1: undefined; // Added Onboarding Step 1
+  OnboardingStep2User: undefined; // Added Onboarding Step 2 User
+  OnboardingStep2Creator: undefined; // Added Onboarding Step 2 Creator
+  OnboardingFinal: undefined; // Added Onboarding Final Step
   // Add other stack screens here if needed (e.g., Settings)
 };
 

@@ -15,7 +15,7 @@ import {
   LayoutChangeEvent,
   StatusBar,
 } from 'react-native';
-import { useRoute, RouteProp, useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useRoute, RouteProp, useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +23,7 @@ import * as Sharing from 'expo-sharing';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { NavigationState } from '@react-navigation/native';
+import { format } from 'date-fns';
 
 import { MainStackParamList } from '../../navigation/types';
 import { useRecipeDetails, RecipeDetailsData } from '../../hooks/useRecipeDetails';
@@ -37,6 +38,8 @@ import { supabase } from '../../services/supabase';
 import { useGroceryManager } from '../../hooks/useGroceryManager';
 import { COLORS } from '../../constants/theme';
 import FloatingTabBar from '../../components/FloatingTabBar';
+import useMealPlanner, { MealSlot } from '../../hooks/useMealPlanner';
+import AddToMealPlannerModal from '../../components/modals/AddToMealPlannerModal';
 
 // Define route prop type
 type RecipeDetailScreenRouteProp = RouteProp<
@@ -138,6 +141,11 @@ export default function RecipeDetailScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { groceryList, fetchGroceryList } = useGroceryManager();
   const scrollViewRef = useRef<ScrollView>(null);
+  const isScreenFocused = useIsFocused(); // Added
+  
+  // Meal Planner integration
+  const { addRecipeToSlot } = useMealPlanner();
+  const [isPlannerModalVisible, setIsPlannerModalVisible] = useState(false);
   
   // Track original tab bar measurements
   const tabBarRef = useRef<View>(null);
@@ -196,8 +204,58 @@ export default function RecipeDetailScreen() {
     setIsLoaded(false); // Reset loaded state for the new video
   }, [recipeDetails?.video_url]);
 
-  // Measure tab bar position after render and when recipe details change
+  // --- Video Player Logic ---
   useEffect(() => {
+    const videoElement = videoRef.current;
+    if (videoElement && isLoaded) { // Ensure video is loaded
+      if (isScreenFocused) {
+        console.log(`RecipeDetailScreen: Screen focused and video loaded, playing video for ID: ${recipeId}`);
+        videoElement.playAsync().catch(e => console.error(`RecipeDetailScreen ${recipeId}: Focus play error:`, e));
+      } else {
+        console.log(`RecipeDetailScreen: Screen NOT focused, pausing video for ID: ${recipeId}`);
+        videoElement.pauseAsync().catch(e => console.error(`RecipeDetailScreen ${recipeId}: Focus pause error:`, e));
+      }
+    }
+  }, [isLoaded, isScreenFocused, recipeId, videoRef]); // Dependencies for focus-aware playback
+
+  const handleLoad = async (status: AVPlaybackStatus) => {
+    if (status.isLoaded) {
+      console.log(`RecipeDetailScreen ${recipeId}: Video loaded. Initial seek: ${initialSeekTime}ms. IsMuted: ${isMuted}`);
+      if (videoRef.current) {
+        if (initialSeekTime > 0) {
+          // Set position but don't auto-play here; useEffect will handle it based on focus.
+          await videoRef.current.setPositionAsync(initialSeekTime, { toleranceMillisBefore: 100, toleranceMillisAfter: 100 });
+        }
+        // Ensure video respects the current isMuted state upon loading
+        await videoRef.current.setIsMutedAsync(isMuted);
+      }
+      setIsLoaded(true); // This will trigger the focus-aware useEffect to potentially play the video
+    } else if (status.error) { 
+      console.error('Detail screen video load error from handleLoad:', status.error); 
+      // Consider calling handleError if status.error is a string message, or adapt handleError
+      // For now, just logging as original code did.
+    } 
+  };
+  
+  const toggleMute = () => { 
+    if (!videoRef.current) {
+      console.error('toggleMute: videoRef.current is null or undefined');
+      return; // Exit if no video ref
+    }
+    videoRef.current.setIsMutedAsync(!isMuted)
+      .catch(e => console.error('setIsMutedAsync error:', e));
+    setIsMuted(prevMuted => !prevMuted);
+  };
+  
+  const handleError = (error: string) => { 
+    console.error(`RecipeDetailScreen ${recipeId}: Video onError event:`, error); 
+    setVideoPlayerError("Video playback failed. Please check your connection or try again later."); // Set user-friendly error
+    setIsLoaded(false); 
+  };
+  // --- End Video Player ---
+
+  // Measure tab bar position after render and when recipe details change
+  useLayoutEffect(() => {
     if (!isLoading && recipeDetails) {
       const measureTabBar = () => {
         if (tabBarRef.current) {
@@ -268,6 +326,10 @@ export default function RecipeDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       // Optionally, invalidate feed if saved status affects feed items
       queryClient.invalidateQueries({ queryKey: ['feed'] }); 
+      // Invalidate the user recipes list for the meal planner modal
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: ['userRecipesForPlanner', user.id] });
+      }
     },
     onError: (saveError) => {
       console.error('Mutation error for save_recipe_video:', saveError);
@@ -293,50 +355,6 @@ export default function RecipeDetailScreen() {
     } 
   };
   // --- End Share ---
-
-  // --- Video Player Logic ---
-  useEffect(() => { 
-    const videoElement = videoRef.current; 
-    if (videoElement && isLoaded) { 
-      videoElement.playAsync().catch(e => console.error('Initial play error:', e)); 
-    }
-  }, [isLoaded]); // Keep isLoaded dependency for play
-
-  const handleLoad = async (status: AVPlaybackStatus) => { // Make handleLoad async
-    if (status.isLoaded) {
-      console.log(`RecipeDetailScreen ${recipeId}: Video loaded. Initial seek: ${initialSeekTime}ms. IsMuted: ${isMuted}`);
-      setIsLoaded(true);
-      if (videoRef.current) {
-        // Apply initial seek time if provided
-        if (initialSeekTime > 0) {
-          await videoRef.current.playFromPositionAsync(initialSeekTime, { toleranceMillisBefore: 100, toleranceMillisAfter: 100 });
-        } else {
-          await videoRef.current.playAsync(); // Autoplay if no seek time
-        }
-        // Ensure video respects the current isMuted state upon loading and playing
-        await videoRef.current.setIsMutedAsync(isMuted);
-      }
-    } else if (status.error) { 
-      console.error('Detail screen video load error:', status.error); 
-    } 
-  };
-  
-  const toggleMute = () => { 
-    if (!videoRef.current) {
-      console.error('toggleMute: videoRef.current is null or undefined');
-      return; // Exit if no video ref
-    }
-    videoRef.current.setIsMutedAsync(!isMuted)
-      .catch(e => console.error('setIsMutedAsync error:', e));
-    setIsMuted(prevMuted => !prevMuted);
-  };
-  
-  const handleError = (error: string) => { 
-    console.error(`RecipeDetailScreen ${recipeId}: Video onError event:`, error); 
-    setVideoPlayerError("Video playback failed. Please check your connection or try again later."); // Set user-friendly error
-    setIsLoaded(false); 
-  };
-  // --- End Video Player ---
 
   // Calculate pantry badge values using the same logic as IngredientsTab
   const ingredients = React.useMemo(() => {
@@ -537,6 +555,45 @@ export default function RecipeDetailScreen() {
           </View>
         );
     }
+  };
+
+  const handleOpenPlannerModal = () => {
+    if (!recipeDetails) {
+      Alert.alert("Error", "Recipe details not loaded yet.");
+      return;
+    }
+    setIsPlannerModalVisible(true);
+  };
+
+  const handleClosePlannerModal = () => {
+    setIsPlannerModalVisible(false);
+  };
+
+  const handleAddToMealPlan = async (date: Date, slot: MealSlot) => {
+    if (!recipeDetails) {
+      Alert.alert("Error", "Cannot add to plan, recipe details are missing.");
+      return;
+    }
+    const dateString = format(date, 'yyyy-MM-dd');
+    console.log(`RecipeDetailScreen: Adding ${recipeDetails.title} (ID: ${recipeDetails.recipe_id}) to meal plan on ${dateString} [${slot}]`);
+    try {
+      const result = await addRecipeToSlot(
+        dateString, 
+        slot, 
+        recipeDetails.recipe_id, 
+        recipeDetails.title,
+        undefined // Pass undefined for thumbnail_url
+      );
+      if (result) {
+        Alert.alert("Success", `Added ${recipeDetails.title} to your meal plan for ${format(date, 'MMM d, yyyy')} (${slot}).`);
+      } else {
+        Alert.alert("Failed", `Could not add ${recipeDetails.title} to your meal plan. Please try again.`);
+      }
+    } catch (e: any) {
+      Alert.alert("Error", e.message || "An unexpected error occurred.");
+      console.error("Error adding to meal plan:", e);
+    }
+    // Modal closes itself
   };
 
   // --- Render Logic ---
@@ -762,6 +819,13 @@ export default function RecipeDetailScreen() {
           />
         </View>
       </ScrollView>
+
+      <AddToMealPlannerModal
+        isVisible={isPlannerModalVisible}
+        onClose={handleClosePlannerModal}
+        onAddToPlan={handleAddToMealPlan}
+        recipeName={recipeDetails?.title}
+      />
     </View>
   );
 }
@@ -993,5 +1057,45 @@ const styles = StyleSheet.create({
   videoPlayer: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 0,
+  },
+  authorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 10, // Added vertical margin
+    paddingHorizontal: 16, // Match content padding
+  },
+  authorAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 10,
+    backgroundColor: '#e0e0e0', // Placeholder bg
+  },
+  authorName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#444',
+  },
+  plannerButton: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.primary, // Use app primary color
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 25, // More rounded
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 16,
+    marginVertical: 15,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  plannerButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 10,
   },
 }); 

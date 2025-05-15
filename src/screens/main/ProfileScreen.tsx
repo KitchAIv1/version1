@@ -21,6 +21,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // I
 import { MainStackParamList } from '../../navigation/types'; // Import param list
 import { useAuth } from '../../providers/AuthProvider'; // Import useAuth
 import { Feather } from '@expo/vector-icons';
+import MealPlannerScreen from './meal_planner/MealPlannerScreen'; // Added import for MealPlannerScreen
 
 // Define types for profile and post data
 interface VideoPostData { 
@@ -131,7 +132,8 @@ const Header: React.FC<HeaderProps> = ({ profile, onMenuPress, onAddPress }) => 
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-      <Text style={styles.username}>{profile.username}</Text>
+      <View style={styles.headerSpacer} />
+      <Text style={styles.headerTitle}>Kitch Hub</Text>
       <View style={styles.headerActions}>
         <TouchableOpacity style={styles.iconBtn} onPress={onAddPress}>
           <Icon name="add-box" size={26} color="#fff" />
@@ -190,9 +192,7 @@ const Bio: React.FC<{ profile: ProfileData }> = ({ profile }) => (
 // -----------------------------------------------------------------------------
 export const ProfileScreen: React.FC = () => {
   const { user } = useAuth();
-  const { data: profile, isLoading: profileLoading, isError: profileError } = useProfile();
-  const [savedItems, setSavedItems] = React.useState<any[]>([]);
-  const [activityItems, setActivityItems] = React.useState<any[]>([]);
+  const { data: profile, isLoading: profileLoading, isError, error: profileFetchError } = useProfile();
   const navigation = useNavigation<ProfileNavigationProp>();
   const queryClient = useQueryClient(); // Get query client instance
 
@@ -216,16 +216,13 @@ export const ProfileScreen: React.FC = () => {
             try {
               const { error } = await supabase.auth.signOut();
               if (error) {
-                throw error;
+                console.error('Supabase signOut error:', error);
+                throw error; // Rethrow to be caught by the outer catch block
               }
-              // Clear cache AFTER successful sign out
-              queryClient.clear(); 
-              console.log('User signed out, navigating to Login');
-              // Navigate to Login screen - Ensure 'Login' is the correct route name
-              // If using nested navigators, might need navigation.navigate('AuthStack', { screen: 'Login' });
-              navigation.navigate('Login' as any); // Use 'as any' for now if type checking is complex
+              console.log('User signed out successfully from Supabase.');
+              queryClient.clear();
             } catch (signOutError: any) {
-              console.error('Error signing out:', signOutError);
+              console.error('Error during sign out process:', signOutError);
               Alert.alert('Sign Out Failed', signOutError.message || 'Could not sign out. Please try again.');
             }
           },
@@ -237,102 +234,105 @@ export const ProfileScreen: React.FC = () => {
 
   if (profileLoading) return <Loader />;
   
-  if (profileError || !profile || typeof profile !== 'object') {
-    return <ErrorMsg message="Could not load profile" />;
+  if (isError || !profile || typeof profile !== 'object') {
+    console.error('[ProfileScreen] Profile error or profile is not an object:', { profileFetchError, profile });
+    const message = profileFetchError?.message || "Failed to load profile. Please try again later.";
+    return <ErrorMsg message={message} />;
   }
 
-  console.log(`[ProfileScreen] Rendering. Avatar URL from useProfile: ${profile?.avatar_url}, Timestamp: ${Date.now()}`);
-
-  // Add handler for navigating to Edit Profile
+  // Navigation handler for "Edit Profile"
   const handleEditProfilePress = () => {
-    const userIdToPass = (profile as any)?.id || user?.id; 
-    if (!userIdToPass) {
-      console.warn('User ID not found for EditProfile navigation');
-      return;
-    }
-    navigation.navigate('EditProfile', { 
-      // Pass only the data EditProfileScreen expects
-      initialProfileData: {
-        bio: profile.bio,
-        avatar_url: profile.avatar_url,
-        username: profile.username // Pass the username
-      },
-      userId: userIdToPass // Ensure userId is also passed if EditProfileScreen needs it directly
-    });
+    navigation.navigate('EditProfile', {}); // Pass empty params object
   };
-
+  
   const renderHeader = () => (
-    <View>
-      <Header profile={profile} onMenuPress={handleSignOut} onAddPress={handleAddRecipePress} /> 
-      <AvatarRow profile={profile} postsCount={profile.videos?.length ?? 0} />
+    <View style={styles.profileHeaderContainer}>
+      <Header 
+        profile={profile} 
+        onMenuPress={handleSignOut} 
+        onAddPress={handleAddRecipePress} 
+      />
+      <AvatarRow profile={profile} postsCount={profile.videos?.length || 0} />
       <Bio profile={profile} />
-      {/* Add Edit Profile Button */}
-      <View style={styles.editButtonContainer}>
-        <TouchableOpacity style={styles.editProfileButton} onPress={handleEditProfilePress}>
-            <Text style={styles.editProfileButtonText}>Edit Profile</Text>
+      <View style={styles.buttonRow}>
+        <TouchableOpacity style={styles.editButton} onPress={handleEditProfilePress}>
+          <Text style={styles.editButtonText}>Edit Profile</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.shareButton} onPress={() => Alert.alert("Share Profile", "Share functionality to be implemented.")}>
+          <Text style={styles.shareButtonText}>Share Profile</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 
-  // Update renderItem to use ProfileRecipeCard with navigation
   const renderProfileCardItem = ({ item }: { item: VideoPostData }) => (
     <ProfileRecipeCard 
-      item={item}
+      item={item} 
       onPress={() => navigation.navigate('RecipeDetail', { id: item.recipe_id })} 
     />
   );
 
   return (
-    <Tabs.Container 
-      renderHeader={renderHeader} 
-      headerHeight={320} 
-      renderTabBar={props => (
+    <Tabs.Container
+      renderHeader={renderHeader}
+      headerHeight={undefined} 
+      allowHeaderOverscroll={true}
+      renderTabBar={(props) => (
         <MaterialTabBar
           {...props}
           activeColor={ACTIVE_COLOR}
-          inactiveColor="#6b7280"
+          inactiveColor="#525252"
           labelStyle={styles.tabLabel}
-          indicatorStyle={{ backgroundColor: ACTIVE_COLOR, height: 2 }}
+          indicatorStyle={styles.tabIndicator}
+          style={styles.materialTabBar}
+          getLabelText={(name: string) => name}
+          // @ts-ignore 
+          renderIcon={(iconProps) => { 
+            let iconName = 'video-library'; 
+            if (iconProps.route.name === 'My Recipes') iconName = 'video-library';
+            if (iconProps.route.name === 'Saved') iconName = 'bookmark';
+            if (iconProps.route.name === 'Planner') iconName = 'event'; 
+            if (iconProps.route.name === 'Activity') iconName = 'notifications';
+
+            return <Icon name={iconName} size={20} color={iconProps.focused ? ACTIVE_COLOR : '#525252'} style={{ marginRight: 0, paddingRight:0 }}/>;
+          }}
         />
       )}
     >
-      <Tabs.Tab name="Uploads" label={`Uploads (${profile.videos?.length ?? 0})`}>
-        {profile.videos && profile.videos.length > 0 ? (
-          <Tabs.FlatList
-            data={profile.videos} 
-            numColumns={2}
-            keyExtractor={(item) => item.recipe_id}
-            renderItem={renderProfileCardItem} 
-            contentContainerStyle={styles.listContentContainer}
-            showsVerticalScrollIndicator={false}
-            initialNumToRender={6}
-            columnWrapperStyle={styles.columnWrapper} // Add column wrapper style for more control
-          />
-        ) : (
-          <Empty label="No uploads yet" />
-        )}
+      <Tabs.Tab name="My Recipes" label="My Recipes">
+        <Tabs.FlatList
+          data={profile.videos}
+          renderItem={renderProfileCardItem}
+          keyExtractor={(item) => item.recipe_id}
+          numColumns={2}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={<Empty label="No recipes uploaded yet." />}
+          contentContainerStyle={styles.gridContentContainer} // Use this for padding
+          style={styles.fullScreenTabContent} // Ensures FlatList takes full available space
+        />
       </Tabs.Tab>
-      <Tabs.Tab name="Saved" label={`Saved (${profile.saved_recipes?.length ?? 0})`}>
-        {profile.saved_recipes && profile.saved_recipes.length > 0 ? (
-          <Tabs.FlatList
-            data={profile.saved_recipes} 
-            numColumns={2} 
-            keyExtractor={(item) => item.recipe_id}
-            renderItem={renderProfileCardItem}
-            contentContainerStyle={styles.listContentContainer}
-            showsVerticalScrollIndicator={false}
-            initialNumToRender={6}
-            columnWrapperStyle={styles.columnWrapper} // Add column wrapper style for more control
-          />
-        ) : (
-          <Empty label="No saved recipes yet" />
-        )}
+      <Tabs.Tab name="Saved" label="Saved">
+        <Tabs.FlatList
+          data={profile.saved_recipes}
+          renderItem={renderProfileCardItem}
+          keyExtractor={(item) => `saved-${item.recipe_id}`}
+          numColumns={2}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={<Empty label="No saved recipes yet." />}
+          contentContainerStyle={styles.gridContentContainer} // Use this for padding
+          style={styles.fullScreenTabContent} // Ensures FlatList takes full available space
+        />
+      </Tabs.Tab>
+      <Tabs.Tab name="Planner" label="Planner">
+        <View style={styles.fullScreenTabContentWithPadding}>
+          <MealPlannerScreen />
+        </View>
       </Tabs.Tab>
       <Tabs.Tab name="Activity" label="Activity">
-        {/* Use ActivityList component */}
-        {/* TODO: Replace [] with actual activityItems data when fetched */}
-        <ActivityList data={activityItems} />
+        {/* Assuming ActivityList can be wrapped or is already scrollable */}
+        <View style={styles.fullScreenTabContentWithPadding}>
+           <ActivityList data={[]} />
+        </View>
       </Tabs.Tab>
     </Tabs.Container>
   );
@@ -364,69 +364,28 @@ const Empty: React.FC<{ label: string }> = ({ label }) => (
 // -----------------------------------------------------------------------------
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: {
-    backgroundColor: ACTIVE_COLOR, 
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
   username: {
     fontSize: 22,
     color: '#fff',
     fontWeight: 'bold',
   },
-  headerActions: { flexDirection: 'row' },
-  iconBtn: {
-    marginLeft: 12,
-  },
-  avatarRow: {
-    flexDirection: 'row',
-    padding: 16,
-    backgroundColor: '#fff',
-  },
-  avatar: { width: 80, height: 80, borderRadius: 40 },
-  avatarPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#e5e7eb',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statsRow: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-  },
-  statValue: { fontSize: 18, fontWeight: '600' },
-  statLabel: { color: '#6b7280' },
-  bioName: { fontWeight: '600', marginBottom: 2 },
-  bioText: { color: '#374151' },
-  bioEmpty: { color: '#9ca3af', fontStyle: 'italic' },
-  tabLabel: { 
-    textTransform: 'capitalize',
-    fontSize: 14,
-  },
   listContentContainer: {
-    paddingHorizontal: 6, // Match card margin for consistent spacing
+    paddingHorizontal: 6,
     paddingTop: 8,
-    paddingBottom: 24, // More bottom space
+    paddingBottom: 24,
   },
   columnWrapper: {
-    justifyContent: 'flex-start', // Align items to the start of the row
+    justifyContent: 'flex-start',
   },
   editButtonContainer: {
     paddingHorizontal: 16,
-    paddingVertical: 10, 
-    backgroundColor: '#fff', // Match background of bio/avatar row
+    paddingVertical: 10,
+    backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#eee',
   },
   editProfileButton: {
-    backgroundColor: '#f0f0f0', 
+    backgroundColor: '#f0f0f0',
     borderRadius: 8,
     paddingVertical: 10,
     alignItems: 'center',
@@ -456,6 +415,165 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#9ca3af',
     textAlign: 'center',
+  },
+  tabBar: {
+    backgroundColor: '#fff',
+  },
+  profileHeaderContainer: {
+    backgroundColor: '#fff',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#10b981',
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    flex: 1,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 80,
+    justifyContent: 'flex-end',
+  },
+  iconBtn: {
+    padding: 6,
+    marginLeft: 10,
+  },
+  avatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  avatarPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#e5e5e5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statsRow: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginLeft: 16,
+  },
+  statValue: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#262626',
+  },
+  statLabel: {
+    fontSize: 13,
+    color: '#737373',
+    marginTop: 2,
+  },
+  bioName: {
+    fontWeight: 'bold',
+    marginBottom: 4,
+    fontSize: 15,
+    color: '#262626',
+  },
+  bioText: {
+    lineHeight: 18,
+    fontSize: 14,
+    color: '#525252',
+  },
+  bioEmpty: {
+    lineHeight: 18,
+    fontSize: 14,
+    color: '#a3a3a3',
+    fontStyle: 'italic',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e5e5',
+    backgroundColor: '#fff',
+  },
+  editButton: {
+    flex: 1,
+    backgroundColor: '#f0f0f0',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  editButtonText: {
+    fontWeight: '600',
+    color: '#333',
+  },
+  shareButton: {
+    flex: 1,
+    backgroundColor: '#f0f0f0',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  shareButtonText: {
+    fontWeight: '600',
+    color: '#333',
+  },
+  materialTabBar: {
+    backgroundColor: '#fff',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 0.5 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e5',
+  },
+  tabLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'none',
+    textAlign: 'center',
+    marginHorizontal: 4,
+  },
+  tabIndicator: {
+    backgroundColor: ACTIVE_COLOR,
+    height: 2.5,
+  },
+  gridContentContainer: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  fullScreenTabContent: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
+  fullScreenTabContentWithPadding: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+    padding: 8,
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

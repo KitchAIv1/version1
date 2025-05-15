@@ -39,6 +39,7 @@ export interface RecipeMetadataForEdgeFunction {
   cook_time_minutes: number;
   servings: number;
   is_public: boolean;
+  thumbnail_url?: string;
 }
 
 interface UseVideoUploaderProps {
@@ -110,7 +111,85 @@ export const useVideoUploader = ({
     setError(null);
     setUploadProgress(0);
 
+    let finalMetadata = { ...metadata }; // Copy metadata to potentially add thumbnail_url
+
     try {
+      // Part 1: Upload Thumbnail if present
+      let publicThumbnailUrl: string | undefined = undefined;
+      if (thumbnailUri) {
+        console.log('[THUMBNAIL] Processing thumbnail URI:', thumbnailUri);
+        setUploadProgress(0.05); // Progress for starting thumbnail upload
+
+        const thumbFileInfo = await FileSystem.getInfoAsync(thumbnailUri);
+        if (!thumbFileInfo.exists) {
+          throw new Error('Selected thumbnail file does not exist.');
+        }
+
+        const thumbBase64 = await FileSystem.readAsStringAsync(thumbnailUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        if (!thumbBase64) {
+          throw new Error('Failed to read thumbnail as base64.');
+        }
+        console.log('[THUMBNAIL] Read thumbnail as base64.');
+
+        const thumbUint8Array = base64ToUint8Array(thumbBase64);
+        const thumbArrayBuffer = thumbUint8Array.buffer as ArrayBuffer;
+
+        if (thumbArrayBuffer.byteLength === 0) {
+          throw new Error("Thumbnail ArrayBuffer is empty.");
+        }
+
+        const thumbFileExt = thumbnailUri.split('.').pop()?.toLowerCase() || 'jpg';
+        const thumbContentType = `image/${thumbFileExt === 'jpg' ? 'jpeg' : thumbFileExt}`;
+        // Use the recipe ID from metadata for a consistent thumbnail name
+        const thumbFileName = `thumb-${metadata.id}-${Date.now()}.${thumbFileExt}`;
+        
+        // Attempt to get user ID for namespacing, fall back to 'public' or a default
+        let userIdForPath = 'public';
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) userIdForPath = user.id;
+        } catch (authError) {
+            console.warn('Could not get user for thumbnail path, using default:', authError);
+        }
+
+        const thumbStoragePath = `${userIdForPath}/recipe-thumbnails/${thumbFileName}`;
+        
+        console.log(`[THUMBNAIL] Uploading to: ${thumbStoragePath}`);
+        setUploadProgress(0.1); // Progress before thumbnail upload call
+
+        const { data: thumbUploadData, error: thumbUploadError } = await supabase.storage
+          .from('recipe-thumbnails')
+          .upload(thumbStoragePath, thumbArrayBuffer, {
+            contentType: thumbContentType,
+            upsert: true, // Consider if upsert is desired for new uploads, usually false
+            cacheControl: '3600',
+          });
+
+        if (thumbUploadError) {
+          console.error('[THUMBNAIL] Upload error:', thumbUploadError);
+          throw new Error(`Failed to upload thumbnail: ${thumbUploadError.message}`);
+        }
+        console.log('[THUMBNAIL] Upload success:', thumbUploadData);
+        setUploadProgress(0.15); // Progress after thumbnail upload
+
+        if (thumbUploadData?.path) {
+          const { data: urlData } = supabase.storage.from('recipe-thumbnails').getPublicUrl(thumbUploadData.path);
+          publicThumbnailUrl = urlData.publicUrl;
+          console.log('[THUMBNAIL] Public URL:', publicThumbnailUrl);
+          finalMetadata.thumbnail_url = publicThumbnailUrl; // Add to metadata
+        } else {
+          console.warn('[THUMBNAIL] Upload successful but no path returned, cannot get public URL.');
+        }
+      } else {
+        console.log('[THUMBNAIL] No thumbnail URI provided, skipping thumbnail upload.');
+      }
+
+      // Part 2: Upload Video (existing logic)
+      // Adjust progress to account for thumbnail step
+      setUploadProgress(publicThumbnailUrl ? 0.2 : 0.05); // Base progress before video actions
+
       const fileExt = videoUri.split('.').pop()?.toLowerCase() || 'mp4';
       const determinedContentType = `video/${fileExt}`;
       let blob: Blob;
@@ -144,11 +223,13 @@ export const useVideoUploader = ({
       if (arrayBuffer.byteLength === 0) {
         throw new Error("ArrayBuffer created from file data is empty (byteLength is 0).");
       }
+      setUploadProgress(publicThumbnailUrl ? 0.25 : 0.1); // Video file processed
 
       const videoFileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
       const rawUploadPath = `raw-videos/${videoFileName}`;
 
       console.log(`Uploading raw video to: ${rawUploadPath}`);
+      setUploadProgress(publicThumbnailUrl ? 0.3 : 0.15); // Before video upload call
       const { data: uploadData, error: uploadErrorResponse } = await supabase.storage
         .from('videos')
         // .upload(rawUploadPath, blob, { // Old way with Blob
@@ -160,18 +241,12 @@ export const useVideoUploader = ({
           upsert: false,
         });
       
-      setUploadProgress(0.5); 
-
-      if (uploadErrorResponse) {
-        console.error('Error uploading raw video:', uploadErrorResponse);
-        throw new Error(`Failed to upload raw video: ${uploadErrorResponse.message}`);
-      }
-      console.log('Raw video upload success:', uploadData);
-      setUploadProgress(0.75); 
+      setUploadProgress(publicThumbnailUrl ? 0.6 : 0.55); 
 
       // Validate the uploaded file by attempting to download it and check its size
       if (uploadData?.path) {
         console.log(`[VALIDATION] Validating uploaded file by downloading: ${uploadData.path}`);
+        setUploadProgress(publicThumbnailUrl ? 0.6 : 0.55); // During validation
         const { data: downloadedBlob, error: downloadValidationError } = await supabase.storage
           .from('videos')
           .download(uploadData.path);
@@ -203,13 +278,15 @@ export const useVideoUploader = ({
         throw new Error('Upload data path missing, cannot validate file.');
       }
 
-      console.log(`Invoking Edge Function 'video-processor' for fileName: ${videoFileName}`);
+      console.log(`Invoking Edge Function 'video-processor' for fileName: ${videoFileName} with metadata:`, finalMetadata);
+      setUploadProgress(publicThumbnailUrl ? 0.8 : 0.75); // Before EF invoke
+
       const { data: functionResponse, error: functionError } = await supabase.functions.invoke(
         'video-processor',
         {
           body: {
             fileName: videoFileName, 
-            metadata: metadata,
+            metadata: finalMetadata, // Pass the potentially updated metadata
           }
         }
       );

@@ -13,6 +13,7 @@ import { Button } from 'react-native-paper';
 // import { COLORS } from '../constants/colors'; // Removed invalid import
 import { supabase } from '../services/supabase'; // Corrected path
 import { useQueryClient } from '@tanstack/react-query'; // Import useQueryClient
+import { useAuth } from '../providers/AuthProvider'; // Corrected path
 import Icon from 'react-native-vector-icons/MaterialIcons'; // For CollapsibleCard
 
 // Placeholder colors - replace with your actual theme colors later
@@ -51,7 +52,8 @@ type EditProfileRouteParams = {
 
 const EditProfileScreen = ({ navigation, route }: any) => { // Using any temporarily for navigation/route types
   const queryClient = useQueryClient(); // Get queryClient instance
-  const { initialProfileData = {}, userId } = route.params || {}; // Ensure initialProfileData is an object
+  const { user, profile, refreshProfile } = useAuth(); // Get user, profile, and refreshProfile from useAuth
+  const { initialProfileData = {} } = route.params || {}; // userId from route.params is no longer the primary source for update
   
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -62,9 +64,8 @@ const EditProfileScreen = ({ navigation, route }: any) => { // Using any tempora
     if (initialProfileData) {
       setBio(initialProfileData.bio || '');
       setAvatarUrl(initialProfileData.avatar_url || null);
-      setUsername(initialProfileData.username || ''); // Populate username
+      setUsername(initialProfileData.username || '');
       
-      // Set screen title dynamically based on username
       if (initialProfileData.username) {
         navigation.setOptions({ title: `Editing: ${initialProfileData.username}` });
       } else {
@@ -73,40 +74,61 @@ const EditProfileScreen = ({ navigation, route }: any) => { // Using any tempora
     }
   }, [initialProfileData, navigation]);
 
-  // Handler for when AvatarEditorAndBio successfully uploads/changes URL
   const handleAvatarUrlUpdate = (newUrl: string) => {
+    console.log('[EditProfileScreen] handleAvatarUrlUpdate received newUrl:', newUrl);
     setAvatarUrl(newUrl);
   };
 
   const updateProfile = async () => {
-    if (!userId) {
-      Alert.alert("Error", "User ID missing. Cannot update profile.");
+    if (!user || !user.id) { // Check for user and user.id from useAuth()
+      Alert.alert("Error", "User not available. Cannot update profile.");
       return;
     }
-    if (!username.trim()) { // Ensure username is not just whitespace
+    if (!username.trim()) { 
         Alert.alert("Validation Error", "Username cannot be empty.");
         return;
     }
 
     setSaving(true);
     try {
-      const { error } = await supabase.rpc('update_profile', {
+      const profileUpdatePayload = {
+        p_user_id: user.id,
         p_avatar_url: avatarUrl,
         p_bio: bio,
-        p_username: username.trim(), // Send trimmed username
-      });
+        p_username: username.trim(),
+        p_role: profile?.role,          // Pass current role from AuthContext
+        p_onboarded: profile?.onboarded, // Pass current onboarded status from AuthContext
+      };
+      console.log('[EditProfileScreen] User ID:', user.id); // Added log for user.id
+      console.log('[EditProfileScreen] Calling update_profile RPC with:', profileUpdatePayload);
+      
+      const { data, error } = await supabase.rpc('update_profile', profileUpdatePayload);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating profile:', error.message); // Log error.message
+        Alert.alert('Failed to update profile', error.message); // Show error.message in alert
+        setSaving(false); // Stop saving indicator on error
+        return;
+      }
+
+      console.log('[EditProfileScreen] Update profile response:', data); // Log success data
 
       Alert.alert("Profile Updated", "Your profile has been saved.", [
-        { text: "OK", onPress: () => {
-            queryClient.invalidateQueries({ queryKey: ['profile', userId] }); 
+        { text: "OK", onPress: async () => { 
+            console.log('[EditProfileScreen] Invalidating queries for key:', ['profile', user.id]);
+            await queryClient.invalidateQueries({ queryKey: ['profile', user.id] }); 
+            if (refreshProfile) {
+                console.log('[EditProfileScreen] Refreshing AuthContext profile for user:', user.id);
+                await refreshProfile(user.id); 
+            }
             navigation.goBack();
           } 
         },
       ]);
     } catch (e: any) {
-      console.error("Update profile error:", e);
+      // This catch block might be redundant if supabase.rpc errors are caught above, 
+      // but kept for other potential errors.
+      console.error("Update profile error (generic catch):", e);
       Alert.alert("Error", e.message || "Could not save profile.");
     } finally {
       setSaving(false);
@@ -119,7 +141,7 @@ const EditProfileScreen = ({ navigation, route }: any) => { // Using any tempora
 
       <CollapsibleCard title="Avatar & Bio" defaultCollapsed={false}>
         <AvatarEditorAndBio
-          userId={userId ?? ''}
+          userId={user?.id ?? ''} // Pass user.id from useAuth() to AvatarEditorAndBio
           initialAvatarUrl={avatarUrl}
           initialBio={bio}
           onAvatarChange={handleAvatarUrlUpdate}
@@ -134,7 +156,7 @@ const EditProfileScreen = ({ navigation, route }: any) => { // Using any tempora
       <TouchableOpacity 
         style={[styles.saveButton, saving && styles.saveButtonDisabled]}
         onPress={updateProfile} 
-        disabled={saving || !userId}
+        disabled={saving || !user || !user.id} // Disable button if no user.id
       >
         {saving ? (
           <ActivityIndicator color="#fff" />

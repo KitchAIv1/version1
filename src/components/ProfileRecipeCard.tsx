@@ -65,8 +65,8 @@ const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = ({ item, onPress }) 
         queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
       }
       // Optionally, you might want to invalidate other queries if the deletion affects other parts of the app
-      // queryClient.invalidateQueries({ queryKey: ['feed'] }); // Example
-      console.log(`Recipe ${deletedRecipeId} deleted, invalidated profile query for user ${user?.id}`);
+      queryClient.invalidateQueries({ queryKey: ['feed'] }); // Ensures feed is also updated
+      console.log(`Recipe ${deletedRecipeId} deleted, invalidated profile query for user ${user?.id} and feed query.`);
     },
     onError: (error: Error) => {
       Alert.alert('Error', error.message || 'Could not delete the recipe. Please try again.');

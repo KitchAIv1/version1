@@ -21,14 +21,31 @@ export default function SignupScreen() {
       return;
     }
     setIsLoading(true);
-    const { error } = await supabase.auth.signUp({ email, password: pw });
+    const { data, error } = await supabase.auth.signUp({ email, password: pw });
     setIsLoading(false);
 
     if (error) {
       return Alert.alert('Sign-up failed', error.message);
     }
-    // Navigate to DietPrefs after successful signup
-    nav.replace('DietPrefs');
+
+    if (data.user && !data.session) {
+      // Email confirmation is ON, user needs to confirm via email.
+      // Trigger has created the profile with onboarded: false.
+      Alert.alert(
+        'Signup Successful!',
+        'Please check your email to confirm your account before logging in.'
+      );
+      nav.replace('Login'); // Navigate to Login screen
+    } else if (data.user && data.session) {
+      // This case implies email confirmation is OFF or user was auto-confirmed.
+      // AuthProvider will pick up the session, AppNavigator will route to onboarding.
+      Alert.alert('Signup Successful!', 'You are now signed up.');
+      // No explicit navigation needed here, AppNavigator takes over.
+    } else {
+      // Fallback for unexpected response from Supabase
+      Alert.alert('Sign-up Puzzling', 'An unexpected issue occurred. Please try again.');
+      console.log('Unexpected Supabase signUp response:', data);
+    }
   };
 
   return (

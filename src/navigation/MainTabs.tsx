@@ -9,10 +9,13 @@ import ProfileScreen from '../screens/main/ProfileScreen';
 import GroceryListScreen from '../screens/grocery/GroceryListScreen';
 import { MainTabsParamList } from './types';
 import { Feather } from '@expo/vector-icons';
+import { useQueryClient } from '@tanstack/react-query';
 
 const Tab = createBottomTabNavigator<MainTabsParamList>();
 
 const MainTabs = () => {
+  const queryClient = useQueryClient();
+
   return (
     <Tab.Navigator 
       initialRouteName="Feed"
@@ -41,7 +44,25 @@ const MainTabs = () => {
         },
       })}
     >
-      <Tab.Screen name="Feed" component={FeedScreen} />
+      <Tab.Screen
+        name="Feed"
+        component={FeedScreen}
+        listeners={({ navigation, route }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+
+            const state = navigation.getState();
+            if (state.routes[state.index].name === 'Feed') {
+              console.log(
+                'Feed tab pressed while it is the current tab. Refreshing feed.'
+              );
+              queryClient.invalidateQueries({ queryKey: ['feed'] });
+            }
+
+            navigation.jumpTo('Feed');
+          },
+        })}
+      />
       <Tab.Screen name="Pantry" component={MyStockScreen} />
       {/* Discover, Create screens are fully removed for this test */}
       <Tab.Screen 
