@@ -6,7 +6,8 @@ import {
   StyleSheet, 
   Text, 
   TouchableOpacity, 
-  ActivityIndicator 
+  ActivityIndicator,
+  TextInput // Added TextInput
 } from 'react-native';
 import { AvatarEditorAndBio } from '../components/AvatarEditorAndBio'; // Check path
 import { Button } from 'react-native-paper';
@@ -15,6 +16,7 @@ import { supabase } from '../services/supabase'; // Corrected path
 import { useQueryClient } from '@tanstack/react-query'; // Import useQueryClient
 import { useAuth } from '../providers/AuthProvider'; // Corrected path
 import Icon from 'react-native-vector-icons/MaterialIcons'; // For CollapsibleCard
+import FoodPreferencesSelector from '../components/FoodPreferencesSelector'; // Added import
 
 // Placeholder colors - replace with your actual theme colors later
 const PLACEHOLDER_BACKGROUND = '#f5f5f5';
@@ -40,7 +42,8 @@ type EditProfileRouteParams = {
   initialProfileData?: { 
     bio?: string | null;
     avatar_url?: string | null;
-    username?: string | null; // Add username to route params
+    username?: string | null;
+    diet_tags?: string[] | null; // Added diet_tags
   };
   userId?: string;
 };
@@ -58,6 +61,7 @@ const EditProfileScreen = ({ navigation, route }: any) => { // Using any tempora
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [username, setUsername] = useState('');
+  const [foodPreferences, setFoodPreferences] = useState<string[]>([]); // Added state for food preferences
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -65,6 +69,7 @@ const EditProfileScreen = ({ navigation, route }: any) => { // Using any tempora
       setBio(initialProfileData.bio || '');
       setAvatarUrl(initialProfileData.avatar_url || null);
       setUsername(initialProfileData.username || '');
+      setFoodPreferences(initialProfileData.diet_tags || []); // Initialize food preferences
       
       if (initialProfileData.username) {
         navigation.setOptions({ title: `Editing: ${initialProfileData.username}` });
@@ -79,6 +84,10 @@ const EditProfileScreen = ({ navigation, route }: any) => { // Using any tempora
     setAvatarUrl(newUrl);
   };
 
+  const handlePreferencesChange = (newPreferences: string[]) => {
+    setFoodPreferences(newPreferences);
+  };
+
   const updateProfile = async () => {
     if (!user || !user.id) { // Check for user and user.id from useAuth()
       Alert.alert("Error", "User not available. Cannot update profile.");
@@ -91,6 +100,10 @@ const EditProfileScreen = ({ navigation, route }: any) => { // Using any tempora
 
     setSaving(true);
     try {
+      const processedFoodPreferences = foodPreferences.map(pref =>
+        pref.toLowerCase().replace(/\s+/g, '-')
+      );
+
       const profileUpdatePayload = {
         p_user_id: user.id,
         p_avatar_url: avatarUrl,
@@ -98,6 +111,7 @@ const EditProfileScreen = ({ navigation, route }: any) => { // Using any tempora
         p_username: username.trim(),
         p_role: profile?.role,          // Pass current role from AuthContext
         p_onboarded: profile?.onboarded, // Pass current onboarded status from AuthContext
+        p_diet_tags: processedFoodPreferences, // Use processed preferences
       };
       console.log('[EditProfileScreen] User ID:', user.id); // Added log for user.id
       console.log('[EditProfileScreen] Calling update_profile RPC with:', profileUpdatePayload);
@@ -117,6 +131,8 @@ const EditProfileScreen = ({ navigation, route }: any) => { // Using any tempora
         { text: "OK", onPress: async () => { 
             console.log('[EditProfileScreen] Invalidating queries for key:', ['profile', user.id]);
             await queryClient.invalidateQueries({ queryKey: ['profile', user.id] }); 
+            console.log('[EditProfileScreen] Invalidating feed query.');
+            await queryClient.invalidateQueries({ queryKey: ['feed'] });
             if (refreshProfile) {
                 console.log('[EditProfileScreen] Refreshing AuthContext profile for user:', user.id);
                 await refreshProfile(user.id); 
@@ -150,8 +166,26 @@ const EditProfileScreen = ({ navigation, route }: any) => { // Using any tempora
         />
       </CollapsibleCard>
       
-      {/* Username could be in another card if it becomes more complex, for now, it's handled by RPC */}
-      {/* We could add a non-editable display of username, or an editable one if logic changes */}
+      <CollapsibleCard title="Account Information" defaultCollapsed={false}>
+        <View style={styles.inputContainer}>
+          <Text style={styles.inputLabel}>Username</Text>
+          <TextInput
+            style={styles.textInput}
+            value={username}
+            onChangeText={setUsername}
+            placeholder="Enter your username"
+            placeholderTextColor="#999"
+            autoCapitalize="none"
+          />
+        </View>
+      </CollapsibleCard>
+
+      <CollapsibleCard title="Food Preferences" defaultCollapsed={false}>
+        <FoodPreferencesSelector 
+          currentPreferences={foodPreferences}
+          onPreferencesChange={handlePreferencesChange}
+        />
+      </CollapsibleCard>
 
       <TouchableOpacity 
         style={[styles.saveButton, saving && styles.saveButtonDisabled]}
@@ -208,6 +242,23 @@ const styles = StyleSheet.create({
   },
   cardContent: { 
     padding: 12 
+  },
+  inputContainer: { // Added style for TextInput container
+    marginBottom: 12,
+  },
+  inputLabel: { // Added style for TextInput label
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 6,
+  },
+  textInput: { // Added style for TextInput
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    backgroundColor: '#fff',
   },
   // Styles for the save button, adapted from EditRecipeScreen
   saveButton: { 

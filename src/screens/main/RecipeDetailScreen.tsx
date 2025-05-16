@@ -26,7 +26,7 @@ import { NavigationState } from '@react-navigation/native';
 import { format } from 'date-fns';
 
 import { MainStackParamList } from '../../navigation/types';
-import { useRecipeDetails, RecipeDetailsData } from '../../hooks/useRecipeDetails';
+import useRecipeDetails, { RecipeDetailsData } from '../../hooks/useRecipeDetails';
 import { RecipeItem } from '../../types';
 import { useAuth } from '../../providers/AuthProvider';
 import ActionOverlay from '../../components/ActionOverlay';
@@ -679,6 +679,14 @@ export default function RecipeDetailScreen() {
             </View>
           )}
         </TouchableOpacity>
+
+        {/* View Count added to video area */}
+        {recipeDetails && typeof recipeDetails.views_count === 'number' && (
+          <View style={styles.videoViewCountContainer}>
+            <Ionicons name="eye-outline" style={styles.videoViewCountIcon} />
+            <Text style={styles.videoViewCountText}>{recipeDetails.views_count} views</Text>
+          </View>
+        )}
       </View>
       
       {/* Floating Tab Bar - appears when scrolled past original tab bar */}
@@ -964,6 +972,21 @@ const styles = StyleSheet.create({
     color: COLORS.primary || '#00796b',
     fontWeight: '600',
   },
+  viewCountContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 16, // Add some spacing from the pantry info
+  },
+  viewCountIcon: {
+    fontSize: 18,
+    color: COLORS.textSecondary || '#555',
+    marginRight: 4,
+  },
+  viewCountText: {
+    fontSize: 15,
+    color: COLORS.textSecondary || '#555',
+    fontWeight: '600',
+  },
   timeInfoRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -1097,5 +1120,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 10,
+  },
+  videoViewCountContainer: {
+    position: 'absolute',
+    bottom: 12, 
+    right: 12,  
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  videoViewCountIcon: {
+    fontSize: 15,
+    color: 'white',
+    marginRight: 5,
+  },
+  videoViewCountText: {
+    fontSize: 13,
+    color: 'white',
+    fontWeight: '600',
   },
 }); 

@@ -6,15 +6,15 @@ import { useMemo } from 'react';
 export interface RecipeDetailsData {
   recipe_id: string;
   title: string;
-  user_id: string;
+  user_id: string; // creator's user_id
   servings: number | null;
   diet_tags: string[] | null;
   is_public: boolean;
   video_url: string | null;
   created_at: string;
   description: string | null;
-  username?: string | null;
-  avatar_url?: string | null;
+  username?: string | null;         // Creator's username
+  avatar_url?: string | null;       // Creator's avatar
   ingredients: Array<{ name: string; unit: string | null; quantity: string | null }>;
   comments_count: number;
   cook_time_minutes: number | null;
@@ -25,7 +25,8 @@ export interface RecipeDetailsData {
   is_saved_by_user: boolean;
   matched_ingredients?: string[];
   missing_ingredient_names?: string[];
-  missing_ingredients?: string[];
+  missing_ingredients?: string[]; 
+  views_count: number;
 }
 
 // Define the hook's return type

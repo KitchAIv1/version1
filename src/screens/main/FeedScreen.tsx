@@ -21,16 +21,37 @@ export default function FeedScreen() {
     error: feedError,
   } = useFeed();
   const isFeedScreenFocused = useIsFocused();
+  const flashListRef = useRef<FlashList<FeedItem>>(null);
+  const prevFeedItemsRef = useRef<FeedItem[] | undefined>();
+  const { user } = useAuth();
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [layoutReady, setLayoutReady] = useState(false);
-  const [itemHeight, setItemHeight] = useState(0);
+  const [itemHeight, setItemHeight] = useState(Dimensions.get('window').height);
+  const [loggedViews, setLoggedViews] = useState<Set<string>>(new Set());
   const insets = useSafeAreaInsets();
   const windowDims = Dimensions.get('window');
+
+  const itemsToRender: FeedItem[] = feedItems || [];
 
   useEffect(() => {
     console.log('FeedScreen Insets:', JSON.stringify(insets), 'WindowHeight:', windowDims.height, 'WindowWidth:', windowDims.width);
   }, [insets, windowDims]);
+
+  useEffect(() => {
+    if (
+      isFeedScreenFocused &&
+      feedItems &&
+      feedItems.length > 0 &&
+      flashListRef.current &&
+      prevFeedItemsRef.current !== undefined &&
+      prevFeedItemsRef.current !== feedItems
+    ) {
+      console.log('[FeedScreen] Feed items updated, scrolling to top.');
+      flashListRef.current.scrollToIndex({ index: 0, animated: true });
+    }
+    prevFeedItemsRef.current = feedItems;
+  }, [feedItems, isFeedScreenFocused]);
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: Array<ViewToken> }) => {
@@ -41,9 +62,24 @@ export default function FeedScreen() {
           if (prevIndex !== newIndex) { return newIndex; }
           return prevIndex;
         });
+        const recipeItem = itemsToRender[newIndex];
+        if (user?.id && recipeItem?.id && !loggedViews.has(recipeItem.id)) {
+          console.log(`[FeedScreen] Logging view for recipe ${recipeItem.id} by user ${user.id}`);
+          supabase.rpc('log_recipe_view', {
+            p_user_id: user.id,
+            p_recipe_id: recipeItem.id,
+          }).then(({ error: rpcError }) => {
+            if (rpcError) {
+              console.error('[FeedScreen] Error logging view for recipe', recipeItem.id, ':', rpcError.message);
+            } else {
+              console.log('[FeedScreen] Successfully logged view for recipe', recipeItem.id);
+              setLoggedViews(prev => new Set(prev).add(recipeItem.id));
+            }
+          });
+        }
       }
     },
-    []
+    [itemsToRender, user, loggedViews]
   );
 
   const viewabilityConfig = useRef({
@@ -69,8 +105,6 @@ export default function FeedScreen() {
   }, [itemHeight]);
   
 
-  const itemsToRender: FeedItem[] = feedItems || [];
-  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const likeMut = useMutation<void, Error, string, MutationContext>({
@@ -135,7 +169,7 @@ export default function FeedScreen() {
         translucent={true} 
       />
       <View style={styles.containerForLayout} onLayout={handleContainerLayout}>
-        {isLoading || itemHeight <= 0 ? (
+        {isLoading || !layoutReady ? (
           <View style={styles.centeredMessageContainer}>
             <ActivityIndicator size="large" color="#666" />
           </View>
@@ -150,6 +184,7 @@ export default function FeedScreen() {
         ) : (
           <View style={styles.flashListContainer}> 
             <FlashList<FeedItem>
+              ref={flashListRef}
               data={itemsToRender}
               keyExtractor={(item) => item.id}
               renderItem={({ item, index }) => (

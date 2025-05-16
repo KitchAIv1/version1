@@ -217,21 +217,17 @@ export default function RecipeCard({ item, isActive, containerHeight, isScreenFo
 
             <View style={styles.userInfoContainer}>
               <TouchableOpacity style={styles.userTouchable}>
-                {item.creatorAvatarUrl ? (
-                  <Image 
-                    source={{ uri: item.creatorAvatarUrl }}
-                    style={styles.avatar}
-                  />
-                ) : (
-                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                    <Feather name="user" size={16} color="#ffffff" />
-                  </View>
-                )}
                 <Text style={styles.usernameText} numberOfLines={1}>
-                  {item.userName || 'Unknown User'}
+                  By {item.userName || 'Unknown User'}
                 </Text>
               </TouchableOpacity>
             </View>
+
+            {item.description && (
+              <Text style={styles.descriptionText} numberOfLines={2}>
+                {item.description}
+              </Text>
+            )}
           </View>
         </View>
 
@@ -246,6 +242,19 @@ export default function RecipeCard({ item, isActive, containerHeight, isScreenFo
             />
           </View>
         )}
+
+        <View style={styles.movedAvatarContainer}>
+          {item.creatorAvatarUrl ? (
+            <Image 
+              source={{ uri: item.creatorAvatarUrl }}
+              style={styles.movedAvatar}
+            />
+          ) : (
+            <View style={[styles.movedAvatar, styles.avatarPlaceholder]}>
+              <Feather name="user" size={24} color="#ffffff" />
+            </View>
+          )}
+        </View>
       </View>
     </TouchableWithoutFeedback>
   );
@@ -254,7 +263,7 @@ export default function RecipeCard({ item, isActive, containerHeight, isScreenFo
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    backgroundColor: 'black', 
+    backgroundColor: 'black',
     justifyContent: 'flex-end', 
     alignItems: 'center', 
   },
@@ -262,7 +271,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: 'transparent',
     zIndex: 5, 
   },
   topOverlayContainer: { 
@@ -378,13 +387,37 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
+  descriptionText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginTop: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 6,
+  },
   actionOverlayContainer: {
-    position: 'absolute', 
-    top: 0,              
-    bottom: 0,             
-    right: 16,             
-    justifyContent: 'center', 
-    zIndex: 3,             
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 18,
+    justifyContent: 'center',
+    zIndex: 3,
     paddingTop: 120,
+    paddingBottom: 5,
+  },
+  movedAvatarContainer: {
+    position: 'absolute',
+    bottom: 165,
+    right: 15,
+    zIndex: 4,
+    alignItems: 'center',
+  },
+  movedAvatar: {
+    width: 53,
+    height: 53,
+    borderRadius: 26.5,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderWidth: 2,
+    borderColor: '#22c55e',
   },
 }); 

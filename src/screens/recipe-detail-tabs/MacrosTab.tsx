@@ -4,6 +4,7 @@ import { useRoute } from '@react-navigation/native';
 import { useRecipeDetails } from '../../hooks/useRecipeDetails';
 import { COLORS } from '../../constants/theme';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../providers/AuthProvider';
 
 // Circular progress component for visually showing macro percentages
 const CircularProgress = ({ percentage, color, size = 60, label, value }: 
@@ -66,8 +67,12 @@ const NutrientBar = ({ label, amount, percentage, color }:
 
 export default function MacrosTab() {
   const route = useRoute<any>();
+  const { user } = useAuth();
   const recipeId = route.params?.id;
-  const { data: recipeDetails, isLoading, error } = useRecipeDetails(recipeId);
+  console.log('[MacrosTab] recipeId from route.params:', recipeId, 'userId:', user?.id);
+
+  const { data: recipeDetails, isLoading, error } = useRecipeDetails(recipeId, user?.id);
+  console.log('[MacrosTab] useRecipeDetails results - recipeDetails:', JSON.stringify(recipeDetails, null, 2), 'isLoading:', isLoading, 'error:', JSON.stringify(error, null, 2));
 
   if (isLoading) {
     return <View style={styles.centered}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
@@ -77,16 +82,13 @@ export default function MacrosTab() {
     return <View style={styles.centered}><Text style={styles.errorText}>Could not load nutritional information.</Text></View>;
   }
 
-  // In a real app, nutrition data would be parsed from recipeDetails here
-  // For this example we'll use placeholder data
-  const hasNutritionData = recipeDetails.servings !== null && recipeDetails.servings !== undefined && recipeDetails.servings > 0;
-  const servings = recipeDetails.servings || 1; // Default to 1 if servings is null/undefined
+  // The mock data will now always be shown if recipeDetails are loaded.
+  const servings = recipeDetails.servings || 1; // Default to 1 if servings is null/undefined, used for display string.
   
-  // Mock data for circular progress (macros breakdown)
   const totalCalories = 240;
-  const caloriesFromProtein = 56; // 14g * 4 kcal/g
-  const caloriesFromCarbs = 24; // 6g * 4 kcal/g
-  const caloriesFromFat = 160; // 18g * 9 kcal/g
+  const caloriesFromProtein = 56; 
+  const caloriesFromCarbs = 24; 
+  const caloriesFromFat = 160; 
   
   const proteinPercentage = Math.round((caloriesFromProtein / totalCalories) * 100);
   const carbsPercentage = Math.round((caloriesFromCarbs / totalCalories) * 100);
@@ -94,102 +96,87 @@ export default function MacrosTab() {
 
   return (
     <View style={styles.container}>
-      {hasNutritionData ? (
-        <>
-          <View style={styles.headerContainer}>
-            <View style={styles.headerRow}>
-              <Ionicons name="nutrition-outline" size={24} color={COLORS.primary} style={styles.headerIcon} />
-              <Text style={styles.headerTitle}>Nutrition Facts</Text>
-            </View>
-            <Text style={styles.servingInfo}>
-              Based on {servings} serving{servings > 1 ? 's' : ''}
-            </Text>
-          </View>
-          
-          {/* Calories Summary Card */}
-          <View style={styles.caloriesCard}>
-            <Text style={styles.caloriesLabel}>Total Calories</Text>
-            <Text style={styles.caloriesValue}>{totalCalories} <Text style={styles.caloriesUnit}>kcal</Text></Text>
-          </View>
-          
-          {/* Macros Distribution */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionTitleContainer}>
-              <Ionicons name="pie-chart-outline" size={18} color={COLORS.primary} />
-              <Text style={styles.sectionTitle}>Macronutrient Distribution</Text>
-            </View>
-            
-            <View style={styles.macrosCirclesContainer}>
-              <CircularProgress 
-                percentage={proteinPercentage} 
-                color="#2E7D32" 
-                label="Protein" 
-                value="14g"
-              />
-              <CircularProgress 
-                percentage={carbsPercentage} 
-                color="#1976D2" 
-                label="Carbs" 
-                value="6g"
-              />
-              <CircularProgress 
-                percentage={fatPercentage} 
-                color="#FF8F00" 
-                label="Fat" 
-                value="18g"
-              />
-            </View>
-          </View>
-          
-          {/* Vitamins & Minerals */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionTitleContainer}>
-              <Ionicons name="leaf-outline" size={18} color={COLORS.primary} />
-              <Text style={styles.sectionTitle}>Vitamins & Minerals</Text>
-              <Text style={styles.dailyValueText}>% Daily Value</Text>
-            </View>
-            
-            <View style={styles.vitaminsContainer}>
-              <NutrientBar label="Vitamin A" amount="750 IU" percentage={15} color="#43A047" />
-              <NutrientBar label="Vitamin C" amount="10.8 mg" percentage={12} color="#E53935" />
-              <NutrientBar label="Calcium" amount="80 mg" percentage={8} color="#1E88E5" />
-              <NutrientBar label="Iron" amount="1.8 mg" percentage={10} color="#FB8C00" />
-              <NutrientBar label="Potassium" amount="525 mg" percentage={15} color="#8E24AA" />
-            </View>
-          </View>
-          
-          {/* Additional Details */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionTitleContainer}>
-              <Ionicons name="information-circle-outline" size={18} color={COLORS.primary} />
-              <Text style={styles.sectionTitle}>Additional Details</Text>
-            </View>
-            
-            <View style={styles.detailsGrid}>
-              <DetailItem label="Saturated Fat" value="4g" />
-              <DetailItem label="Trans Fat" value="0g" />
-              <DetailItem label="Cholesterol" value="175mg" />
-              <DetailItem label="Sodium" value="380mg" />
-              <DetailItem label="Fiber" value="4g" />
-              <DetailItem label="Sugar" value="1g" />
-            </View>
-          </View>
-          
-          <View style={styles.disclaimerContainer}>
-            <Text style={styles.disclaimerText}>
-              Values are approximate based on recipe ingredients. Individual nutritional content may vary.
-            </Text>
-          </View>
-        </>
-      ) : (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="nutrition-outline" size={50} color={COLORS.textSecondary || '#888'} style={styles.emptyIcon} />
-          <Text style={styles.emptyTitle}>No Nutritional Data</Text>
-          <Text style={styles.emptyText}>
-            Nutritional information is not available for this recipe yet.
-          </Text>
+      {/* The content below will now always be rendered as hasNutritionData logic is removed */}
+      <View style={styles.headerContainer}>
+        <View style={styles.headerRow}>
+          <Ionicons name="nutrition-outline" size={24} color={COLORS.primary} style={styles.headerIcon} />
+          <Text style={styles.headerTitle}>Nutrition Facts</Text>
         </View>
-      )}
+        <Text style={styles.servingInfo}>
+          Based on {servings} serving{servings > 1 ? 's' : ''}
+        </Text>
+      </View>
+      
+      <View style={styles.caloriesCard}>
+        <Text style={styles.caloriesLabel}>Total Calories</Text>
+        <Text style={styles.caloriesValue}>{totalCalories} <Text style={styles.caloriesUnit}>kcal</Text></Text>
+      </View>
+      
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionTitleContainer}>
+          <Ionicons name="pie-chart-outline" size={18} color={COLORS.primary} />
+          <Text style={styles.sectionTitle}>Macronutrient Distribution</Text>
+        </View>
+        
+        <View style={styles.macrosCirclesContainer}>
+          <CircularProgress 
+            percentage={proteinPercentage} 
+            color="#2E7D32" 
+            label="Protein" 
+            value="14g"
+          />
+          <CircularProgress 
+            percentage={carbsPercentage} 
+            color="#1976D2" 
+            label="Carbs" 
+            value="6g"
+          />
+          <CircularProgress 
+            percentage={fatPercentage} 
+            color="#FF8F00" 
+            label="Fat" 
+            value="18g"
+          />
+        </View>
+      </View>
+      
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionTitleContainer}>
+          <Ionicons name="leaf-outline" size={18} color={COLORS.primary} />
+          <Text style={styles.sectionTitle}>Vitamins & Minerals</Text>
+          <Text style={styles.dailyValueText}>% Daily Value</Text>
+        </View>
+        
+        <View style={styles.vitaminsContainer}>
+          <NutrientBar label="Vitamin A" amount="750 IU" percentage={15} color="#43A047" />
+          <NutrientBar label="Vitamin C" amount="10.8 mg" percentage={12} color="#E53935" />
+          <NutrientBar label="Calcium" amount="80 mg" percentage={8} color="#1E88E5" />
+          <NutrientBar label="Iron" amount="1.8 mg" percentage={10} color="#FB8C00" />
+          <NutrientBar label="Potassium" amount="525 mg" percentage={15} color="#8E24AA" />
+        </View>
+      </View>
+      
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionTitleContainer}>
+          <Ionicons name="information-circle-outline" size={18} color={COLORS.primary} />
+          <Text style={styles.sectionTitle}>Additional Details</Text>
+        </View>
+        
+        <View style={styles.detailsGrid}>
+          <DetailItem label="Saturated Fat" value="4g" />
+          <DetailItem label="Trans Fat" value="0g" />
+          <DetailItem label="Cholesterol" value="175mg" />
+          <DetailItem label="Sodium" value="380mg" />
+          <DetailItem label="Fiber" value="4g" />
+          <DetailItem label="Sugar" value="1g" />
+        </View>
+      </View>
+      
+      <View style={styles.disclaimerContainer}>
+        <Text style={styles.disclaimerText}>
+          Values are approximate based on recipe ingredients. Individual nutritional content may vary.
+        </Text>
+      </View>
     </View>
   );
 }

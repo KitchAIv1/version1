@@ -242,7 +242,14 @@ export const ProfileScreen: React.FC = () => {
 
   // Navigation handler for "Edit Profile"
   const handleEditProfilePress = () => {
-    navigation.navigate('EditProfile', {}); // Pass empty params object
+    if (!profile) return; // Guard against profile being null/undefined
+    navigation.navigate('EditProfile', { 
+      initialProfileData: {
+        bio: profile.bio,
+        avatar_url: profile.avatar_url,
+        username: profile.username
+      }
+    });
   };
   
   const renderHeader = () => (

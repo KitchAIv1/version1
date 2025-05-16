@@ -3,6 +3,7 @@ export interface RecipeItem {
   id: string;                 // Maps from output_id
   title: string;              // Maps from output_name
   video: string;              // Maps from output_video_url
+  description?: string;       // Maps from output_description
   pantryMatchPct?: number;    // Calculated
   liked?: boolean;            // Maps from output_is_liked
   likes?: number;             // Maps from output_likes (or maybe likes_count? Check RPC usage)

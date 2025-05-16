@@ -8,6 +8,7 @@ interface RawFeedItem {
   output_user_id: string;
   output_name: string;
   output_video_url: string;
+  output_description: string;
   output_likes: number;
   output_comments: any; // Adjust type if known
   output_created_at: string;
@@ -94,6 +95,7 @@ export const useFeed = () =>
           id: item.output_id,
           title: item.output_name,
           video: item.output_video_url,
+          description: item.output_description,
           liked: item.output_is_liked,
           likes: item.output_likes,
           saved: item.output_is_saved,
