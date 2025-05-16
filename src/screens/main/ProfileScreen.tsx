@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useQuery, QueryKey, useQueryClient } from '@tanstack/react-query';
 import { Tabs, MaterialTabBar } from 'react-native-collapsible-tab-view';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { supabase } from '../../services/supabase';
 import ProfileRecipeCard from '../../components/ProfileRecipeCard'; // Import the new card
@@ -21,7 +21,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // I
 import { MainStackParamList } from '../../navigation/types'; // Import param list
 import { useAuth } from '../../providers/AuthProvider'; // Import useAuth
 import { Feather } from '@expo/vector-icons';
-import MealPlannerScreen from './meal_planner/MealPlannerScreen'; // Added import for MealPlannerScreen
+import MealPlannerScreen from './meal_planner/MealPlannerScreen'; // Existing planner
+import MealPlannerV2Screen from './meal_planner_v2/MealPlannerV2Screen'; // New V2 planner
 
 // Define types for profile and post data
 interface VideoPostData { 
@@ -299,6 +300,7 @@ export const ProfileScreen: React.FC = () => {
             if (iconProps.route.name === 'My Recipes') iconName = 'video-library';
             if (iconProps.route.name === 'Saved') iconName = 'bookmark';
             if (iconProps.route.name === 'Planner') iconName = 'event'; 
+            if (iconProps.route.name === 'Planner V2') iconName = 'calendar-today'; // Icon for new planner
             if (iconProps.route.name === 'Activity') iconName = 'notifications';
 
             return <Icon name={iconName} size={20} color={iconProps.focused ? ACTIVE_COLOR : '#525252'} style={{ marginRight: 0, paddingRight:0 }}/>;
@@ -334,6 +336,11 @@ export const ProfileScreen: React.FC = () => {
         <View style={styles.fullScreenTabContentWithPadding}>
           <MealPlannerScreen />
         </View>
+      </Tabs.Tab>
+      <Tabs.Tab name="Planner V2" label="Planner V2">
+        <Tabs.ScrollView style={styles.fullScreenTabContent}>
+          <MealPlannerV2Screen />
+        </Tabs.ScrollView>
       </Tabs.Tab>
       <Tabs.Tab name="Activity" label="Activity">
         {/* Assuming ActivityList can be wrapped or is already scrollable */}

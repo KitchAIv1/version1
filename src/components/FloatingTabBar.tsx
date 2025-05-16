@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   View, 
   Text, 
@@ -7,7 +7,8 @@ import {
   Animated, 
   Dimensions,
   Platform,
-  StatusBar
+  StatusBar,
+  LayoutChangeEvent
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../constants/theme';
@@ -17,13 +18,15 @@ interface FloatingTabBarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   visible: Animated.Value; // Animated value from parent controlling visibility
+  offsetTop?: number; // Prop for top offset (e.g., height of video header)
 }
 
 const FloatingTabBar: React.FC<FloatingTabBarProps> = ({ 
   tabs, 
   activeTab, 
   onTabChange,
-  visible
+  visible,
+  offsetTop
 }) => {
   // Use opacity and transform for smooth transitions
   const opacity = visible.interpolate({
@@ -45,12 +48,16 @@ const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
 
   // Get the status bar height
   const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 0;
+  
+  // Use provided offsetTop or default to STATUS_BAR_HEIGHT
+  const finalOffsetTop = offsetTop !== undefined ? offsetTop : STATUS_BAR_HEIGHT;
 
   return (
     <Animated.View 
       style={[
         styles.container,
         {
+          top: finalOffsetTop, 
           opacity,
           transform: [
             { translateY },
@@ -59,40 +66,19 @@ const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         }
       ]}
     >
-      <LinearGradient
-        colors={[
-          'rgba(255,255,255,1)',     // Fully opaque at top
-          'rgba(255,255,255,0.99)',  // Barely noticeable change
-          'rgba(255,255,255,0.95)',  // Slight transparency
-          'rgba(255,255,255,0.85)',  // More transparent
-          'rgba(255,255,255,0.6)',   // Much more transparent
-          'rgba(255,255,255,0.1)',   // Almost invisible
-          'rgba(255,255,255,0)'      // Completely transparent
-        ]}
-        locations={[0, 0.25, 0.5, 0.7, 0.85, 0.95, 1]}
-        style={styles.gradient}
-      >
-        {/* Status bar spacer */}
-        <View style={[styles.statusBarSpacer, { height: STATUS_BAR_HEIGHT }]} />
-        
-        {/* Tab bar */}
-        <View style={styles.tabBarContainer}>
-          {tabs.map(tab => (
-            <TouchableOpacity 
-              key={`floating-tab-${tab}`}
-              style={[styles.tabButton, activeTab === tab && styles.activeTabButton]} 
-              onPress={() => onTabChange(tab)}
-            >
-              <Text style={[styles.tabButtonText, activeTab === tab && styles.activeTabButtonText]}>
-                {tab}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        
-        {/* Extra fade-out space */}
-        <View style={styles.bottomFadeSpace} />
-      </LinearGradient>
+      <View style={styles.tabBarContainer}>
+        {tabs.map(tab => (
+          <TouchableOpacity 
+            key={`floating-tab-${tab}`}
+            style={[styles.tabButton, activeTab === tab && styles.activeTabButton]} 
+            onPress={() => onTabChange(tab)}
+          >
+            <Text style={[styles.tabButtonText, activeTab === tab && styles.activeTabButtonText]}>
+              {tab}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
     </Animated.View>
   );
 };
@@ -102,50 +88,37 @@ const { width: screenWidth } = Dimensions.get('window');
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 0, // Start from the very top of screen
     left: 0,
     right: 0,
     zIndex: 1000,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-  gradient: {
-    width: '100%',
-  },
-  statusBarSpacer: {
-    width: '100%',
+    // Ensure the container itself doesn't have a background if only tabBarContainer should be colored
   },
   tabBarContainer: {
     flexDirection: 'row',
-    paddingVertical: 4, // Add a bit more padding
-    borderBottomColor: 'rgba(0,0,0,0.05)', // Very subtle bottom border
-    borderBottomWidth: 1,
-  },
-  bottomFadeSpace: {
-    height: 20, // Extra space for gradient to fade out
-    width: '100%',
+    paddingVertical: 4, 
+    backgroundColor: COLORS.primary || '#00796b', // Solid metallic green background
+    // Potentially add some horizontal padding if needed, or rounded corners for a more refined bar look
+    // e.g., paddingHorizontal: 10, borderRadius: 8,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 10, // Restored: Reduced padding for compactness
     alignItems: 'center',
     justifyContent: 'center',
   },
   activeTabButton: {
     borderBottomWidth: 2,
-    borderBottomColor: COLORS.primary || '#00796b',
+    borderBottomColor: COLORS.white || '#FFFFFF', // White indicator for active tab
   },
   tabButtonText: {
-    fontSize: 14,
+    fontSize: 14, // Increased font size
     fontWeight: '500',
-    color: COLORS.textSecondary || '#666',
+    color: 'rgba(255,255,255,0.7)', // Light color for inactive tabs (70% white)
     textTransform: 'capitalize',
   },
   activeTabButtonText: {
-    color: COLORS.primary || '#00796b',
+    fontSize: 14, // Increased font size
+    color: COLORS.white || '#FFFFFF', // White for active tab text
     fontWeight: '600',
   },
 });

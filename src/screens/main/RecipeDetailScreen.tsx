@@ -695,6 +695,7 @@ export default function RecipeDetailScreen() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         visible={floatingTabBarVisible}
+        offsetTop={HEADER_HEIGHT}
       />
 
       {/* Scrollable Content Area */}
