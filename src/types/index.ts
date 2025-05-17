@@ -1,32 +1,35 @@
 // src/types/index.ts
 export interface RecipeItem {
-  id: string;                 // Maps from output_id
-  title: string;              // Maps from output_name
-  video: string;              // Maps from output_video_url
-  description?: string;       // Maps from output_description
-  pantryMatchPct?: number;    // Calculated
-  liked?: boolean;            // Maps from output_is_liked
-  likes?: number;             // Maps from output_likes (or maybe likes_count? Check RPC usage)
-  saved?: boolean;            // Maps from output_is_saved
-  saves?: number;             // Note: RPC doesn't return save count. Need to adjust UI or RPC.
-  userName?: string;          // Maps from user_name
-  creatorAvatarUrl?: string | null;  // Maps from out_creator_avatar_url, allow null based on RPC data
-  // Add other fields returned by RPC if needed:
-  // comments?: any;          // Maps from output_comments
-  commentsCount?: number;  // Maps from output_comments_count
-  // feedType?: string;       // Maps from output_feed_type
-  // createdAt?: string;      // Maps from output_created_at
-  // userId?: string;         // Maps from output_user_id
-  // dietaryCategoryIds?: string[]; // Maps from output_dietary_category_ids
+  recipe_id: string;          // From your log data
+  title: string;              // From your log data
+  video_url?: string;         // From your log data (main video/image)
+  thumbnail_url?: string;     // From your log data (specific thumbnail)
+  created_at?: string;        // From your log data
+  
+  // Fields from original RecipeItem that might still be relevant or populated elsewhere:
+  description?: string;
+  pantryMatchPct?: number;
+  liked?: boolean;
+  likes?: number;
+  saved?: boolean; // This could be crucial for your new requirement!
+  saves?: number;
+  userName?: string;
+  creatorAvatarUrl?: string | null;
+  
+  // comments?: any;
+  commentsCount?: number;
+  // feedType?: string;
+  // userId?: string; // This would be the creator's ID, recipe_id is the recipe's unique ID
+  // dietaryCategoryIds?: string[];
 
   // Internal client-side state (added by FeedScreen)
   onLike?: () => void;
   onSave?: () => void;
 
-  // Raw counts from RPC for calculation (optional)
-  _userIngredientsCount?: number; // Maps from output_user_ingredients_count
-  _totalIngredientsCount?: number; // Maps from output_total_ingredients_count
-
-  // Assumed field for pagination cursor (needs confirmation from RPC)
+  _userIngredientsCount?: number;
+  _totalIngredientsCount?: number;
   cursor?: string | null;
+
+  // Add a flag if the backend can provide it for distinguishing saved vs created
+  source?: 'saved' | 'created_by_user' | 'feed'; 
 } 

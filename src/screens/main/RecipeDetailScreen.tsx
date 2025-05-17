@@ -134,7 +134,7 @@ export default function RecipeDetailScreen() {
   const route = useRoute<RecipeDetailScreenRouteProp>();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const recipeId = route.params?.id;
+  const id = route.params?.id;
   const initialSeekTime = route.params?.initialSeekTime ?? 0;
   const initialTabFromParams = route.params?.initialTab; // Read the initialTab param
   const videoRef = useRef<Video>(null);
@@ -196,7 +196,7 @@ export default function RecipeDetailScreen() {
     data: recipeDetails,
     isLoading,
     error,
-  } = useRecipeDetails(recipeId, user?.id);
+  } = useRecipeDetails(id, user?.id);
   
   // Effect to reset video error when video_url changes
   useEffect(() => {
@@ -209,18 +209,18 @@ export default function RecipeDetailScreen() {
     const videoElement = videoRef.current;
     if (videoElement && isLoaded) { // Ensure video is loaded
       if (isScreenFocused) {
-        console.log(`RecipeDetailScreen: Screen focused and video loaded, playing video for ID: ${recipeId}`);
-        videoElement.playAsync().catch(e => console.error(`RecipeDetailScreen ${recipeId}: Focus play error:`, e));
+        console.log(`RecipeDetailScreen: Screen focused and video loaded, playing video for ID: ${id}`);
+        videoElement.playAsync().catch(e => console.error(`RecipeDetailScreen ${id}: Focus play error:`, e));
       } else {
-        console.log(`RecipeDetailScreen: Screen NOT focused, pausing video for ID: ${recipeId}`);
-        videoElement.pauseAsync().catch(e => console.error(`RecipeDetailScreen ${recipeId}: Focus pause error:`, e));
+        console.log(`RecipeDetailScreen: Screen NOT focused, pausing video for ID: ${id}`);
+        videoElement.pauseAsync().catch(e => console.error(`RecipeDetailScreen ${id}: Focus pause error:`, e));
       }
     }
-  }, [isLoaded, isScreenFocused, recipeId, videoRef]); // Dependencies for focus-aware playback
+  }, [isLoaded, isScreenFocused, id, videoRef]); // Dependencies for focus-aware playback
 
   const handleLoad = async (status: AVPlaybackStatus) => {
     if (status.isLoaded) {
-      console.log(`RecipeDetailScreen ${recipeId}: Video loaded. Initial seek: ${initialSeekTime}ms. IsMuted: ${isMuted}`);
+      console.log(`RecipeDetailScreen ${id}: Video loaded. Initial seek: ${initialSeekTime}ms. IsMuted: ${isMuted}`);
       if (videoRef.current) {
         if (initialSeekTime > 0) {
           // Set position but don't auto-play here; useEffect will handle it based on focus.
@@ -248,7 +248,7 @@ export default function RecipeDetailScreen() {
   };
   
   const handleError = (error: string) => { 
-    console.error(`RecipeDetailScreen ${recipeId}: Video onError event:`, error); 
+    console.error(`RecipeDetailScreen ${id}: Video onError event:`, error); 
     setVideoPlayerError("Video playback failed. Please check your connection or try again later."); // Set user-friendly error
     setIsLoaded(false); 
   };
@@ -285,19 +285,19 @@ export default function RecipeDetailScreen() {
   // --- Optimistic updates for like/save --- 
   const likeMut = useMutation<void, Error, void, any>({
     mutationFn: async () => { 
-      if (!recipeId) throw new Error('Recipe ID missing'); 
+      if (!id) throw new Error('Recipe ID missing'); 
       // Assuming 'toggle_like_recipe' RPC and it handles user internally
-      const { error: likeError } = await supabase.rpc('toggle_like_recipe', { p_recipe_id: recipeId }); 
+      const { error: likeError } = await supabase.rpc('toggle_like_recipe', { p_recipe_id: id }); 
       if (likeError) throw likeError; 
     },
     onSuccess: () => {
       // Optimistically update UI or simply refetch for consistency
-      queryClient.invalidateQueries({ queryKey: ['recipeDetails', recipeId, user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['recipeDetails', id, user?.id] });
       queryClient.invalidateQueries({ queryKey: ['profile'] }); // If likes affect profile display
       queryClient.invalidateQueries({ queryKey: ['feed'] });
     },
     // onError: (err, _vars, context) => {
-    //   queryClient.setQueryData(['recipeDetails', recipeId, user?.id], context?.previousDetails);
+    //   queryClient.setQueryData(['recipeDetails', id, user?.id], context?.previousDetails);
     // },
   });
 
@@ -305,12 +305,12 @@ export default function RecipeDetailScreen() {
   const saveRecipeVideoMut = useMutation<void, Error, void, any>({
     mutationFn: async () => { 
       const userId = user?.id;
-      if (!recipeId || !userId) { 
+      if (!id || !userId) { 
         throw new Error('Recipe ID or User ID missing for save action'); 
       }
       // Call the new RPC, passing both recipe_id and user_id
       const { error: saveError } = await supabase.rpc('save_recipe_video', { 
-        p_recipe_id: recipeId, 
+        p_recipe_id: id, 
         p_user_id: userId // Pass user ID
       }); 
       if (saveError) {
@@ -321,7 +321,7 @@ export default function RecipeDetailScreen() {
     onSuccess: () => {
       console.log('Recipe save/unsave successful, invalidating queries...');
       // Invalidate recipe details to refetch and get updated is_saved_by_user status
-      queryClient.invalidateQueries({ queryKey: ['recipeDetails', recipeId, user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['recipeDetails', id, user?.id] });
       // Invalidate profile data as the saved list will change
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       // Optionally, invalidate feed if saved status affects feed items
