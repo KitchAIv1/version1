@@ -3,7 +3,8 @@ import { View, Text, SafeAreaView, ActivityIndicator, Button, Alert, StyleSheet,
 import { useGroceryManager, GroceryItem } from '../../hooks/useGroceryManager';
 import { COLORS, FONTS, SIZES } from '../../constants/theme';
 import Icon from 'react-native-vector-icons/Ionicons';
-import useMealPlanner, { AggregatedIngredient } from '../../hooks/useMealPlanner';
+import { getIngredientsForMealPlanRange, AggregatedIngredient } from '../../hooks/useMealPlanAggregatedIngredients';
+import { useAuth } from '../../providers/AuthProvider';
 import { startOfWeek, endOfWeek, format, addDays } from 'date-fns';
 
 // Enable LayoutAnimation for Android
@@ -129,7 +130,7 @@ export default function GroceryListScreen() {
     clearAllItems,
   } = useGroceryManager();
 
-  const { getIngredientsForMealPlanRange } = useMealPlanner();
+  const { user } = useAuth();
   const [mealPlanIngredients, setMealPlanIngredients] = useState<AggregatedIngredient[]>([]);
   const [isLoadingMealPlanIngredients, setIsLoadingMealPlanIngredients] = useState(false);
   const [mealPlanIngredientsError, setMealPlanIngredientsError] = useState<string | null>(null);
@@ -142,7 +143,7 @@ export default function GroceryListScreen() {
       const today = new Date();
       const startDate = startOfWeek(today, { weekStartsOn: 1 }); 
       const endDate = endOfWeek(today, { weekStartsOn: 1 });
-      const ingredients = await getIngredientsForMealPlanRange(startDate, endDate);
+      const ingredients = await getIngredientsForMealPlanRange(startDate, endDate, user?.id);
       setMealPlanIngredients(ingredients);
     } catch (e: any) {
       setMealPlanIngredientsError(e.message || "Failed to load ingredients from meal plan.");

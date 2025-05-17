@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { GroceryItemInput } from '../hooks/useGroceryManager'; // Import the type
 
 type Props = {
-  ing: { name: string; qty?: string; unit?: string };
+  ing: { name: string; quantity?: string; unit?: string };
   matched: boolean;
   missing: boolean;
   isAdded?: boolean;
@@ -20,7 +20,7 @@ export default function IngredientRow({ ing, matched, missing, isAdded, recipeNa
     }
     const itemToAdd: GroceryItemInput = {
       item_name: ing.name,
-      quantity: ing.qty ? parseFloat(ing.qty) : null,
+      quantity: ing.quantity ? parseFloat(ing.quantity) : null,
       unit: ing.unit || null,
       recipeName: recipeName,
     };
@@ -46,13 +46,13 @@ export default function IngredientRow({ ing, matched, missing, isAdded, recipeNa
       </View>
       {/* Text Group */}
       <View style={styles.textGroupContainer}>
-        {ing.qty && (
-          <Text style={[styles.textBase, styles.qtyText, matched ? styles.matchedText : styles.missingText]}>
-            {ing.qty}
+        {ing.quantity && (
+          <Text style={[styles.textBase, styles.qtyText, matched ? styles.matchedText : styles.missingText, styles.boldText]}>
+            {ing.quantity}
           </Text>
         )}
         {ing.unit && (
-          <Text style={[styles.textBase, styles.unitText, matched ? styles.matchedUnitText : styles.missingUnitText]}>
+          <Text style={[styles.textBase, styles.unitText, matched ? styles.matchedUnitText : styles.missingUnitText, styles.boldText]}>
             {ing.unit}
           </Text>
         )}
@@ -61,7 +61,6 @@ export default function IngredientRow({ ing, matched, missing, isAdded, recipeNa
             styles.textBase, 
             styles.nameText, 
             matched ? styles.matchedText : styles.missingText,
-            { fontWeight: 'bold' }
           ]}
           numberOfLines={1}
           ellipsizeMode="tail"
@@ -121,7 +120,7 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   nameText: {
-    // Removed flex: 1 here as textGroupContainer handles flexing
+    fontWeight: 'normal',
   },
   matchedText: {
     fontWeight: '500',

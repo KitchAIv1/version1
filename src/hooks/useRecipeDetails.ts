@@ -1,6 +1,6 @@
 import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 
 // Define the RecipeDetailsData interface for type safety
 export interface RecipeDetailsData {
@@ -129,6 +129,32 @@ export const prefetchRecipeDetails = async (queryClient: any, recipeId: string, 
 export const useRecipeDetails = (recipeId: string | undefined, userId?: string): UseRecipeDetailsResult => {
   const queryClient = useQueryClient();
   
+  // useEffect to log recipe view
+  useEffect(() => {
+    if (recipeId && userId) {
+      const logView = async () => {
+        try {
+          console.log(`[useRecipeDetails] Logging view for recipe ${recipeId}, user ${userId}`);
+          const { error: logError } = await supabase.rpc('log_recipe_view', {
+            p_recipe_id: recipeId,
+            p_user_id: userId
+          });
+          if (logError) {
+            console.error('[useRecipeDetails] Error calling log_recipe_view:', logError);
+            // Optionally, don't throw here to avoid breaking the main data fetch if logging fails
+          } else {
+            console.log(`[useRecipeDetails] View logged successfully for recipe ${recipeId}. Invalidating query.`);
+            // Invalidate the query to refetch details which should include updated views_count
+            queryClient.invalidateQueries({ queryKey: ['recipeDetails', recipeId, userId] });
+          }
+        } catch (e) {
+          console.error('[useRecipeDetails] Exception in logView:', e);
+        }
+      };
+      logView();
+    }
+  }, [recipeId, userId, queryClient]);
+
   const results = useQueries({
     queries: [
       {
