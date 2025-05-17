@@ -21,7 +21,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // I
 import { MainStackParamList } from '../../navigation/types'; // Import param list
 import { useAuth } from '../../providers/AuthProvider'; // Import useAuth
 import { Feather } from '@expo/vector-icons';
-import MealPlannerScreen from './meal_planner/MealPlannerScreen'; // Existing planner
+// import MealPlannerScreen from './meal_planner/MealPlannerScreen'; // REMOVED Existing planner
 import MealPlannerV2Screen from './meal_planner_v2/MealPlannerV2Screen'; // New V2 planner
 
 // Define types for profile and post data
@@ -299,7 +299,7 @@ export const ProfileScreen: React.FC = () => {
             let iconName = 'video-library'; 
             if (iconProps.route.name === 'My Recipes') iconName = 'video-library';
             if (iconProps.route.name === 'Saved') iconName = 'bookmark';
-            if (iconProps.route.name === 'Planner') iconName = 'event'; 
+            // if (iconProps.route.name === 'Planner') iconName = 'event'; // REMOVED V1 Planner icon
             if (iconProps.route.name === 'Planner V2') iconName = 'calendar-today'; // Icon for new planner
             if (iconProps.route.name === 'Activity') iconName = 'notifications';
 
@@ -332,11 +332,11 @@ export const ProfileScreen: React.FC = () => {
           style={styles.fullScreenTabContent} // Ensures FlatList takes full available space
         />
       </Tabs.Tab>
-      <Tabs.Tab name="Planner" label="Planner">
+      {/* <Tabs.Tab name="Planner" label="Planner"> // REMOVED V1 PLANNER TAB
         <View style={styles.fullScreenTabContentWithPadding}>
           <MealPlannerScreen />
         </View>
-      </Tabs.Tab>
+      </Tabs.Tab> */}
       <Tabs.Tab name="Planner V2" label="Planner V2">
         <Tabs.ScrollView style={styles.fullScreenTabContent}>
           <MealPlannerV2Screen />

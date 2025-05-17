@@ -38,7 +38,7 @@ import { supabase } from '../../services/supabase';
 import { useGroceryManager } from '../../hooks/useGroceryManager';
 import { COLORS } from '../../constants/theme';
 import FloatingTabBar from '../../components/FloatingTabBar';
-import useMealPlanner, { MealSlot } from '../../hooks/useMealPlanner';
+import { useDailyMealPlan, MealSlot } from '../../hooks/useDailyMealPlan';
 import AddToMealPlannerModal from '../../components/modals/AddToMealPlannerModal';
 
 // Define route prop type
@@ -143,8 +143,8 @@ export default function RecipeDetailScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const isScreenFocused = useIsFocused(); // Added
   
-  // Meal Planner integration
-  const { addRecipeToSlot } = useMealPlanner();
+  // Meal Planner integration (V2)
+  const { addRecipeToSlot } = useDailyMealPlan(format(new Date(), 'yyyy-MM-dd')); // Pass default date
   const [isPlannerModalVisible, setIsPlannerModalVisible] = useState(false);
   
   // Track original tab bar measurements
@@ -574,26 +574,26 @@ export default function RecipeDetailScreen() {
       Alert.alert("Error", "Cannot add to plan, recipe details are missing.");
       return;
     }
-    const dateString = format(date, 'yyyy-MM-dd');
-    console.log(`RecipeDetailScreen: Adding ${recipeDetails.title} (ID: ${recipeDetails.recipe_id}) to meal plan on ${dateString} [${slot}]`);
+    const dateString = format(date, 'yyyy-MM-dd'); // Date for the plan entry
+    console.log(`RecipeDetailScreen: Adding ${recipeDetails.title} (ID: ${recipeDetails.recipe_id}) to meal plan on ${dateString} [${slot}] using V2 hook`);
     try {
-      const result = await addRecipeToSlot(
-        dateString, 
-        slot, 
-        recipeDetails.recipe_id, 
-        recipeDetails.title,
-        undefined // Pass undefined for thumbnail_url
-      );
-      if (result) {
-        Alert.alert("Success", `Added ${recipeDetails.title} to your meal plan for ${format(date, 'MMM d, yyyy')} (${slot}).`);
-      } else {
-        Alert.alert("Failed", `Could not add ${recipeDetails.title} to your meal plan. Please try again.`);
-      }
+      // V2 addRecipeToSlot expects an object
+      await addRecipeToSlot({
+        planDate: dateString, // Pass the formatted date for the plan
+        slot: slot, 
+        recipeId: recipeDetails.recipe_id, // Corrected: Use recipe_id
+        recipeTitle: recipeDetails.title,
+        recipeThumbnailUrl: recipeDetails.video_url || undefined, // Corrected: Use video_url as thumbnail_url is not directly on RecipeDetailsData
+      });
+      Alert.alert("Success", `Added ${recipeDetails.title} to your meal plan for ${format(date, 'MMM d, yyyy')} (${slot}).`);
+      // Invalidate queries for the meal planner screen to refresh
+      queryClient.invalidateQueries({ queryKey: ['dailyMealPlan', dateString] });
     } catch (e: any) {
-      Alert.alert("Error", e.message || "An unexpected error occurred.");
-      console.error("Error adding to meal plan:", e);
+      Alert.alert("Error", e.message || "An unexpected error occurred while adding to meal plan.");
+      console.error("Error adding to meal plan (V2):", e);
     }
-    // Modal closes itself
+    setIsPlannerModalVisible(false); // Close modal on success or failure
+    // Modal closes itself - original comment, keeping it but also explicitly closing
   };
 
   // --- Render Logic ---

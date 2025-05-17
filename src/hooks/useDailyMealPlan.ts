@@ -2,6 +2,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../providers/AuthProvider';
 
+// Define and export MealSlot type
+export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack'; // Added 'snack' to match V1 modal, can be adjusted
+
 // Types for our meal plan data
 export interface PlannedRecipe {
   recipe_id: string;
@@ -14,17 +17,19 @@ export interface DailyMealPlan {
   breakfast?: PlannedRecipe | null;
   lunch?: PlannedRecipe | null;
   dinner?: PlannedRecipe | null;
+  // Consider if 'snack' should be part of DailyMealPlan if it's a valid slot for planning
 }
 
 interface AddRecipeVariables {
-  slot: 'breakfast' | 'lunch' | 'dinner';
+  planDate: string; // Added planDate here as it's passed to the RPC
+  slot: MealSlot; // Use the exported MealSlot type
   recipeId: string;
   recipeTitle?: string;
   recipeThumbnailUrl?: string;
 }
 
 interface RemoveRecipeVariables {
-  slot: 'breakfast' | 'lunch' | 'dinner';
+  slot: MealSlot; // Use the exported MealSlot type
 }
 
 // Function to fetch meal plan for a given date

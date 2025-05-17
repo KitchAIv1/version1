@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { MealSlot } from '../../hooks/useMealPlanner';
+import { MealSlot } from '../../hooks/useDailyMealPlan';
 import { format, addDays, startOfDay } from 'date-fns';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker'; // For date picking
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
