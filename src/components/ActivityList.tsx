@@ -13,6 +13,9 @@ interface ActivityListProps {
   data: ActivityItem[];
 }
 
+// Separator component function
+const ItemSeparator = () => <View style={styles.separator} />;
+
 export const ActivityList: React.FC<ActivityListProps> = ({ data }) => {
   const renderItem = ({ item }: { item: ActivityItem }) => (
     <View style={styles.itemContainer}>
@@ -36,7 +39,7 @@ export const ActivityList: React.FC<ActivityListProps> = ({ data }) => {
       renderItem={renderItem}
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.listContainer}
-      ItemSeparatorComponent={() => <View style={styles.separator} />}
+      ItemSeparatorComponent={ItemSeparator}
     />
   );
 };

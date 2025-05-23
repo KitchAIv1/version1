@@ -23,6 +23,7 @@ export interface ItemToUpsert {
   quantity: number;
   unit: string;
   description?: string | null;
+  created_at?: string;
 }
 
 export interface DuplicateAction {
@@ -102,12 +103,14 @@ export const processItemsForDuplicates = async (
       });
     } else {
       // New item - add directly to upsert list
+      const now = new Date().toISOString();
       itemsToUpsert.push({
         user_id: userId,
         item_name: itemNameLower,
         quantity: convertedQuantity,
         unit: backendUnit,
-        description: null
+        description: null,
+        created_at: now
       });
     }
   }
@@ -145,7 +148,8 @@ export const handleDuplicateUserDecision = (
               item_name: item.currentName,
               quantity: newTotalQty,
               unit: existingDetails.unit, // Keep existing unit
-              description: null
+              description: null,
+              created_at: new Date().toISOString()
             });
           }
         },
@@ -159,7 +163,8 @@ export const handleDuplicateUserDecision = (
               item_name: item.currentName,
               quantity: convertedQuantity,
               unit: backendUnit,
-              description: null
+              description: null,
+              created_at: new Date().toISOString()
             });
           }
         },

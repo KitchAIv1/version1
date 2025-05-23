@@ -23,6 +23,7 @@ import { useAuth } from '../../providers/AuthProvider'; // Import useAuth
 import { Feather } from '@expo/vector-icons';
 // import MealPlannerScreen from './meal_planner/MealPlannerScreen'; // REMOVED Existing planner
 import MealPlannerV2Screen from './meal_planner_v2/MealPlannerV2Screen'; // New V2 planner
+import { ProfileScreenSkeleton, RecipeGridSkeleton } from '../../components/ProfileScreenSkeletons';
 
 // Define types for profile and post data
 interface VideoPostData { 
@@ -46,13 +47,6 @@ interface ProfileData {
 }
 
 const ACTIVE_COLOR = '#22c55e'; // Defined active color
-
-// Props for Header component to include onAddPress
-interface HeaderProps {
-  profile: ProfileData;
-  onMenuPress?: () => void;
-  onAddPress?: () => void; // New prop for add button
-}
 
 // -----------------------------------------------------------------------------
 // Hooks (data)
@@ -125,39 +119,27 @@ const useProfile = () => {
       console.log(`[useProfile] Processed ${processedUploadedVideos.length} uploaded, ${processedSavedRecipes.length} saved recipes.`);
       return processedFrontendData;
     },
-    enabled: !!userId, 
+    enabled: !!userId,
+    staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
+    gcTime: 10 * 60 * 1000, // 10 minutes - cache retention (renamed from cacheTime)
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnMount: false, // Don't refetch on mount if data exists
+    retry: 2, // Retry failed requests 2 times
   });
 }
 
 // -----------------------------------------------------------------------------
 // Components
 // -----------------------------------------------------------------------------
-const Header: React.FC<HeaderProps> = ({ profile, onMenuPress, onAddPress }) => {
-  const insets = useSafeAreaInsets();
-  return (
-    <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-      <View style={styles.headerSpacer} />
-      <Text style={styles.headerTitle}>Kitch Hub</Text>
-      <View style={styles.headerActions}>
-        <TouchableOpacity style={styles.iconBtn} onPress={onAddPress}>
-          <Icon name="add-box" size={26} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.iconBtn} onPress={onMenuPress}>
-          <Icon name="menu" size={26} color="#fff" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-};
-
-const AvatarRow: React.FC<{ profile: ProfileData; postsCount: number }> = ({ profile, postsCount }) => {
+const AvatarRow: React.FC<{ profile: ProfileData; postsCount: number }> = React.memo(({ profile, postsCount }) => {
   console.log(`[AvatarRow] Rendering. Avatar URL: ${profile.avatar_url}, Timestamp: ${Date.now()}`);
   return (
     <View style={styles.avatarRow}>
       {profile.avatar_url ? (
         <Image 
-          source={{ uri: `${profile.avatar_url}?cache=${Date.now()}` }} 
+          source={{ uri: profile.avatar_url }} 
           style={styles.avatar} 
+          loadingIndicatorSource={{ uri: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' }}
         />
       ) : (
         <View style={styles.avatarPlaceholder}>
@@ -171,16 +153,16 @@ const AvatarRow: React.FC<{ profile: ProfileData; postsCount: number }> = ({ pro
       </View>
     </View>
   );
-};
+});
 
-const Stat: React.FC<{ label: string; value: number }> = ({ label, value }) => (
+const Stat: React.FC<{ label: string; value: number }> = React.memo(({ label, value }) => (
   <View style={{ alignItems: 'center' }}>
     <Text style={styles.statValue}>{value}</Text>
     <Text style={styles.statLabel}>{label}</Text>
   </View>
-);
+));
 
-const Bio: React.FC<{ profile: ProfileData }> = ({ profile }) => (
+const Bio: React.FC<{ profile: ProfileData }> = React.memo(({ profile }) => (
   <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
     <Text style={styles.bioName}>{profile.username}</Text>
     {profile.bio ? (
@@ -189,7 +171,46 @@ const Bio: React.FC<{ profile: ProfileData }> = ({ profile }) => (
       <Text style={styles.bioEmpty}>No bio yet.</Text>
     )}
   </View>
-);
+));
+
+// Lazy Tab Content Component
+const LazyTabContent: React.FC<{ 
+  data: VideoPostData[]; 
+  context: 'myRecipes' | 'savedRecipes';
+  emptyLabel: string;
+}> = React.memo(({ data, context, emptyLabel }) => {
+  const navigation = useNavigation<ProfileNavigationProp>();
+  
+  const renderItem = React.useCallback(({ item }: { item: VideoPostData }) => (
+    <ProfileRecipeCard 
+      item={item} 
+      onPress={() => navigation.navigate('RecipeDetail', { id: item.recipe_id })}
+      context={context}
+    />
+  ), [navigation, context]);
+
+  const keyExtractor = React.useCallback((item: VideoPostData) => 
+    context === 'savedRecipes' ? `saved-${item.recipe_id}` : item.recipe_id, 
+    [context]
+  );
+
+  return (
+    <Tabs.FlatList
+      data={data}
+      renderItem={renderItem}
+      keyExtractor={keyExtractor}
+      numColumns={2}
+      showsVerticalScrollIndicator={false}
+      ListEmptyComponent={<Empty label={emptyLabel} />}
+      contentContainerStyle={styles.gridContentContainer}
+      style={styles.fullScreenTabContent}
+      removeClippedSubviews={true} // Performance optimization
+      maxToRenderPerBatch={4} // Render 4 items per batch
+      windowSize={10} // Keep 10 items in memory
+      initialNumToRender={6} // Render 6 items initially
+    />
+  );
+});
 
 // -----------------------------------------------------------------------------
 // Screen
@@ -236,7 +257,7 @@ export const ProfileScreen: React.FC = () => {
   };
   // --- End Sign Out Handler ---
 
-  if (profileLoading) return <Loader />;
+  if (profileLoading) return <ProfileScreenSkeleton />;
   
   if (isError || !profile || typeof profile !== 'object') {
     console.error('[ProfileScreen] Profile error or profile is not an object:', { profileFetchError, profile });
@@ -255,14 +276,22 @@ export const ProfileScreen: React.FC = () => {
       }
     });
   };
-  
-  const renderHeader = () => (
-    <View style={styles.profileHeaderContainer}>
-      <Header 
-        profile={profile} 
-        onMenuPress={handleSignOut} 
-        onAddPress={handleAddRecipePress} 
-      />
+
+  const renderProfileInfo = () => (
+    <View style={styles.profileInfoContainer}>
+      {/* Header content moved here - now part of scrollable content */}
+      <View style={styles.scrollableHeader}>
+        <View style={styles.headerSpacer} />
+        <Text style={styles.scrollableHeaderTitle}>Kitch Hub</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.iconBtn} onPress={handleAddRecipePress}>
+            <Icon name="add-box" size={26} color="#10b981" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={handleSignOut}>
+            <Icon name="menu" size={26} color="#1f2937" />
+          </TouchableOpacity>
+        </View>
+      </View>
       <AvatarRow profile={profile} postsCount={profile.videos?.length || 0} />
       <Bio profile={profile} />
       <View style={styles.buttonRow}>
@@ -277,85 +306,67 @@ export const ProfileScreen: React.FC = () => {
   );
 
   return (
-    <Tabs.Container
-      renderHeader={renderHeader}
-      headerHeight={undefined} 
-      allowHeaderOverscroll={true}
-      renderTabBar={(props) => (
-        <MaterialTabBar
-          {...props}
-          activeColor={ACTIVE_COLOR}
-          inactiveColor="#525252"
-          labelStyle={styles.tabLabel}
-          indicatorStyle={styles.tabIndicator}
-          style={styles.materialTabBar}
-          getLabelText={(name: string) => name}
-          // @ts-ignore 
-          renderIcon={(iconProps) => { 
-            let iconName = 'video-library'; 
-            if (iconProps.route.name === 'My Recipes') iconName = 'video-library';
-            if (iconProps.route.name === 'Saved') iconName = 'bookmark';
-            if (iconProps.route.name === 'Planner') iconName = 'calendar-today'; // Changed from Planner V2
-            if (iconProps.route.name === 'Activity') iconName = 'notifications';
+    <View style={styles.container}>
+      {/* Fixed Green Header - covers status bar area and stays fixed */}
+      <View style={styles.fixedGreenHeader}>
+        <SafeAreaView edges={['top']} />
+      </View>
+      
+      {/* Scrollable Content - includes Kitch Hub content above avatar */}
+      <View style={styles.tabsContainer}>
+        <Tabs.Container
+          renderHeader={renderProfileInfo}
+          headerHeight={undefined} 
+          allowHeaderOverscroll={false}
+          renderTabBar={(props) => (
+            <MaterialTabBar
+              {...props}
+              activeColor={ACTIVE_COLOR}
+              inactiveColor="#525252"
+              labelStyle={styles.tabLabel}
+              indicatorStyle={styles.tabIndicator}
+              style={styles.materialTabBar}
+              getLabelText={(name: string) => name}
+              // @ts-ignore 
+              renderIcon={(iconProps) => { 
+                let iconName = 'video-library'; 
+                if (iconProps.route.name === 'My Recipes') iconName = 'video-library';
+                if (iconProps.route.name === 'Saved') iconName = 'bookmark';
+                if (iconProps.route.name === 'Planner') iconName = 'calendar-today'; // Changed from Planner V2
+                if (iconProps.route.name === 'Activity') iconName = 'notifications';
 
-            return <Icon name={iconName} size={20} color={iconProps.focused ? ACTIVE_COLOR : '#525252'} style={{ marginRight: 0, paddingRight:0 }}/>;
-          }}
-        />
-      )}
-    >
-      <Tabs.Tab name="My Recipes" label="My Recipes">
-        <Tabs.FlatList
-          data={profile.videos}
-          renderItem={({ item }) => (
-            <ProfileRecipeCard 
-              item={item} 
-              onPress={() => navigation.navigate('RecipeDetail', { id: item.recipe_id })}
-              context="myRecipes" // Context for My Recipes
+                return <Icon name={iconName} size={20} color={iconProps.focused ? ACTIVE_COLOR : '#525252'} style={{ marginRight: 0, paddingRight:0 }}/>;
+              }}
             />
           )}
-          keyExtractor={(item) => item.recipe_id}
-          numColumns={2}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={<Empty label="No recipes uploaded yet." />}
-          contentContainerStyle={styles.gridContentContainer} // Use this for padding
-          style={styles.fullScreenTabContent} // Ensures FlatList takes full available space
-        />
-      </Tabs.Tab>
-      <Tabs.Tab name="Saved" label="Saved">
-        <Tabs.FlatList
-          data={profile.saved_recipes}
-          renderItem={({ item }) => (
-            <ProfileRecipeCard 
-              item={item} 
-              onPress={() => navigation.navigate('RecipeDetail', { id: item.recipe_id })}
-              context="savedRecipes" // Context for Saved Recipes
+        >
+          <Tabs.Tab name="My Recipes" label="My Recipes">
+            <LazyTabContent 
+              data={profile.videos} 
+              context="myRecipes" 
+              emptyLabel="No recipes uploaded yet."
             />
-          )}
-          keyExtractor={(item) => `saved-${item.recipe_id}`}
-          numColumns={2}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={<Empty label="No saved recipes yet." />}
-          contentContainerStyle={styles.gridContentContainer} // Use this for padding
-          style={styles.fullScreenTabContent} // Ensures FlatList takes full available space
-        />
-      </Tabs.Tab>
-      {/* <Tabs.Tab name="Planner" label="Planner"> // REMOVED V1 PLANNER TAB
-        <View style={styles.fullScreenTabContentWithPadding}>
-          <MealPlannerScreen />
-        </View>
-      </Tabs.Tab> */}
-      <Tabs.Tab name="Planner" label="Planner">
-        <Tabs.ScrollView style={styles.fullScreenTabContent}>
-          <MealPlannerV2Screen />
-        </Tabs.ScrollView>
-      </Tabs.Tab>
-      <Tabs.Tab name="Activity" label="Activity">
-        {/* Assuming ActivityList can be wrapped or is already scrollable */}
-        <View style={styles.fullScreenTabContentWithPadding}>
-           <ActivityList data={[]} />
-        </View>
-      </Tabs.Tab>
-    </Tabs.Container>
+          </Tabs.Tab>
+          <Tabs.Tab name="Saved" label="Saved">
+            <LazyTabContent 
+              data={profile.saved_recipes} 
+              context="savedRecipes" 
+              emptyLabel="No saved recipes yet."
+            />
+          </Tabs.Tab>
+          <Tabs.Tab name="Planner" label="Planner">
+            <Tabs.ScrollView style={styles.fullScreenTabContent}>
+              <MealPlannerV2Screen />
+            </Tabs.ScrollView>
+          </Tabs.Tab>
+          <Tabs.Tab name="Activity" label="Activity">
+            <View style={styles.fullScreenTabContentWithPadding}>
+               <ActivityList data={[]} />
+            </View>
+          </Tabs.Tab>
+        </Tabs.Container>
+      </View>
+    </View>
   );
 };
 
@@ -443,62 +454,38 @@ const styles = StyleSheet.create({
   profileHeaderContainer: {
     backgroundColor: '#fff',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#10b981',
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  headerTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    flex: 1,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: 80,
-    justifyContent: 'flex-end',
-  },
-  iconBtn: {
-    padding: 6,
-    marginLeft: 10,
-  },
   avatarRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 20,
     backgroundColor: '#fff',
   },
   avatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
+    borderWidth: 3,
+    borderColor: '#10b981',
   },
   avatarPlaceholder: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#e5e5e5',
+    backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#e0e0e0',
   },
   statsRow: {
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginLeft: 16,
+    marginLeft: 20,
   },
   statValue: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#262626',
   },
@@ -506,20 +493,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#737373',
     marginTop: 2,
+    fontWeight: '500',
   },
   bioName: {
     fontWeight: 'bold',
-    marginBottom: 4,
-    fontSize: 15,
+    marginBottom: 6,
+    fontSize: 16,
     color: '#262626',
   },
   bioText: {
-    lineHeight: 18,
+    lineHeight: 20,
     fontSize: 14,
     color: '#525252',
   },
   bioEmpty: {
-    lineHeight: 18,
+    lineHeight: 20,
     fontSize: 14,
     color: '#a3a3a3',
     fontStyle: 'italic',
@@ -528,34 +516,43 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 16,
     borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
+    borderTopColor: '#f0f0f0',
     backgroundColor: '#fff',
   },
   editButton: {
     flex: 1,
-    backgroundColor: '#f0f0f0',
-    paddingVertical: 10,
-    borderRadius: 8,
+    backgroundColor: '#10b981',
+    paddingVertical: 12,
+    borderRadius: 10,
     alignItems: 'center',
     marginRight: 8,
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   editButtonText: {
     fontWeight: '600',
-    color: '#333',
+    color: '#fff',
+    fontSize: 15,
   },
   shareButton: {
     flex: 1,
-    backgroundColor: '#f0f0f0',
-    paddingVertical: 10,
-    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
+    paddingVertical: 12,
+    borderRadius: 10,
     alignItems: 'center',
     marginLeft: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   shareButtonText: {
     fontWeight: '600',
-    color: '#333',
+    color: '#495057',
+    fontSize: 15,
   },
   materialTabBar: {
     backgroundColor: '#fff',
@@ -581,6 +578,7 @@ const styles = StyleSheet.create({
   gridContentContainer: {
     paddingVertical: 8,
     paddingHorizontal: 4,
+    paddingBottom: 20,
   },
   fullScreenTabContent: {
     flex: 1,
@@ -595,6 +593,64 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  profileInfoContainer: {
+    backgroundColor: '#fff',
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  safeAreaContainer: {
+    backgroundColor: '#10b981',
+  },
+  tabsContainer: {
+    flex: 1,
+    zIndex: 1,
+    paddingTop: 50,
+  },
+  scrollableHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  scrollableHeaderTitle: {
+    color: '#1f2937',
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    flex: 1,
+    letterSpacing: 0.5,
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 80,
+    justifyContent: 'flex-end',
+  },
+  iconBtn: {
+    padding: 8,
+    marginLeft: 8,
+    borderRadius: 20,
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  fixedGreenHeader: {
+    backgroundColor: '#10b981',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
   },
 });
 

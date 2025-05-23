@@ -15,6 +15,7 @@ import {
 import RNPickerSelect from 'react-native-picker-select';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { StockItem, UnitOption, DEFAULT_UNIT_OPTIONS } from '../../hooks/useStockManager'; // Adjust path
+import { formatDetailedTimestamp } from '../../utils/dateUtils';
 
 interface ManualAddModalProps {
   visible: boolean;
@@ -100,6 +101,17 @@ export const ManualAddModal: React.FC<ManualAddModalProps> = ({
                   <Icon name="close" size={24} color="#666" />
                 </TouchableOpacity>
               </View>
+
+              {/* Timestamp Information for Edit Mode */}
+              {isEditMode && initialItem && initialItem.created_at && (
+                <View style={styles.timestampContainer}>
+                  <View style={styles.timestampRow}>
+                    <Icon name="add-circle-outline" size={16} color="#666" />
+                    <Text style={styles.timestampLabel}>Added: </Text>
+                    <Text style={styles.timestampValue}>{formatDetailedTimestamp(initialItem.created_at)}</Text>
+                  </View>
+                </View>
+              )}
 
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Item Name*</Text>
@@ -262,7 +274,24 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 10,
     top: Platform.OS === 'ios' ? 10 : 12, 
-  }
+  },
+  timestampContainer: {
+    marginBottom: 20,
+  },
+  timestampRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  timestampLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginRight: 5,
+  },
+  timestampValue: {
+    fontSize: 14,
+    color: '#333',
+  },
 });
 
 const pickerSelectStyles = StyleSheet.create({

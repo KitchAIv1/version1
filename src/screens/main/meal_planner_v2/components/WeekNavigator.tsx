@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import DayItem from './DayItem';
@@ -41,68 +41,92 @@ interface WeekNavigatorProps {
   onTargetWeekChange?: (targetWeekStartDate: Date) => void;
 }
 
-const WeekNavigator: React.FC<WeekNavigatorProps> = ({ selectedDate, onDateSelect, onTargetWeekChange }) => {
-  const [currentActualWeekStartDate] = useState(getWeekStartDate(new Date()));
-  const [maxTargetWeekStartDate] = useState(() => {
+const WeekNavigator: React.FC<WeekNavigatorProps> = React.memo(({ selectedDate, onDateSelect, onTargetWeekChange }) => {
+  const currentActualWeekStartDate = useMemo(() => getWeekStartDate(new Date()), []);
+  const maxTargetWeekStartDate = useMemo(() => {
     const maxDate = getWeekStartDate(new Date());
     maxDate.setDate(maxDate.getDate() + 3 * 7); // Current week + 3 weeks
     return maxDate;
-  });
+  }, []);
 
-  const [displayWeekStartDate, setDisplayWeekStartDate] = useState(getWeekStartDate(selectedDate));
-  const [targetWeekStartDate, setTargetWeekStartDate] = useState(getWeekStartDate(selectedDate));
-  const [weekDatesForDisplay, setWeekDatesForDisplay] = useState<Date[]>(getWeekDates(displayWeekStartDate));
+  const [targetWeekStartDate, setTargetWeekStartDate] = useState(() => getWeekStartDate(selectedDate));
 
+  // Memoize week dates to prevent recalculation and blinking
+  const weekDatesForDisplay = useMemo(() => {
+    return getWeekDates(targetWeekStartDate);
+  }, [targetWeekStartDate]);
+
+  // Synchronize with parent's selectedDate changes
   useEffect(() => {
-    setWeekDatesForDisplay(getWeekDates(displayWeekStartDate));
-  }, [displayWeekStartDate]);
-  
-  // Effect to synchronize internal week states when selectedDate prop changes from parent
-  useEffect(() => {
-    const newActualWeekStart = getWeekStartDate(selectedDate);
-    
-    // Only update if the week has actually changed to avoid potential issues
-    if (!isSameDay(newActualWeekStart, displayWeekStartDate)) {
-      setDisplayWeekStartDate(newActualWeekStart);
+    const newWeekStart = getWeekStartDate(selectedDate);
+    if (!isSameDay(newWeekStart, targetWeekStartDate)) {
+      setTargetWeekStartDate(newWeekStart);
     }
-    if (!isSameDay(newActualWeekStart, targetWeekStartDate)) {
-      setTargetWeekStartDate(newActualWeekStart);
-    }
-    // DO NOT call onTargetWeekChange here. 
-    // This effect is for reacting to parent's selectedDate.
-    // Parent updates its own week indicator when selectedDate changes (e.g. in handleDayPress).
-  }, [selectedDate]); // Removed onTargetWeekChange from deps; also displayWeekStartDate and targetWeekStartDate to avoid self-triggering if included incorrectly.
+  }, [selectedDate]);
 
-  const canNavigatePrev = !isSameDay(targetWeekStartDate, currentActualWeekStartDate) && targetWeekStartDate > currentActualWeekStartDate;
-  const canNavigateNext = !isSameDay(targetWeekStartDate, maxTargetWeekStartDate) && targetWeekStartDate < maxTargetWeekStartDate;
+  const canNavigatePrev = useMemo(() => 
+    !isSameDay(targetWeekStartDate, currentActualWeekStartDate) && targetWeekStartDate > currentActualWeekStartDate,
+    [targetWeekStartDate, currentActualWeekStartDate]
+  );
 
-  const handlePrevWeekArrow = () => {
+  const canNavigateNext = useMemo(() => 
+    !isSameDay(targetWeekStartDate, maxTargetWeekStartDate) && targetWeekStartDate < maxTargetWeekStartDate,
+    [targetWeekStartDate, maxTargetWeekStartDate]
+  );
+
+  const handlePrevWeekArrow = useCallback(() => {
     if (!canNavigatePrev) return;
 
     const prevTargetWeekStart = new Date(targetWeekStartDate);
     prevTargetWeekStart.setDate(targetWeekStartDate.getDate() - 7);
+    
+    // Update state immediately to prevent blinking
     setTargetWeekStartDate(prevTargetWeekStart);
+    
+    // Notify parent after a brief delay to ensure smooth transition
     if (onTargetWeekChange) {
-      onTargetWeekChange(prevTargetWeekStart);
+      requestAnimationFrame(() => {
+        onTargetWeekChange(prevTargetWeekStart);
+      });
     }
-  };
+  }, [canNavigatePrev, targetWeekStartDate, onTargetWeekChange]);
 
-  const handleNextWeekArrow = () => {
+  const handleNextWeekArrow = useCallback(() => {
     if (!canNavigateNext) return;
 
     const nextTargetWeekStart = new Date(targetWeekStartDate);
     nextTargetWeekStart.setDate(targetWeekStartDate.getDate() + 7);
+    
+    // Update state immediately to prevent blinking
     setTargetWeekStartDate(nextTargetWeekStart);
+    
+    // Notify parent after a brief delay to ensure smooth transition
     if (onTargetWeekChange) {
-      onTargetWeekChange(nextTargetWeekStart);
+      requestAnimationFrame(() => {
+        onTargetWeekChange(nextTargetWeekStart);
+      });
     }
-  };
+  }, [canNavigateNext, targetWeekStartDate, onTargetWeekChange]);
 
-  const handleDayItemPress = (dayIndexInDisplayedWeek: number) => {
+  const handleDayItemPress = useCallback((dayIndexInDisplayedWeek: number) => {
     const newSelectedDate = new Date(targetWeekStartDate);
     newSelectedDate.setDate(targetWeekStartDate.getDate() + dayIndexInDisplayedWeek);
-    onDateSelect(newSelectedDate); 
-  };
+    
+    // Prevent unnecessary calls if selecting the same date
+    if (!isSameDay(newSelectedDate, selectedDate)) {
+      onDateSelect(newSelectedDate);
+    }
+  }, [targetWeekStartDate, onDateSelect, selectedDate]);
+
+  const renderDayItem = useCallback(({ item, index }: { item: Date; index: number }) => (
+    <DayItem 
+      date={item} 
+      isSelected={isSameDay(item, selectedDate)}
+      onPress={() => handleDayItemPress(index)} 
+    />
+  ), [selectedDate, handleDayItemPress]);
+
+  const keyExtractor = useCallback((item: Date) => item.toISOString(), []);
 
   return (
     <View style={styles.daySelectorRow}>
@@ -111,53 +135,57 @@ const WeekNavigator: React.FC<WeekNavigatorProps> = ({ selectedDate, onDateSelec
         style={[styles.arrowButton, !canNavigatePrev && styles.disabledArrow]}
         disabled={!canNavigatePrev}
       >
-        <Icon name="chevron-left" size={28} color={canNavigatePrev ? (COLORS.text || '#333') : (COLORS.textSecondary || '#aaa')} />
+        <Icon name="chevron-left" size={28} color={canNavigatePrev ? '#10b981' : '#ccc'} />
       </TouchableOpacity>
       <FlatList
         data={weekDatesForDisplay}
-        renderItem={({ item, index }) => (
-          <DayItem 
-            date={item} 
-            isSelected={isSameDay(item, selectedDate)}
-            onPress={() => handleDayItemPress(index)} 
-          />
-        )}
-        keyExtractor={(item) => item.toISOString()}
+        renderItem={renderDayItem}
+        keyExtractor={keyExtractor}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.daySelectorList}
+        removeClippedSubviews={false} // Prevent clipping issues
+        initialNumToRender={7}
+        maxToRenderPerBatch={7}
+        windowSize={1}
       />
       <TouchableOpacity 
         onPress={handleNextWeekArrow} 
         style={[styles.arrowButton, !canNavigateNext && styles.disabledArrow]}
         disabled={!canNavigateNext}
       >
-        <Icon name="chevron-right" size={28} color={canNavigateNext ? (COLORS.text || '#333') : (COLORS.textSecondary || '#aaa')} />
+        <Icon name="chevron-right" size={28} color={canNavigateNext ? '#10b981' : '#ccc'} />
       </TouchableOpacity>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   daySelectorRow: { 
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
-    paddingHorizontal: 5, 
-    backgroundColor: COLORS.white || '#FFFFFF', // Use theme color
+    paddingVertical: 12,
+    paddingHorizontal: 8, 
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border || '#e9ecef', // Use theme color
+    borderBottomColor: '#f0f0f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   arrowButton: {
-    padding: 5,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
   },
   disabledArrow: {
-    // opacity: 0.3, // Example: visually indicate disabled state
-    // You can also change the icon color directly as done in the Icon component
+    backgroundColor: 'rgba(204, 204, 204, 0.1)',
   },
   daySelectorList: { 
-    paddingHorizontal: 5, 
+    paddingHorizontal: 8, 
     alignItems: 'center',
   },
 });

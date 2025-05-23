@@ -37,14 +37,14 @@ const formatDate = (dateString: string) => {
   }
 };
 
-const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = ({ item, onPress, context }) => {
+const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = React.memo(({ item, onPress, context }) => {
   const { user } = useAuth(); // Moved user declaration earlier
   console.log(`[ProfileRecipeCard] Rendering card for "${item.recipe_name}", thumbnail_url: "${item.thumbnail_url}", context: "${context}", creator_id: "${item.creator_user_id}", current_user_id: "${user?.id}"`);
 
   const thumbnailHeight = cardWidth * 0.8; // Slightly taller ratio for better visibility
   
-  // Add animation for card press feedback
-  const [scaleAnim] = useState(new Animated.Value(1));
+  // Add animation for card press feedback - memoized to prevent recreation
+  const scaleAnim = React.useMemo(() => new Animated.Value(1), []);
   
   // Initialize navigation
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
@@ -211,7 +211,7 @@ const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = ({ item, onPress, co
       </Animated.View>
     </TouchableOpacity>
   );
-};
+});
 
 const styles = StyleSheet.create({
   cardWrapper: {

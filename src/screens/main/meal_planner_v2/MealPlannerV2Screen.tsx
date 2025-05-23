@@ -7,7 +7,7 @@ import { useUserRecipes } from '../../../hooks/useUserRecipes';
 import SelectFromMyRecipesModal, { RecipeForModal } from '../../../components/modals/SelectFromMyRecipesModal';
 import { RecipeItem } from '../../../types';
 import { format } from 'date-fns';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 // Helper function to get the start of the week (Monday)
 const getWeekStartDate = (date: Date): Date => {
@@ -59,7 +59,7 @@ function getWeekStartDateHelper(date: Date): Date {
     return new Date(d.setDate(diff));
 }
 
-const MealPlannerV2Screen = () => {
+const MealPlannerV2Screen = React.memo(() => {
   const navigation = useNavigation();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [weekIndicatorText, setWeekIndicatorText] = useState(() => 
@@ -67,9 +67,11 @@ const MealPlannerV2Screen = () => {
   );
   const [isRecipeModalVisible, setIsRecipeModalVisible] = useState(false);
   const [currentSelectedSlot, setCurrentSelectedSlot] = useState<'breakfast' | 'lunch' | 'dinner' | null>(null);
+  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
+  const [displayedMealPlan, setDisplayedMealPlan] = useState<any>(null);
 
-  // Format selectedDate for the hook
-  const formattedDateForHook = format(selectedDate, 'yyyy-MM-dd');
+  // Format selectedDate for the hook - memoized to prevent unnecessary recalculations
+  const formattedDateForHook = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
   console.log(`[[MEAL_PLANNER_V2_SCREEN]] Requesting data for date: ${formattedDateForHook}`);
 
   const {
@@ -81,6 +83,20 @@ const MealPlannerV2Screen = () => {
     isAddingRecipe,
     isRemovingRecipe,
   } = useDailyMealPlan(formattedDateForHook);
+
+  // Track when we've initially loaded to prevent full-screen loading on date changes
+  useEffect(() => {
+    if (!isLoadingDailyMealPlan && !hasInitiallyLoaded) {
+      setHasInitiallyLoaded(true);
+    }
+  }, [isLoadingDailyMealPlan, hasInitiallyLoaded]);
+
+  // Update displayed meal plan when new data arrives, but preserve during loading
+  useEffect(() => {
+    if (!isLoadingDailyMealPlan && dailyMealPlan !== undefined) {
+      setDisplayedMealPlan(dailyMealPlan);
+    }
+  }, [dailyMealPlan, isLoadingDailyMealPlan]);
 
   console.log(
     `[[MEAL_PLANNER_V2_SCREEN]] Received for date ${formattedDateForHook}:`,
@@ -95,7 +111,7 @@ const MealPlannerV2Screen = () => {
     error: userRecipesError 
   } = useUserRecipes();
 
-  // Map RecipeItem[] to RecipeForModal[] for the modal
+  // Map RecipeItem[] to RecipeForModal[] for the modal - memoized for performance
   const recipesForModal: RecipeForModal[] = useMemo(() => {
     if (!userRecipesData) return [];
     // console.log('[[MEAL_PLANNER_V2_SCREEN]] Mapping userRecipesData to recipesForModal. Input userRecipesData:', JSON.stringify(userRecipesData, null, 2));
@@ -109,26 +125,40 @@ const MealPlannerV2Screen = () => {
     return mapped;
   }, [userRecipesData]);
 
-  const longDateFormat = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  const selectedDayInfoText = `Displaying for: ${longDateFormat.format(selectedDate)}`;
+  // Memoized date formatting to prevent recalculation
+  const selectedDayInfoText = useMemo(() => {
+    const longDateFormat = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    return `Displaying for: ${longDateFormat.format(selectedDate)}`;
+  }, [selectedDate]);
 
   const handleDayPress = useCallback((date: Date) => {
+    // Prevent unnecessary updates if selecting the same date
+    if (isSameDay(date, selectedDate)) {
+      return;
+    }
+    
+    // Batch state updates to prevent blinking
+    const newWeekIndicatorText = formatWeekRangeText(getWeekStartDateHelper(date));
+    
+    // Use immediate state update for better responsiveness
     setSelectedDate(date);
-    setWeekIndicatorText(formatWeekRangeText(getWeekStartDateHelper(date)));
-  }, []);
+    setWeekIndicatorText(newWeekIndicatorText);
+  }, [selectedDate]);
 
   const handleTargetWeekChange = useCallback((newTargetWeekStart: Date) => {
-    setWeekIndicatorText(formatWeekRangeText(newTargetWeekStart));
-    setSelectedDate(new Date(newTargetWeekStart)); // Also update selectedDate to the first day of the target week
+    // Only update week indicator text, don't change selected date to prevent blinking
+    const newWeekIndicatorText = formatWeekRangeText(newTargetWeekStart);
+    setWeekIndicatorText(newWeekIndicatorText);
   }, []);
 
-  const handleOpenRecipeSelectionModal = (slot: 'breakfast' | 'lunch' | 'dinner') => {
+  const handleOpenRecipeSelectionModal = useCallback((slot: 'breakfast' | 'lunch' | 'dinner') => {
     setCurrentSelectedSlot(slot);
     setIsRecipeModalVisible(true);
-  };
+  }, []);
 
-  const handleRemoveRecipe = (slot: 'breakfast' | 'lunch' | 'dinner') => {
-    const recipeTitle = dailyMealPlan?.[slot]?.recipe_title || 'this recipe';
+  const handleRemoveRecipe = useCallback((slot: 'breakfast' | 'lunch' | 'dinner') => {
+    // Use current dailyMealPlan for alert, but displayedMealPlan for UI consistency
+    const recipeTitle = (dailyMealPlan || displayedMealPlan)?.[slot]?.recipe_title || 'this recipe';
     Alert.alert(
       'Confirm Removal',
       `Are you sure you want to remove ${recipeTitle} from ${slot} for ${formattedDateForHook}?`,
@@ -148,10 +178,10 @@ const MealPlannerV2Screen = () => {
         },
       ]
     );
-  };
+  }, [dailyMealPlan, displayedMealPlan, formattedDateForHook, removeRecipeFromSlot]);
 
   // Handler for when a recipe is selected from the modal
-  const handleRecipeSelectedFromModal = async (recipe: RecipeForModal) => {
+  const handleRecipeSelectedFromModal = useCallback(async (recipe: RecipeForModal) => {
     if (currentSelectedSlot) {
       try {
         await addRecipeToSlot({ 
@@ -159,6 +189,7 @@ const MealPlannerV2Screen = () => {
           recipeId: recipe.recipe_id,
           recipeTitle: recipe.recipe_name,
           recipeThumbnailUrl: recipe.thumbnail_url || undefined,
+          planDate: formattedDateForHook,
         });
         Alert.alert('Success', `${recipe.recipe_name} added to ${currentSelectedSlot} for ${formattedDateForHook}`);
       } catch (e: any) {
@@ -168,9 +199,9 @@ const MealPlannerV2Screen = () => {
     }
     setIsRecipeModalVisible(false);
     setCurrentSelectedSlot(null);
-  };
+  }, [currentSelectedSlot, addRecipeToSlot, formattedDateForHook]);
 
-  const handleCookRecipe = (recipeId: string) => {
+  const handleCookRecipe = useCallback((recipeId: string) => {
     if (!recipeId) {
       console.warn('Attempted to navigate to recipe detail without a recipeId.');
       return;
@@ -179,7 +210,7 @@ const MealPlannerV2Screen = () => {
     // Pass "id" as the parameter name, with the value of recipeId
     // @ts-ignore 
     navigation.navigate('RecipeDetail', { id: recipeId });
-  };
+  }, [navigation]);
 
   // Show main loading spinner if adding a recipe (covers interaction)
   if (isAddingRecipe) {
@@ -193,10 +224,11 @@ const MealPlannerV2Screen = () => {
     );
   }
 
-  if (isLoadingDailyMealPlan && !dailyMealPlan) { // Show initial load only if no data yet
+  // Only show full-screen loading on initial load, not when switching dates
+  if (isLoadingDailyMealPlan && !hasInitiallyLoaded) {
     return (
       <View style={[styles.container, styles.centeredFeedback]}>
-        <ActivityIndicator size="large" color="#00796b" />
+        <ActivityIndicator size="large" color="#10b981" />
         <Text style={styles.feedbackText}>Loading meal plan...</Text>
       </View>
     );
@@ -237,95 +269,116 @@ const MealPlannerV2Screen = () => {
 
       <View style={styles.mealSlotsContainer}>
         <TouchableOpacity 
-          style={[styles.mealSlotCard, styles.breakfastCard]}
+          style={[styles.mealSlotCard]}
           onPress={() => {
-            if (dailyMealPlan?.breakfast?.recipe_id) {
-              handleCookRecipe(dailyMealPlan.breakfast.recipe_id);
+            if (displayedMealPlan?.breakfast?.recipe_id) {
+              handleCookRecipe(displayedMealPlan.breakfast.recipe_id);
             } else {
               handleOpenRecipeSelectionModal('breakfast');
             }
           }}
+          activeOpacity={0.7}
         >
-          <Text style={styles.mealSlotTitle}>Breakfast</Text>
-          {dailyMealPlan?.breakfast ? (
+          <View style={styles.mealSlotHeader}>
+            <Icon name="coffee" size={18} color="#10b981" />
+            <Text style={styles.mealSlotTitle} numberOfLines={1}>Breakfast</Text>
+          </View>
+          {displayedMealPlan?.breakfast ? (
             <View style={styles.recipeInfoContainer}>
-              {dailyMealPlan.breakfast.recipe_thumbnail_url && (
+              {displayedMealPlan.breakfast.recipe_thumbnail_url && (
                 <Image 
-                  source={{ uri: dailyMealPlan.breakfast.recipe_thumbnail_url }} 
+                  source={{ uri: displayedMealPlan.breakfast.recipe_thumbnail_url }} 
                   style={styles.recipeImage} 
                 />
               )}
               <Text style={styles.recipeTitle} numberOfLines={2}>
-                {dailyMealPlan.breakfast.recipe_title || 'Recipe Title Missing'}
+                {displayedMealPlan.breakfast.recipe_title || 'Recipe Title Missing'}
               </Text>
               <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleRemoveRecipe('breakfast'); }} style={styles.removeButton}>
-                <Icon name="close-circle-outline" size={24} color="#D32F2F" />
+                <Icon name="close" size={24} color="#ef4444" />
               </TouchableOpacity>
             </View>
           ) : (
-            <Text style={styles.placeholderText}>+ Add Recipe</Text>
+            <View style={styles.placeholderContainer}>
+              <Icon name="add" size={32} color="#10b981" />
+              <Text style={styles.placeholderText}>Add Recipe</Text>
+            </View>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={[styles.mealSlotCard, styles.lunchCard]}
+          style={[styles.mealSlotCard]}
           onPress={() => {
-            if (dailyMealPlan?.lunch?.recipe_id) {
-              handleCookRecipe(dailyMealPlan.lunch.recipe_id);
+            if (displayedMealPlan?.lunch?.recipe_id) {
+              handleCookRecipe(displayedMealPlan.lunch.recipe_id);
             } else {
               handleOpenRecipeSelectionModal('lunch');
             }
           }}
+          activeOpacity={0.7}
         >
-          <Text style={styles.mealSlotTitle}>Lunch</Text>
-          {dailyMealPlan?.lunch ? (
+          <View style={styles.mealSlotHeader}>
+            <Icon name="fastfood" size={18} color="#10b981" />
+            <Text style={styles.mealSlotTitle} numberOfLines={1}>Lunch</Text>
+          </View>
+          {displayedMealPlan?.lunch ? (
             <View style={styles.recipeInfoContainer}>
-              {dailyMealPlan.lunch.recipe_thumbnail_url && (
+              {displayedMealPlan.lunch.recipe_thumbnail_url && (
                 <Image 
-                  source={{ uri: dailyMealPlan.lunch.recipe_thumbnail_url }} 
+                  source={{ uri: displayedMealPlan.lunch.recipe_thumbnail_url }} 
                   style={styles.recipeImage} 
                 />
               )}
               <Text style={styles.recipeTitle} numberOfLines={2}>
-                {dailyMealPlan.lunch.recipe_title || 'Recipe Title Missing'}
+                {displayedMealPlan.lunch.recipe_title || 'Recipe Title Missing'}
               </Text>
               <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleRemoveRecipe('lunch'); }} style={styles.removeButton}>
-                <Icon name="close-circle-outline" size={24} color="#D32F2F" />
+                <Icon name="close" size={24} color="#ef4444" />
               </TouchableOpacity>
             </View>
           ) : (
-            <Text style={styles.placeholderText}>+ Add Recipe</Text>
+            <View style={styles.placeholderContainer}>
+              <Icon name="add" size={32} color="#10b981" />
+              <Text style={styles.placeholderText}>Add Recipe</Text>
+            </View>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={[styles.mealSlotCard, styles.dinnerCard]}
+          style={[styles.mealSlotCard]}
           onPress={() => {
-            if (dailyMealPlan?.dinner?.recipe_id) {
-              handleCookRecipe(dailyMealPlan.dinner.recipe_id);
+            if (displayedMealPlan?.dinner?.recipe_id) {
+              handleCookRecipe(displayedMealPlan.dinner.recipe_id);
             } else {
               handleOpenRecipeSelectionModal('dinner');
             }
           }}
+          activeOpacity={0.7}
         >
-          <Text style={styles.mealSlotTitle}>Dinner</Text>
-          {dailyMealPlan?.dinner ? (
+          <View style={styles.mealSlotHeader}>
+            <Icon name="restaurant" size={18} color="#10b981" />
+            <Text style={styles.mealSlotTitle} numberOfLines={1}>Dinner</Text>
+          </View>
+          {displayedMealPlan?.dinner ? (
             <View style={styles.recipeInfoContainer}>
-              {dailyMealPlan.dinner.recipe_thumbnail_url && (
+              {displayedMealPlan.dinner.recipe_thumbnail_url && (
                 <Image 
-                  source={{ uri: dailyMealPlan.dinner.recipe_thumbnail_url }} 
+                  source={{ uri: displayedMealPlan.dinner.recipe_thumbnail_url }} 
                   style={styles.recipeImage} 
                 />
               )}
               <Text style={styles.recipeTitle} numberOfLines={2}>
-                {dailyMealPlan.dinner.recipe_title || 'Recipe Title Missing'}
+                {displayedMealPlan.dinner.recipe_title || 'Recipe Title Missing'}
               </Text>
               <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleRemoveRecipe('dinner'); }} style={styles.removeButton}>
-                <Icon name="close-circle-outline" size={24} color="#D32F2F" />
+                <Icon name="close" size={24} color="#ef4444" />
               </TouchableOpacity>
             </View>
           ) : (
-            <Text style={styles.placeholderText}>+ Add Recipe</Text>
+            <View style={styles.placeholderContainer}>
+              <Icon name="add" size={32} color="#10b981" />
+              <Text style={styles.placeholderText}>Add Recipe</Text>
+            </View>
           )}
         </TouchableOpacity>
       </View>
@@ -339,125 +392,143 @@ const MealPlannerV2Screen = () => {
       />
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#f4f7f6',
+    backgroundColor: '#f8f9fa',
     flex: 1, // Ensure container takes full height if content is less
   },
   titleContainer: {
-    paddingVertical: 15,
-    paddingHorizontal: 15,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
     backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   titleText: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1f2937',
     marginBottom: 4,
   },
   weekIndicator: {
     fontSize: 14,
-    color: '#555',
+    color: '#6b7280',
+    fontWeight: '500',
   },
   selectedDayInfoContainer: {
-    paddingVertical: 10,
-    paddingHorizontal: 15,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     alignItems: 'center',
-    backgroundColor: '#F0F8FF', // Light blue, consider using COLORS.surface or similar from theme
+    backgroundColor: '#10b981',
   },
   selectedDayInfoText: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#4A4A4A', // Dark gray, consider using COLORS.text or similar
+    fontWeight: '600',
+    color: '#ffffff',
   },
   mealSlotsContainer: {
-    paddingVertical: 10,
-    paddingHorizontal: 5,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
     flexDirection: 'row',
     justifyContent: 'space-around',
+    alignItems: 'stretch',
   },
   mealSlotCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    padding: 10, // Reduced padding slightly
-    alignItems: 'center',
+    borderRadius: 16,
+    padding: 10,
+    alignItems: 'flex-start',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 3,
-    minHeight: 180, // Increased minHeight to accommodate image and text
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    minHeight: 200,
     width: '31%',
-    justifyContent: 'flex-start', // Align title to top
+    justifyContent: 'flex-start',
+    borderWidth: 2,
+    borderColor: '#10b981',
+    backgroundColor: '#f0fdf4',
   },
-  breakfastCard: {
-    borderColor: '#FFD700',
-    borderWidth: 1,
-  },
-  lunchCard: {
-    borderColor: '#90EE90',
-    borderWidth: 1,
-  },
-  dinnerCard: {
-    borderColor: '#ADD8E6',
-    borderWidth: 1,
+  mealSlotHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    width: '100%',
   },
   mealSlotTitle: {
-    fontSize: 16, // Slightly reduced title
+    fontSize: 12,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 8, // Reduced margin
+    color: '#1f2937',
+    marginLeft: 4,
+    flex: 1,
   },
   recipeInfoContainer: {
     alignItems: 'center',
     width: '100%',
+    flex: 1,
+    justifyContent: 'center',
   },
   recipeImage: {
-    width: 80, // Fixed size for the image
+    width: 80,
     height: 80,
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 8,
-    backgroundColor: '#e0e0e0', // Placeholder background for image
+    backgroundColor: '#e5e7eb',
   },
   recipeTitle: {
-    fontSize: 13, // Smaller font for recipe title
-    color: '#444',
+    fontSize: 13,
+    color: '#374151',
     textAlign: 'center',
-    fontWeight: '500',
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  placeholderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    opacity: 0.7,
   },
   placeholderText: {
-    color: '#007bff', // Changed to a more actionable blue
+    color: '#10b981',
     fontSize: 14,
-    fontWeight: 'bold',
-    marginTop: 20, // Add some margin to center it if no recipe
+    fontWeight: '600',
+    marginTop: 8,
+    textAlign: 'center',
   },
   centeredFeedback: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20, // Added padding for centered text
+    padding: 20,
   },
   feedbackText: {
-    marginTop: 10,
+    marginTop: 12,
     fontSize: 16,
-    color: '#00796b', // Consider using COLORS.primary
+    color: '#10b981',
+    fontWeight: '500',
   },
   errorText: {
-    marginTop: 10,
+    marginTop: 12,
     fontSize: 16,
-    color: '#D32F2F', 
+    color: '#ef4444', 
     textAlign: 'center',
     paddingHorizontal: 20,
+    fontWeight: '500',
   },
   removeButton: {
     position: 'absolute',
-    top: -5,
-    right: -5,
+    top: -8,
+    right: -8,
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 2,
+    borderRadius: 16,
+    padding: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   loadingOverlay: {
     position: 'absolute',
@@ -465,8 +536,8 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    zIndex: 10, // Ensure it's on top
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    zIndex: 10,
   }
 });
 

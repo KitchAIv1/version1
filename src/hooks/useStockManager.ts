@@ -12,6 +12,7 @@ export interface StockItem {
   unit: string;
   description?: string | null;
   user_id?: string;
+  created_at?: string;
 }
 
 // Type for raw item from Supabase before quantity conversion if needed
@@ -89,9 +90,9 @@ export const useStockManager = () => {
     try {
       const { data, error: dbError } = await supabase
         .from('stock')
-        .select('id, item_name, quantity, unit, description')
+        .select('id, item_name, quantity, unit, description, created_at')
         .eq('user_id', idToUse)
-        .order('item_name', { ascending: true });
+        .order('created_at', { ascending: false });
 
       if (dbError) throw dbError;
 
@@ -159,6 +160,7 @@ export const useStockManager = () => {
         quantity: itemToSave.quantity,
         unit: itemToSave.unit || 'units',
         description: itemToSave.description?.trim() || null,
+        ...(editingItem ? {} : { created_at: new Date().toISOString() }) // Only set created_at for new items
       };
 
       if (editingItem && originalItemName) {

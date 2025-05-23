@@ -8,8 +8,10 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { StockItem } from '../../hooks/useStockManager'; // Adjust path as needed
+import { formatStockTimestamp, getShortRelativeTime } from '../../utils/dateUtils';
+import { getIconForPantryItem } from '../../utils/iconMapping';
 
 interface StockListProps {
   data: StockItem[];
@@ -31,42 +33,58 @@ export const StockList: React.FC<StockListProps> = ({
   isRefreshing = false,
 }) => {
 
-  const renderItem = ({ item }: { item: StockItem }) => (
-    <TouchableOpacity 
-      style={styles.itemContainer} 
-      onPress={() => onEdit(item)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.itemIconContainer}>
-        <Icon name="kitchen" size={20} color="#4CAF50" />
-      </View>
-      <View style={styles.itemContent}>
-        <Text style={styles.itemName}>{item.item_name.charAt(0).toUpperCase() + item.item_name.slice(1)}</Text>
-        <View style={styles.itemDetailsRow}>
-            <View style={styles.quantityChip}>
-                <Text style={styles.quantityChipText}>
-                    {`${item.quantity} ${item.unit || ''}`.trim()}
-                </Text>
-            </View>
-            {/* Add more details like expiry or description summary here if needed */}
+  const renderItem = ({ item }: { item: StockItem }) => {
+    const lastUpdated = formatStockTimestamp(item.created_at);
+    const shortTime = getShortRelativeTime(item.created_at);
+    const iconName = getIconForPantryItem(item.item_name); // Dynamic icon based on item name
+    
+    return (
+      <TouchableOpacity 
+        style={styles.itemContainer} 
+        onPress={() => onEdit(item)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.itemIconContainer}>
+          <Icon name={iconName} size={20} color="#4CAF50" />
         </View>
-        {item.description && (
-            <Text style={styles.itemDescription} numberOfLines={1}>{item.description}</Text>
-        )}
-      </View>
-      <View style={styles.itemActions}>
-        <TouchableOpacity onPress={() => onEdit(item)} style={styles.actionButton}>
-          <Icon name="edit" size={22} color="#757575" />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => {
-            // Consider adding a confirmation alert here before deleting
-            onDelete(item);
-        }} style={styles.actionButton}>
-          <Icon name="delete-outline" size={24} color="#F44336" />
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
+        <View style={styles.itemContent}>
+          <View style={styles.itemHeader}>
+            <Text style={styles.itemName}>{item.item_name.charAt(0).toUpperCase() + item.item_name.slice(1)}</Text>
+            {shortTime && (
+              <Text style={styles.timeChip}>{shortTime}</Text>
+            )}
+          </View>
+          <View style={styles.itemDetailsRow}>
+              <View style={styles.quantityChip}>
+                  <Text style={styles.quantityChipText}>
+                      {`${item.quantity} ${item.unit || ''}`.trim()}
+                  </Text>
+              </View>
+              {lastUpdated && (
+                <View style={styles.timestampContainer}>
+                  <Icon name="time-outline" size={12} color="#999" />
+                  <Text style={styles.timestampText}>{lastUpdated}</Text>
+                </View>
+              )}
+          </View>
+          {item.description && (
+              <Text style={styles.itemDescription} numberOfLines={1}>{item.description}</Text>
+          )}
+        </View>
+        <View style={styles.itemActions}>
+          <TouchableOpacity onPress={() => onEdit(item)} style={styles.actionButton}>
+            <Icon name="create-outline" size={22} color="#757575" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => {
+              // Consider adding a confirmation alert here before deleting
+              onDelete(item);
+          }} style={styles.actionButton}>
+            <Icon name="trash-outline" size={24} color="#F44336" />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   if (isLoading && !data.length && !isRefreshing) {
     return (
@@ -80,7 +98,7 @@ export const StockList: React.FC<StockListProps> = ({
   if (error) {
     return (
       <View style={styles.centeredMessageContainer}>
-        <Icon name="error-outline" size={48} color="#F44336" />
+        <Icon name="alert-circle-outline" size={48} color="#F44336" />
         <Text style={styles.errorTitle}>Oops! Something went wrong.</Text>
         <Text style={styles.errorText}>{error}</Text>
         {onRefresh && (
@@ -95,7 +113,7 @@ export const StockList: React.FC<StockListProps> = ({
   if (!data.length) {
     return (
       <View style={styles.centeredMessageContainer}>
-        <Icon name="inbox" size={48} color="#9E9E9E" />
+        <Icon name="restaurant-outline" size={48} color="#9E9E9E" />
         <Text style={styles.emptyTitle}>Pantry is Empty</Text>
         <Text style={styles.emptyText}>
           Tap "Scan Pantry" or "Add Manually" to add your first item.
@@ -151,8 +169,6 @@ const styles = StyleSheet.create({
   itemIconContainer: {
     width: 44,
     height: 44,
-    borderRadius: 22,
-    backgroundColor: '#e8f5e9', // Light green background for icon
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -161,11 +177,25 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+  itemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 3,
+  },
   itemName: {
     fontSize: 17,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 3,
+    marginRight: 6,
+  },
+  timeChip: {
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    fontSize: 11,
+    color: '#666',
+    fontWeight: '500',
   },
   itemDetailsRow: {
     flexDirection: 'row',
@@ -245,6 +275,16 @@ const styles = StyleSheet.create({
     color: '#757575',
     textAlign: 'center',
     lineHeight: 22,
+  },
+  timestampContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 6,
+  },
+  timestampText: {
+    fontSize: 11,
+    color: '#999',
+    marginLeft: 2,
   },
 });
 
