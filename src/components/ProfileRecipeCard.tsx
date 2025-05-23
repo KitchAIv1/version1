@@ -15,8 +15,10 @@ interface ProfileRecipeCardProps {
     recipe_name: string;
     thumbnail_url: string | null;
     created_at: string;
+    creator_user_id: string; // Ensured creator_user_id is part of the item prop
   };
   onPress?: () => void;
+  context: 'myRecipes' | 'savedRecipes'; // Added context prop
 }
 
 const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/150/D3D3D3/808080?text=No+Image';
@@ -35,9 +37,9 @@ const formatDate = (dateString: string) => {
   }
 };
 
-const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = ({ item, onPress }) => {
-  // Keep this log for now to confirm URLs
-  console.log(`[ProfileRecipeCard] Rendering card for "${item.recipe_name}", thumbnail_url: "${item.thumbnail_url}"`);
+const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = ({ item, onPress, context }) => {
+  const { user } = useAuth(); // Moved user declaration earlier
+  console.log(`[ProfileRecipeCard] Rendering card for "${item.recipe_name}", thumbnail_url: "${item.thumbnail_url}", context: "${context}", creator_id: "${item.creator_user_id}", current_user_id: "${user?.id}"`);
 
   const thumbnailHeight = cardWidth * 0.8; // Slightly taller ratio for better visibility
   
@@ -47,10 +49,10 @@ const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = ({ item, onPress }) 
   // Initialize navigation
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const queryClient = useQueryClient(); // Added queryClient
-  const { user } = useAuth(); // Added useAuth to get user
 
   const deleteRecipeMut = useMutation({
     mutationFn: async (recipeIdToDelete: string) => {
+      // This is for hard deleting user's own recipe
       const { error } = await supabase.rpc('delete_recipe', { p_recipe_id: recipeIdToDelete });
       if (error) {
         console.error('Error deleting recipe:', error);
@@ -59,17 +61,44 @@ const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = ({ item, onPress }) 
       return recipeIdToDelete;
     },
     onSuccess: (deletedRecipeId) => {
-      Alert.alert('Success', `Recipe "${item.recipe_name}" deleted successfully.`);
-      // Invalidate queries to refresh the profile screen's recipe list
+      Alert.alert('Success', `Recipe "${item.recipe_name}" has been deleted.`);
       if (user?.id) {
         queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
       }
-      // Optionally, you might want to invalidate other queries if the deletion affects other parts of the app
-      queryClient.invalidateQueries({ queryKey: ['feed'] }); // Ensures feed is also updated
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
       console.log(`Recipe ${deletedRecipeId} deleted, invalidated profile query for user ${user?.id} and feed query.`);
     },
     onError: (error: Error) => {
       Alert.alert('Error', error.message || 'Could not delete the recipe. Please try again.');
+    },
+  });
+
+  const unsaveRecipeMut = useMutation({
+    mutationFn: async (recipeIdToUnsave: string) => {
+      if (!user?.id) {
+        throw new Error("User not authenticated to unsave recipe.");
+      }
+      const { error } = await supabase.rpc('unsave_recipe', { 
+        p_recipe_id: recipeIdToUnsave,
+        p_user_id: user.id 
+      });
+      if (error) {
+        console.error('Error unsaving recipe:', error);
+        throw new Error(error.message || 'Failed to unsave recipe.');
+      }
+      return recipeIdToUnsave;
+    },
+    onSuccess: (unsavedRecipeId) => {
+      Alert.alert('Success', `Recipe "${item.recipe_name}" has been unsaved.`);
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: ['profile', user.id] }); // Refreshes saved list
+      }
+      // Optionally, invalidate feed if saved status affects feed display, though less common
+      // queryClient.invalidateQueries({ queryKey: ['feed'] }); 
+      console.log(`Recipe ${unsavedRecipeId} unsaved, invalidated profile query for user ${user?.id}.`);
+    },
+    onError: (error: Error) => {
+      Alert.alert('Error', error.message || 'Could not unsave the recipe. Please try again.');
     },
   });
 
@@ -92,29 +121,52 @@ const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = ({ item, onPress }) 
   };
 
   const handleMenuPress = () => {
+    const isMyRecipeContext = context === 'myRecipes';
+    const isOwner = item.creator_user_id === user?.id;
+
+    const options: Array<any> = []; // Initialize options array
+
+    // Add "Edit Recipe" option conditionally
+    if (isMyRecipeContext || (context === 'savedRecipes' && isOwner)) {
+      options.push({
+        text: 'Edit Recipe',
+        onPress: () => {
+          navigation.navigate('EditRecipe', { recipeId: item.recipe_id });
+        },
+      });
+    }
+
+    // Add "Delete Recipe" or "Unsave Recipe" option
+    options.push({
+      text: isMyRecipeContext ? 'Delete Recipe' : 'Unsave Recipe',
+      onPress: () => {
+        if (isMyRecipeContext) {
+          // Optionally, add another confirmation for permanent deletion
+          Alert.alert(
+            "Confirm Delete",
+            `Are you sure you want to permanently delete "${item.recipe_name}"? This action cannot be undone.`,
+            [
+              { text: "Cancel", style: "cancel" },
+              { text: "Delete", style: "destructive", onPress: () => deleteRecipeMut.mutate(item.recipe_id) }
+            ]
+          );
+        } else {
+          unsaveRecipeMut.mutate(item.recipe_id);
+        }
+      },
+      style: 'destructive' as 'destructive' | 'default' | 'cancel', // Ensure type correctness
+    });
+
+    // Add "Cancel" option
+    options.push({
+      text: 'Cancel',
+      style: 'cancel' as 'destructive' | 'default' | 'cancel',
+    });
+
     Alert.alert(
       `Options for "${item.recipe_name}"`,
       'What would you like to do?',
-      [
-        {
-          text: 'Edit Recipe',
-          onPress: () => {
-            navigation.navigate('EditRecipe', { recipeId: item.recipe_id });
-          },
-        },
-        {
-          text: 'Delete Recipe',
-          onPress: () => {
-            // Call the mutation to delete the recipe
-            deleteRecipeMut.mutate(item.recipe_id);
-          },
-          style: 'destructive',
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-      ],
+      options,
       { cancelable: true }
     );
   };

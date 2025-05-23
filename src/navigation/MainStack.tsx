@@ -3,7 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MainTabs from './MainTabs'; // Import the tabs navigator
 // import SearchResultsScreen from '../screens/main/SearchResultsScreen'; // Commented out
 import RecipeDetailScreen from '../screens/main/RecipeDetailScreen'; // Uncommented
-// import PantryScanningScreen from '../screens/pantry/PantryScanningScreen'; // Commented out
+import PantryScanningScreen from '../screens/pantry/PantryScanningScreen'; // Uncommented
 import EditProfileScreen from '../screens/EditProfileScreen'; // Uncommented
 import VideoRecipeUploaderScreen from '../screens/recipe/VideoRecipeUploaderScreen';
 import EditRecipeScreen from '../screens/recipe/EditRecipeScreen'; // Import EditRecipeScreen
@@ -39,11 +39,11 @@ const MainStack: React.FC<MainStackProps> = ({ userOnboarded }) => {
       <Stack.Screen name="MainTabs" component={MainTabs} />
       {/* <Stack.Screen name="SearchResults" component={SearchResultsScreen} /> */}
       <Stack.Screen name="RecipeDetail" component={RecipeDetailScreen} />
-      {/* <Stack.Screen 
+      <Stack.Screen 
         name="PantryScan" 
         component={PantryScanningScreen} 
         options={{ presentation: 'modal' }} 
-      /> */}
+      />
       <Stack.Screen 
         name="EditProfile" // Changed from EditProfileScreen to EditProfile for brevity
         component={EditProfileScreen} 

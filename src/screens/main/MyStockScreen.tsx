@@ -7,32 +7,24 @@ import {
   Alert,
   Text,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useStockManager, StockItem } from '../../hooks/useStockManager'; // Re-enabled hook import
 import { StockHeader } from '../../components/stock/StockHeader'; // Use named import
 import { StockList } from '../../components/stock/StockList'; // Use named import
-import { CameraScannerModal } from '../../components/stock/CameraScannerModal'; // Uncommented component
 import { ManualAddModal } from '../../components/stock/ManualAddModal'; // Uncommented component import
-import StockConfirmation from '../../../components/stock/StockConfirmation'; // Verifying path for new location
 import { COLORS as ThemeColors } from '../../constants/theme'; // Import real COLORS, maybe alias
 
 // const COLORS = { background: '#FFF' }; // Remove mock
 
 export default function MyStockScreen() {
+  const navigation = useNavigation();
+  
   // Re-enabled hook call and destructuring
   const {
     stockData, // Keep even if StockList is commented, hook fetches it
     isLoading,
     error,
     isSaving,
-    isRecognizing,
-    cameraRef, // Keep this if hook returns it, even if not passed to modal
-    permissionStatus, 
-    requestPermission, // Destructure this, it's now returned by the hook
-    ensureCameraPermission, 
-    isCameraVisible, // Not directly used yet
-    openCamera,
-    closeCamera, // Not directly used yet
-    handleCaptureAndProcessImage, // Not directly used yet
     isManualModalVisible, // Needed for ManualAddModal
     openManualModal, 
     closeManualModal, // Needed for ManualAddModal
@@ -52,12 +44,9 @@ export default function MyStockScreen() {
       item.item_name.toLowerCase().includes(searchQuery.toLowerCase())
     ), [stockData, searchQuery]);
 
-  const handleAttemptOpenScanner = async () => {
-    // This now uses ensureCameraPermission from the hook
-    const hasPermission = await ensureCameraPermission();
-    if (hasPermission) {
-      openCamera(); // Uses openCamera from the hook
-    }
+  const handleNavigateToScanner = () => {
+    // Navigate to our enhanced PantryScanningScreen
+    navigation.navigate('PantryScan' as never);
   };
 
   // Re-enabled delete handler
@@ -87,9 +76,9 @@ export default function MyStockScreen() {
       <StockHeader 
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
-        onScanPress={handleAttemptOpenScanner} 
+        onScanPress={handleNavigateToScanner} 
         onManualPress={() => openManualModal()} // Uses openManualModal from hook
-        isScanning={isRecognizing} // Uses isRecognizing from hook
+        isScanning={false} // No longer using old scanning state
         isAddingManually={isSaving} // Uses isSaving from hook
       />
 
@@ -105,17 +94,7 @@ export default function MyStockScreen() {
         />
       </View>
 
-      {/* Uncommented CameraScannerModal */}
-      <CameraScannerModal 
-        visible={isCameraVisible} 
-        onClose={closeCamera} 
-        onCapture={handleCaptureAndProcessImage} 
-        permissionStatus={permissionStatus} 
-        requestPermission={requestPermission} 
-        isAnalyzing={isRecognizing} 
-      />
-
-      {/* Uncommented ManualAddModal */}
+      {/* Keep ManualAddModal for manual entry */}
       <ManualAddModal
         visible={isManualModalVisible}
         onClose={closeManualModal}

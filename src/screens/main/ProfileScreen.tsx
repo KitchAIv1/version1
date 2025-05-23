@@ -31,6 +31,7 @@ interface VideoPostData {
   video_url: string;
   thumbnail_url: string | null;
   created_at: string;
+  creator_user_id: string; // Added creator's user ID
 }
 
 interface ProfileData { 
@@ -89,6 +90,7 @@ const useProfile = () => {
           video_url: recipe.video_url,
           thumbnail_url: recipe.thumbnail_url,
           created_at: recipe.created_at,
+          creator_user_id: recipe.creator_user_id, // Corrected mapping
         }));
       } else {
         console.warn('[useProfile] profileDataBackend.recipes is not an array or is missing.');
@@ -103,6 +105,7 @@ const useProfile = () => {
           video_url: recipe.video_url,
           thumbnail_url: recipe.thumbnail_url,
           created_at: recipe.created_at,
+          creator_user_id: recipe.creator_user_id, // Corrected mapping
         }));
       } else {
         console.warn('[useProfile] profileDataBackend.saved_recipes is not an array or is missing.');
@@ -273,13 +276,6 @@ export const ProfileScreen: React.FC = () => {
     </View>
   );
 
-  const renderProfileCardItem = ({ item }: { item: VideoPostData }) => (
-    <ProfileRecipeCard 
-      item={item} 
-      onPress={() => navigation.navigate('RecipeDetail', { id: item.recipe_id })} 
-    />
-  );
-
   return (
     <Tabs.Container
       renderHeader={renderHeader}
@@ -299,8 +295,7 @@ export const ProfileScreen: React.FC = () => {
             let iconName = 'video-library'; 
             if (iconProps.route.name === 'My Recipes') iconName = 'video-library';
             if (iconProps.route.name === 'Saved') iconName = 'bookmark';
-            // if (iconProps.route.name === 'Planner') iconName = 'event'; // REMOVED V1 Planner icon
-            if (iconProps.route.name === 'Planner V2') iconName = 'calendar-today'; // Icon for new planner
+            if (iconProps.route.name === 'Planner') iconName = 'calendar-today'; // Changed from Planner V2
             if (iconProps.route.name === 'Activity') iconName = 'notifications';
 
             return <Icon name={iconName} size={20} color={iconProps.focused ? ACTIVE_COLOR : '#525252'} style={{ marginRight: 0, paddingRight:0 }}/>;
@@ -311,7 +306,13 @@ export const ProfileScreen: React.FC = () => {
       <Tabs.Tab name="My Recipes" label="My Recipes">
         <Tabs.FlatList
           data={profile.videos}
-          renderItem={renderProfileCardItem}
+          renderItem={({ item }) => (
+            <ProfileRecipeCard 
+              item={item} 
+              onPress={() => navigation.navigate('RecipeDetail', { id: item.recipe_id })}
+              context="myRecipes" // Context for My Recipes
+            />
+          )}
           keyExtractor={(item) => item.recipe_id}
           numColumns={2}
           showsVerticalScrollIndicator={false}
@@ -323,7 +324,13 @@ export const ProfileScreen: React.FC = () => {
       <Tabs.Tab name="Saved" label="Saved">
         <Tabs.FlatList
           data={profile.saved_recipes}
-          renderItem={renderProfileCardItem}
+          renderItem={({ item }) => (
+            <ProfileRecipeCard 
+              item={item} 
+              onPress={() => navigation.navigate('RecipeDetail', { id: item.recipe_id })}
+              context="savedRecipes" // Context for Saved Recipes
+            />
+          )}
           keyExtractor={(item) => `saved-${item.recipe_id}`}
           numColumns={2}
           showsVerticalScrollIndicator={false}
@@ -337,7 +344,7 @@ export const ProfileScreen: React.FC = () => {
           <MealPlannerScreen />
         </View>
       </Tabs.Tab> */}
-      <Tabs.Tab name="Planner V2" label="Planner V2">
+      <Tabs.Tab name="Planner" label="Planner">
         <Tabs.ScrollView style={styles.fullScreenTabContent}>
           <MealPlannerV2Screen />
         </Tabs.ScrollView>

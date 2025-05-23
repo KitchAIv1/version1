@@ -148,9 +148,9 @@ export default function RecipeDetailScreen() {
   const [isPlannerModalVisible, setIsPlannerModalVisible] = useState(false);
   
   // Track original tab bar measurements
-  const tabBarRef = useRef<View>(null);
-  const [tabBarPosition, setTabBarPosition] = useState(0);
-  const [tabBarHeight, setTabBarHeight] = useState(0);
+  // const tabBarRef = useRef<View>(null);
+  // const [tabBarPosition, setTabBarPosition] = useState(0);
+  // const [tabBarHeight, setTabBarHeight] = useState(0);
   
   // State for floating tab bar control with debouncing
   const [shouldShowFloatingBar, setShouldShowFloatingBar] = useState(false);
@@ -255,32 +255,32 @@ export default function RecipeDetailScreen() {
   // --- End Video Player ---
 
   // Measure tab bar position after render and when recipe details change
-  useLayoutEffect(() => {
-    if (!isLoading && recipeDetails) {
-      const measureTabBar = () => {
-        if (tabBarRef.current) {
-          tabBarRef.current.measure((x, y, width, height, pageX, pageY) => {
-            if (pageY > 0) {
-              setTabBarPosition(pageY);
-              setTabBarHeight(height);
-              console.log('Tab bar measured:', { position: pageY, height });
-            }
-          });
-        }
-      };
-      
-      // Measure after a delay to ensure layout is complete
-      const initialTimer = setTimeout(measureTabBar, 300);
-      
-      // Measure again after a longer delay as a backup
-      const backupTimer = setTimeout(measureTabBar, 1000);
-      
-      return () => {
-        clearTimeout(initialTimer);
-        clearTimeout(backupTimer);
-      };
-    }
-  }, [isLoading, recipeDetails]);
+  // useLayoutEffect(() => {
+  //   if (!isLoading && recipeDetails) {
+  //     const measureTabBar = () => {
+  //       if (tabBarRef.current) {
+  //         tabBarRef.current.measure((x, y, width, height, pageX, pageY) => {
+  //           if (pageY > 0) {
+  //             setTabBarPosition(pageY);
+  //             setTabBarHeight(height);
+  //             console.log('Tab bar measured:', { position: pageY, height });
+  //           }
+  //         });
+  //       }
+  //     };
+  //     
+  //     // Measure after a delay to ensure layout is complete
+  //     const initialTimer = setTimeout(measureTabBar, 300);
+  //     
+  //     // Measure again after a longer delay as a backup
+  //     const backupTimer = setTimeout(measureTabBar, 1000);
+  //     
+  //     return () => {
+  //       clearTimeout(initialTimer);
+  //       clearTimeout(backupTimer);
+  //     };
+  //   }
+  // }, [isLoading, recipeDetails]);
 
   // --- Optimistic updates for like/save --- 
   const likeMut = useMutation<void, Error, void, any>({
@@ -402,109 +402,52 @@ export default function RecipeDetailScreen() {
     }));
   }, []);
 
-  // Handle tab change to ensure proper scrolling
+  // Handle tab change to ensure proper scrolling (reverted to HEADER_HEIGHT)
   const handleTabChange = useCallback((tab: string) => {
-    // If we're already scrolled past the tab bar, adjust scroll position
-    if (currentScrollPosition > HEADER_HEIGHT + 250) {
+    if (currentScrollPosition > HEADER_HEIGHT) { 
       scrollViewRef.current?.scrollTo({ 
-        y: HEADER_HEIGHT + 250, 
+        y: HEADER_HEIGHT, 
         animated: true 
       });
     }
-  }, [currentScrollPosition]);
+  }, [currentScrollPosition, HEADER_HEIGHT]); // Reverted to HEADER_HEIGHT dependency
   
-  // Handle scroll event to show/hide floating tab bar
+  // Handle scroll event to show/hide floating tab bar (reverted to HEADER_HEIGHT logic)
   const handleScroll = useCallback((event: any) => {
     const scrollY = event.nativeEvent.contentOffset.y;
     setCurrentScrollPosition(scrollY);
     
-    // Log every 20th scroll position for debugging deep scrolling
+    // No longer need to check markerPosition_Y === 0
+
     if (Math.floor(scrollY) % 200 === 0) {
-      console.log(`Deep scroll check: scrollY=${scrollY.toFixed(0)}`);
+      console.log(`[RDP HandleScroll] scrollY=${scrollY.toFixed(0)}, HEADER_HEIGHT=${HEADER_HEIGHT.toFixed(0)}`);
     }
     
-    if (tabBarPosition > 0 && tabBarHeight > 0) {
-      // Original tab bar disappears from view calculation
-      // Account for device height to determine when tab bar is no longer visible
-      const windowHeight = Dimensions.get('window').height;
-      
-      // Calculate the bottom edge of the tab bar
-      const tabBarBottomPosition = tabBarPosition + tabBarHeight;
-      
-      // The point where the original tab bar's BOTTOM edge starts to exit the viewport
-      // We subtract a small buffer (20px) to show floating bar slightly before original disappears
-      const tabBarExitPoint = tabBarBottomPosition - windowHeight + 20;
-      
-      // Hide floating bar when very deep in content (user reading comments, etc.)
-      // Use a smaller threshold for the Comments tab specifically
-      const contentDeepPoint = tabBarBottomPosition + (activeTab === TAB_ROUTES.COMMENTS ? 150 : 600);
-      
-      // Show floating bar in the "middle zone" - after original tab bar exits viewport but before deep in content
-      const shouldShow = (scrollY > tabBarExitPoint) && (scrollY < contentDeepPoint);
-      
-      // Special handling for Comments tab - always hide when deep scrolling
-      if (activeTab === TAB_ROUTES.COMMENTS && scrollY > contentDeepPoint) {
-        if (shouldShowFloatingBar) {
-          setShouldShowFloatingBar(false);
-          console.log(`COMMENTS TAB OVERRIDE: Force hiding floating bar at scrollY=${scrollY.toFixed(0)}`);
-          Animated.timing(floatingTabBarVisible, {
-            toValue: 0,
-            duration: 150,
-            useNativeDriver: true
-          }).start();
-          return;
-        }
-      }
-      
-      // Force hide at deep scroll positions regardless of other conditions
-      if (scrollY > contentDeepPoint) {
-        // Ensure we hide the floating bar when scrolled deep
-        if (shouldShowFloatingBar) {
-          setShouldShowFloatingBar(false);
-          console.log(`FORCE HIDING at deep scroll: ${scrollY.toFixed(0)} > ${contentDeepPoint}`);
-          
-          // Immediately hide for deep scrolls
-          Animated.timing(floatingTabBarVisible, {
-            toValue: 0,
-            duration: 150,
-            useNativeDriver: true
-          }).start();
-        }
-        return; // Skip other logic when in deep scroll
-      }
-      
-      // Only animate if visibility state is changing
-      if (shouldShow !== shouldShowFloatingBar) {
-        setShouldShowFloatingBar(shouldShow);
-        console.log(`Visibility change: ${shouldShowFloatingBar} -> ${shouldShow}`);
-        console.log(`Scroll metrics: scrollY=${scrollY.toFixed(0)}, tabExit=${tabBarExitPoint.toFixed(0)}, contentDeep=${contentDeepPoint.toFixed(0)}`);
-        
-        // Use spring animation for more natural feel
-        if (shouldShow) {
-          // Show animation
-          floatingBarAnimating.current = true;
-          Animated.spring(floatingTabBarVisible, {
-            toValue: 1,
-            tension: 50,
-            friction: 7,
-            useNativeDriver: true
-          }).start(() => {
-            floatingBarAnimating.current = false;
-          });
-        } else {
-          // Hide animation - use timing for more predictable hiding
-          floatingBarAnimating.current = true;
-          Animated.timing(floatingTabBarVisible, {
-            toValue: 0,
-            duration: 150, 
-            useNativeDriver: true
-          }).start(() => {
-            floatingBarAnimating.current = false;
-          });
-        }
-      }
+    const tabBarExitPoint = HEADER_HEIGHT; // Reverted to HEADER_HEIGHT
+
+    const deepContentHideOffset = screenHeight * 0.8; 
+    const contentDeepPoint = HEADER_HEIGHT + deepContentHideOffset; // Relative to HEADER_HEIGHT
+
+    let shouldShow = scrollY > tabBarExitPoint && scrollY < contentDeepPoint;
+
+    if (activeTab === TAB_ROUTES.COMMENTS && scrollY > (HEADER_HEIGHT + screenHeight * 0.2)) { 
+        shouldShow = false;
     }
-  }, [shouldShowFloatingBar, floatingTabBarVisible, tabBarPosition, tabBarHeight, activeTab]);
+    
+    if (shouldShow !== shouldShowFloatingBar && !floatingBarAnimating.current) {
+      floatingBarAnimating.current = true;
+      logVisibilityChange.current++;
+      console.log(`[RDP HandleScroll #${logVisibilityChange.current}] Visibility change: shouldShow=${shouldShow}, scrollY=${scrollY.toFixed(0)}, tabBarExitPoint=${tabBarExitPoint.toFixed(0)}, contentDeepPoint=${contentDeepPoint.toFixed(0)}`);
+      setShouldShowFloatingBar(shouldShow);
+      Animated.timing(floatingTabBarVisible, {
+        toValue: shouldShow ? 1 : 0,
+        duration: 250, 
+        useNativeDriver: true,
+      }).start(() => {
+        floatingBarAnimating.current = false;
+      });
+    }
+  }, [activeTab, shouldShowFloatingBar, floatingTabBarVisible, HEADER_HEIGHT]); // REVERTED dependencies
 
   // Render the active tab content
   const renderTabContent = () => {
@@ -818,7 +761,7 @@ export default function RecipeDetailScreen() {
         </View>
 
         {/* Original Tab Navigator - Not sticky anymore */}
-        <View ref={tabBarRef} style={styles.tabNavigatorWrapper}>
+        <View style={styles.tabNavigatorWrapper}>
           <CustomTabNavigator 
             activeTab={activeTab} 
             setActiveTab={setActiveTab} 

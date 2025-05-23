@@ -1,40 +1,79 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   ActivityIndicator,
   Alert,
   StyleSheet,
   Text,
-  Modal as RNModal,
+  SafeAreaView,
 } from 'react-native';
 import {
   CameraView,
   CameraCapturedPicture,
+  useCameraPermissions,
 } from 'expo-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as Haptics from 'expo-haptics';
 import { useNavigation } from '@react-navigation/native';
 import { Button } from 'react-native-paper';
 
-import { useStockManager, PreparedItem, ConfirmedStockItemFromModal } from '../../hooks/useStockManager';
-// import StockConfirmation from '../../../components/stock/StockConfirmation'; // Temporarily disable StockConfirmation
+import { 
+  ScanningLoadingOverlay, 
+  CameraInterface, 
+  ItemConfirmationModal 
+} from '../../components/pantry';
+import {
+  processImageWithAI,
+  enforceMinimumDisplayTime,
+  ScannedItem,
+  ItemToUpsert,
+} from '../../utils/pantryScanning';
+import { supabase } from '../../services/supabase';
 
 export default function PantryScanningScreen() {
-  console.log('[PantryScanningScreen] Component RENDERED or RE-RENDERED - JULY_22_DIAGNOSTIC');
+  console.log('[PantryScanningScreen] Component RENDERED or RE-RENDERED - Enhanced with V1 features');
 
   // ---------- refs & state ----------
-  const {
-    cameraRef,
-    permissionStatus: perm,
-    requestPermission: requestPerm,
-    isCameraVisible,
-    openCamera,
-    closeStockConfirmationModal,
-    ensureCameraPermission,
-  } = useStockManager();
-
+  const cameraRef = useRef<CameraView>(null);
+  const [permission, requestPermission] = useCameraPermissions();
+  const [isCameraVisible, setIsCameraVisible] = useState(false);
   const nav = useNavigation();
-  const [showTestModalDirectly, setShowTestModalDirectly] = useState(false);
-  console.log('[PantryScanningScreen] current showTestModalDirectly state:', showTestModalDirectly);
+  
+  // Enhanced state management for V1 features
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [scannedItems, setScannedItems] = useState<ScannedItem[] | null>(null);
+  const [analysisMessage, setAnalysisMessage] = useState('Analyzing your pantry...');
+  
+  // Analysis message cycling
+  const analysisPhrases = [
+    "Analyzing your pantry...",
+    "Identifying items...",
+    "Looking for ingredients...",
+    "Processing labels...",
+    "Almost done...",
+    "AI is working its magic..."
+  ];
+
+  // Camera management functions
+  const openCamera = () => setIsCameraVisible(true);
+  
+  const ensureCameraPermission = async (): Promise<boolean> => {
+    if (!permission) return false;
+    
+    if (permission.granted) return true;
+    
+    if (permission.status === 'denied' && !permission.canAskAgain) {
+      Alert.alert(
+        'Permission Required',
+        'Camera access was permanently denied. Please enable it in your device settings.'
+      );
+      return false;
+    }
+    
+    const { granted } = await requestPermission();
+    return granted;
+  };
 
   // ---------- ask once on mount / manage camera visibility ----------
   useEffect(() => {
@@ -44,103 +83,175 @@ export default function PantryScanningScreen() {
       if (hasPermission) {
         openCamera();
       } else {
-        // Potentially navigate back or show persistent message if no permission
-        // This is important if perm.canAskAgain becomes false
-        if (perm && perm.status === 'denied' && !perm.canAskAgain) {
-            // Alert.alert("Camera Access Required", "Please enable camera permissions in your device settings to use this feature.");
-            // nav.goBack(); // Example: go back if permission permanently denied
+        if (permission && permission.status === 'denied' && !permission.canAskAgain) {
+          // Handle permanent denial if needed
         }
       }
     };
     manageCamera();
-  }, [ensureCameraPermission, openCamera, perm, nav]);
+  }, [permission, nav]);
 
-  // ---------- helpers ----------
-  const handleSnapPress = () => {
-    console.log('[PantryScanningScreen] handleSnapPress CALLED. Current showTestModalDirectly:', showTestModalDirectly);
-    setShowTestModalDirectly(true);
-    console.log('[PantryScanningScreen] handleSnapPress: setShowTestModalDirectly(true) has been CALLED.');
+  // Cycle through analysis messages
+  useEffect(() => {
+    if (isAnalyzing) {
+      const messageInterval = setInterval(() => {
+        setAnalysisMessage(prev => {
+          const currentIndex = analysisPhrases.indexOf(prev);
+          const nextIndex = (currentIndex + 1) % analysisPhrases.length;
+          return analysisPhrases[nextIndex];
+        });
+      }, 2000);
+      
+      return () => clearInterval(messageInterval);
+    }
+  }, [isAnalyzing]);
+
+  // ---------- Enhanced camera capture with V1 logic ----------
+  const handleCameraCapture = async () => {
+    if (!permission) {
+      Alert.alert('Permission Required', 'Camera access is needed.');
+      const { granted } = await requestPermission();
+      if (!granted) return;
+    }
+
+    if (!cameraRef.current) {
+      Alert.alert("Error", "Camera not ready.");
+      return;
+    }
+
+    setIsAnalyzing(true);
+    console.log('[PantryScanningScreen] Starting enhanced analysis with V1 features');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    try {
+      const analysisStartTime = Date.now();
+      
+      // Take picture with enhanced quality settings
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.7,
+        base64: true,
+      });
+
+      console.log('[PantryScanningScreen] Picture taken, processing with AI...');
+      
+      // Process image with AI recognition
+      const recognitionResult = await processImageWithAI(photo.base64!);
+      
+      // Enforce minimum display time for better UX
+      await enforceMinimumDisplayTime(analysisStartTime, 4000);
+
+      if (recognitionResult.items.length === 0) {
+        setIsAnalyzing(false);
+        Alert.alert('No Items Recognized', 'Could not detect items. Try a different angle or better lighting?');
+      } else {
+        console.log('[PantryScanningScreen] Items recognized:', recognitionResult.items);
+        setScannedItems(recognitionResult.items);
+        setIsAnalyzing(false);
+      }
+    } catch (error) {
+      console.error('[PantryScanningScreen] Enhanced capture/analysis error:', error);
+      setIsAnalyzing(false);
+      Alert.alert('Error', `Failed to process image: ${(error as Error).message}`);
+    }
+  };
+
+  // ---------- Enhanced confirmation handlers ----------
+  const handleConfirmItems = async (itemsToUpsert: ItemToUpsert[]) => {
+    console.log('[PantryScanningScreen] Confirmation confirmed with enhanced logic:', itemsToUpsert);
+    setScannedItems(null); // Close confirmation modal
+    setIsSaving(true);
+
+    try {
+      if (itemsToUpsert.length > 0) {
+        // Use Supabase directly for upsert operation
+        const { error } = await supabase
+          .from('stock')
+          .upsert(itemsToUpsert, { 
+            onConflict: 'user_id, item_name'
+          });
+          
+        if (error) {
+          console.error('[PantryScanningScreen] Error saving items:', error);
+          throw error;
+        }
+        
+        console.log('[PantryScanningScreen] Items saved successfully');
+        Alert.alert('Success', `${itemsToUpsert.length} items added to your pantry!`);
+      }
+    } catch (error) {
+      console.error('[PantryScanningScreen] Error in handleConfirmItems:', error);
+      Alert.alert('Error', `Failed to save items: ${(error as Error).message}`);
+    } finally {
+      setIsSaving(false);
+      // Reopen camera for next scan
+      if (!isCameraVisible) openCamera();
+    }
+  };
+
+  const handleCancelConfirmation = () => {
+    console.log('[PantryScanningScreen] Confirmation cancelled');
+    setScannedItems(null);
+    // Reopen camera
+    if (!isCameraVisible) openCamera();
   };
 
   // ---------- render states ----------
-  if (!perm)
+  if (!permission)
     return (
       <Centered>
         <ActivityIndicator size="large" />
-        <Text style={styles.centeredText}>Initializing camera... JULY_22_VISIBLE_TEST</Text>
+        <Text style={styles.centeredText}>Initializing camera...</Text>
       </Centered>
     );
 
-  if (!perm.granted)
+  if (!permission.granted)
     return (
       <Centered>
         <Text style={styles.centeredText}>
-          We need camera access... JULY_22_VISIBLE_TEST
+          We need camera access to scan your pantry items
         </Text>
-        <Button mode="contained" onPress={requestPerm}>
+        <Button mode="contained" onPress={requestPermission}>
           Grant permission
         </Button>
-        {perm.status === 'denied' && !perm.canAskAgain && (
-           <Text style={{textAlign: 'center', marginTop:10, color: 'grey'}}>Permission was denied. Please enable it in settings.</Text>
+        {permission.status === 'denied' && !permission.canAskAgain && (
+           <Text style={{textAlign: 'center', marginTop:10, color: 'grey'}}>
+             Permission was denied. Please enable it in settings.
+           </Text>
         )}
       </Centered>
     );
 
   return (
-    <View style={styles.container}>
-      {isCameraVisible && !showTestModalDirectly && (
-        <CameraView
+    <SafeAreaView style={styles.container}>
+      {/* Enhanced Camera Interface */}
+      {isCameraVisible && !scannedItems && (
+        <CameraInterface
           ref={cameraRef}
-          style={styles.camera}
-          facing='back'
+          onCapturePress={handleCameraCapture}
+          isAnalyzing={isAnalyzing}
+          instructionText="Position your pantry items clearly in the frame and tap to scan"
         />
       )}
 
-      {isCameraVisible && !showTestModalDirectly && (
-        <Button
-          mode="contained"
-          icon="camera"
-          onPress={handleSnapPress}
-          style={styles.fab}
-          contentStyle={{ height: 54 }}
-          children={null}
+      {/* Enhanced Item Confirmation Modal */}
+      {scannedItems && (
+        <ItemConfirmationModal
+          isVisible={!!scannedItems}
+          items={scannedItems}
+          onConfirm={handleConfirmItems}
+          onCancel={handleCancelConfirmation}
+          isProcessing={isSaving}
         />
       )}
 
-      {showTestModalDirectly && (
-        <RNModal visible={showTestModalDirectly} transparent={false} animationType="slide">
-          <View style={{ flex: 1, backgroundColor: 'magenta', justifyContent: 'center', alignItems: 'center' }}>
-            <Text style={{ fontSize: 30, color: 'black' }}>IMMEDIATE TEST MODAL</Text>
-            <Button 
-              mode="contained" 
-              onPress={() => {
-                setShowTestModalDirectly(false);
-                closeStockConfirmationModal();
-                if (!isCameraVisible) openCamera();
-              }}
-              style={{ marginTop: 20 }}
-            >
-              Close Immediate Test Modal
-            </Button>
-          </View>
-        </RNModal>
-      )}
-      
-      {/* {isStockConfirmationVisible && scannedItemsForConfirmation && Array.isArray(scannedItemsForConfirmation) && (
-        <StockConfirmation
-          isVisible={isStockConfirmationVisible} 
-          items={scannedItemsForConfirmation} 
-          isProcessing={isSaving} 
-          onConfirm={(confirmedItems: ConfirmedStockItemFromModal[]) => { 
-            handleConfirmStockItems(confirmedItems);
-          }}
-          onCancel={() => { 
-            closeStockConfirmationModal();
-            if (!isCameraVisible) openCamera();
-          }}
-        />
-      )} */}
-    </View>
+      {/* Enhanced Loading Overlay */}
+      <ScanningLoadingOverlay
+        isVisible={isAnalyzing || isSaving}
+        isAnalyzing={isAnalyzing}
+        isSaving={isSaving}
+        analysisMessage={analysisMessage}
+      />
+    </SafeAreaView>
   );
 }
 
@@ -151,23 +262,21 @@ const Centered = ({ children }: { children: React.ReactNode }) => (
 
 /* ---------- styles ---------- */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  camera: { flex: 1 },
-  fab: {
-    position: 'absolute',
-    bottom: 36,
-    alignSelf: 'center',
-    borderRadius: 28,
-    backgroundColor: '#22c55e',
+  container: { 
+    flex: 1, 
+    backgroundColor: '#000' 
   },
-  hud: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
+  center: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    padding: 32, 
+    backgroundColor: '#fff' 
   },
-  hudText: { marginTop: 12, color: '#fff', fontSize: 16 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, backgroundColor: '#fff' },
-  centeredText: { textAlign: 'center', marginBottom: 16, color: '#000', fontSize: 16 },
+  centeredText: { 
+    textAlign: 'center', 
+    marginBottom: 16, 
+    color: '#000', 
+    fontSize: 16 
+  },
 });

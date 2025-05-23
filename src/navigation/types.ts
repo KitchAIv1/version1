@@ -9,7 +9,6 @@ export type AuthStackParamList = {
   Splash: undefined; // No params expected for Splash
   Login: undefined;
   Signup: undefined;
-  DietPrefs: undefined; // Or potentially { userId: string } if needed right after signup
 };
 
 // For the main application tabs (nested within MainStack)
@@ -68,7 +67,6 @@ export type MainStackParamList = {
 export type SplashScreenProps = NativeStackScreenProps<AuthStackParamList, 'Splash'>;
 export type LoginScreenProps = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 export type SignupScreenProps = NativeStackScreenProps<AuthStackParamList, 'Signup'>;
-export type DietPrefsScreenProps = NativeStackScreenProps<AuthStackParamList, 'DietPrefs'>;
 
 // Example: Prop types for screens within MainTabs (if needed for options/listeners)
 export type FeedScreenProps = BottomTabScreenProps<MainTabsParamList, 'Feed'>;
