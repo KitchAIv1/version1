@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,9 @@ import {
   FlatList,
   StyleSheet,
   Alert,
+  RefreshControl,
+  RefreshControlProps,
+  Modal,
 } from 'react-native';
 import { useQuery, QueryKey, useQueryClient } from '@tanstack/react-query';
 import { Tabs, MaterialTabBar } from 'react-native-collapsible-tab-view';
@@ -15,7 +18,7 @@ import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context'
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { supabase } from '../../services/supabase';
 import ProfileRecipeCard from '../../components/ProfileRecipeCard'; // Import the new card
-import ActivityList from '../../components/ActivityList'; // Import ActivityList
+import ActivityFeed from '../../components/ActivityFeed'; // Import ActivityFeed instead of ActivityList
 import { useNavigation } from '@react-navigation/native'; // Import useNavigation
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // Import navigation type
 import { MainStackParamList } from '../../navigation/types'; // Import param list
@@ -24,6 +27,9 @@ import { Feather } from '@expo/vector-icons';
 // import MealPlannerScreen from './meal_planner/MealPlannerScreen'; // REMOVED Existing planner
 import MealPlannerV2Screen from './meal_planner_v2/MealPlannerV2Screen'; // New V2 planner
 import { ProfileScreenSkeleton, RecipeGridSkeleton } from '../../components/ProfileScreenSkeletons';
+import { useUserActivityFeed } from '../../hooks/useUserActivityFeed'; // Import the activity feed hook
+import { useAccessControl } from '../../hooks/useAccessControl'; // Import access control hook
+import { TierDisplay } from '../../components/TierDisplay'; // Added TierDisplay import
 
 // Define types for profile and post data
 interface VideoPostData { 
@@ -162,9 +168,40 @@ const Stat: React.FC<{ label: string; value: number }> = React.memo(({ label, va
   </View>
 ));
 
-const Bio: React.FC<{ profile: ProfileData }> = React.memo(({ profile }) => (
+const Bio: React.FC<{ 
+  profile: ProfileData; 
+  onTierBadgePress: () => void;
+  tierDisplay: string;
+  showTierBadge: boolean;
+}> = React.memo(({ profile, onTierBadgePress, tierDisplay, showTierBadge }) => (
   <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
-    <Text style={styles.bioName}>{profile.username}</Text>
+    <View style={styles.usernameRow}>
+      <Text style={styles.bioName}>{profile.username}</Text>
+      {showTierBadge && (
+        <TouchableOpacity 
+          style={[
+            styles.tierBadge,
+            tierDisplay === 'PREMIUM' || tierDisplay.includes('CREATOR') 
+              ? styles.tierBadgePremium 
+              : styles.tierBadgeFreemium
+          ]}
+          onPress={onTierBadgePress}
+          activeOpacity={0.7}
+        >
+          {tierDisplay === 'PREMIUM' || tierDisplay.includes('CREATOR') ? (
+            <Icon name="star" size={12} color="#333" style={styles.tierBadgeIcon} />
+          ) : null}
+          <Text style={[
+            styles.tierBadgeText,
+            tierDisplay === 'PREMIUM' || tierDisplay.includes('CREATOR')
+              ? styles.tierBadgeTextPremium
+              : styles.tierBadgeTextFreemium
+          ]}>
+            {tierDisplay.includes('CREATOR') ? 'Creator' : tierDisplay}
+          </Text>
+        </TouchableOpacity>
+      )}
+    </View>
     {profile.bio ? (
       <Text style={styles.bioText}>{profile.bio}</Text>
     ) : (
@@ -178,7 +215,8 @@ const LazyTabContent: React.FC<{
   data: VideoPostData[]; 
   context: 'myRecipes' | 'savedRecipes';
   emptyLabel: string;
-}> = React.memo(({ data, context, emptyLabel }) => {
+  refreshControl?: React.ReactElement<RefreshControlProps>;
+}> = React.memo(({ data, context, emptyLabel, refreshControl }) => {
   const navigation = useNavigation<ProfileNavigationProp>();
   
   const renderItem = React.useCallback(({ item }: { item: VideoPostData }) => (
@@ -208,6 +246,7 @@ const LazyTabContent: React.FC<{
       maxToRenderPerBatch={4} // Render 4 items per batch
       windowSize={10} // Keep 10 items in memory
       initialNumToRender={6} // Render 6 items initially
+      refreshControl={refreshControl}
     />
   );
 });
@@ -217,15 +256,76 @@ const LazyTabContent: React.FC<{
 // -----------------------------------------------------------------------------
 export const ProfileScreen: React.FC = () => {
   const { user } = useAuth();
-  const { data: profile, isLoading: profileLoading, isError, error: profileFetchError } = useProfile();
+  const { data: profile, isLoading: profileLoading, isError, error: profileFetchError, refetch: refetchProfile } = useProfile();
   const navigation = useNavigation<ProfileNavigationProp>();
   const queryClient = useQueryClient(); // Get query client instance
+
+  // Add access control hook
+  const { getUsageDisplay } = useAccessControl();
+  const usageData = getUsageDisplay();
+
+  // Modal state for tier badge
+  const [showTierModal, setShowTierModal] = useState(false);
+
+  // Add activity feed hook
+  const { 
+    data: activityData, 
+    isLoading: activityLoading, 
+    error: activityError,
+    refetch: refetchActivity
+  } = useUserActivityFeed(user?.id);
+
+  // Pull-to-refresh state and functionality
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Refresh handler - refreshes all data sources
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      // Refresh all data sources in parallel
+      await Promise.all([
+        refetchProfile(),
+        refetchActivity(),
+        // Invalidate any other relevant queries
+        queryClient.invalidateQueries({ queryKey: ['profile'] }),
+        queryClient.invalidateQueries({ queryKey: ['userActivityFeed'] }),
+      ]);
+    } catch (error) {
+      console.error('[ProfileScreen] Refresh error:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refetchProfile, refetchActivity, queryClient]);
+
+  // Create RefreshControl component
+  const refreshControl = (
+    <RefreshControl
+      refreshing={isRefreshing}
+      onRefresh={handleRefresh}
+      tintColor={ACTIVE_COLOR}
+      colors={[ACTIVE_COLOR]}
+      title="Pull to refresh"
+      titleColor="#666"
+    />
+  );
 
   // --- Navigation Handler for Add Recipe --- (New Handler)
   const handleAddRecipePress = () => {
     navigation.navigate('VideoRecipeUploader');
   };
   // --- End Navigation Handler for Add Recipe ---
+
+  // --- Navigation Handler for Upgrade --- (New Handler)
+  const handleUpgradePress = () => {
+    navigation.navigate('UpgradeScreen');
+  };
+  // --- End Navigation Handler for Upgrade ---
+
+  // --- Tier Badge Press Handler ---
+  const handleTierBadgePress = () => {
+    setShowTierModal(true);
+  };
+  // --- End Tier Badge Press Handler ---
 
   // --- Sign Out Handler ---
   const handleSignOut = async () => {
@@ -293,7 +393,13 @@ export const ProfileScreen: React.FC = () => {
         </View>
       </View>
       <AvatarRow profile={profile} postsCount={profile.videos?.length || 0} />
-      <Bio profile={profile} />
+      <Bio 
+        profile={profile} 
+        onTierBadgePress={handleTierBadgePress}
+        tierDisplay={usageData.tierDisplay}
+        showTierBadge={true}
+      />
+      
       <View style={styles.buttonRow}>
         <TouchableOpacity style={styles.editButton} onPress={handleEditProfilePress}>
           <Text style={styles.editButtonText}>Edit Profile</Text>
@@ -345,6 +451,7 @@ export const ProfileScreen: React.FC = () => {
               data={profile.videos} 
               context="myRecipes" 
               emptyLabel="No recipes uploaded yet."
+              refreshControl={refreshControl}
             />
           </Tabs.Tab>
           <Tabs.Tab name="Saved" label="Saved">
@@ -352,20 +459,114 @@ export const ProfileScreen: React.FC = () => {
               data={profile.saved_recipes} 
               context="savedRecipes" 
               emptyLabel="No saved recipes yet."
+              refreshControl={refreshControl}
             />
           </Tabs.Tab>
           <Tabs.Tab name="Planner" label="Planner">
-            <Tabs.ScrollView style={styles.fullScreenTabContent}>
+            <Tabs.ScrollView 
+              style={styles.fullScreenTabContent}
+              refreshControl={refreshControl}
+            >
               <MealPlannerV2Screen />
             </Tabs.ScrollView>
           </Tabs.Tab>
           <Tabs.Tab name="Activity" label="Activity">
-            <View style={styles.fullScreenTabContentWithPadding}>
-               <ActivityList data={[]} />
-            </View>
+            <Tabs.ScrollView 
+              style={styles.fullScreenTabContent}
+              refreshControl={refreshControl}
+            >
+              <ActivityFeed 
+                data={activityData}
+                isLoading={activityLoading}
+                error={activityError}
+              />
+            </Tabs.ScrollView>
           </Tabs.Tab>
         </Tabs.Container>
       </View>
+
+      {/* Tier Modal */}
+      <Modal
+        visible={showTierModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowTierModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Icon 
+                name={usageData.tierDisplay === 'PREMIUM' || usageData.tierDisplay.includes('CREATOR') ? 'star' : 'person'} 
+                size={48} 
+                color={usageData.tierDisplay === 'PREMIUM' || usageData.tierDisplay.includes('CREATOR') ? '#FFD700' : '#10b981'} 
+              />
+              <Text style={styles.modalTitle}>
+                {usageData.tierDisplay.includes('CREATOR') ? 'Creator Account' : `${usageData.tierDisplay} Account`}
+              </Text>
+            </View>
+            
+            {usageData.showUsage ? (
+              <>
+                <Text style={styles.modalMessage}>Monthly Usage</Text>
+                
+                <View style={styles.usageStatsContainer}>
+                  <View style={styles.usageStat}>
+                    <Icon name="camera-alt" size={24} color="#6b7280" />
+                    <Text style={styles.usageStatLabel}>Pantry Scans</Text>
+                    <Text style={styles.usageStatValue}>{usageData.scanUsage}</Text>
+                  </View>
+                  
+                  <View style={styles.usageStat}>
+                    <Icon name="lightbulb-outline" size={24} color="#6b7280" />
+                    <Text style={styles.usageStatLabel}>AI Recipes</Text>
+                    <Text style={styles.usageStatValue}>{usageData.aiRecipeUsage}</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.modalSubMessage}>
+                  Upgrade to Premium for unlimited access to all features!
+                </Text>
+
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity 
+                    style={styles.modalCancelButton}
+                    onPress={() => setShowTierModal(false)}
+                  >
+                    <Text style={styles.modalCancelText}>Close</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.modalUpgradeButton}
+                    onPress={() => {
+                      setShowTierModal(false);
+                      handleUpgradePress();
+                    }}
+                  >
+                    <Icon name="arrow-upward" size={20} color="#fff" />
+                    <Text style={styles.modalUpgradeText}>Upgrade Now</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={styles.modalMessage}>
+                  {usageData.tierDisplay.includes('CREATOR') 
+                    ? 'You have unlimited access to all features as a Creator!'
+                    : 'You have unlimited access to all Premium features!'
+                  }
+                </Text>
+                
+                <TouchableOpacity 
+                  style={styles.modalCloseButton}
+                  onPress={() => setShowTierModal(false)}
+                >
+                  <Text style={styles.modalCloseText}>Close</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -651,6 +852,126 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 1000,
+  },
+  tierSection: {
+    padding: 16,
+  },
+  usernameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tierBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    marginLeft: 8,
+    height: 20,
+  },
+  tierBadgePremium: {
+    backgroundColor: '#FFD700',
+  },
+  tierBadgeFreemium: {
+    backgroundColor: '#E0E0E0',
+  },
+  tierBadgeIcon: {
+    marginRight: 4,
+  },
+  tierBadgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  tierBadgeTextPremium: {
+    color: '#333',
+  },
+  tierBadgeTextFreemium: {
+    color: '#555',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 10,
+    width: '80%',
+    maxWidth: 400,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 10,
+  },
+  modalMessage: {
+    fontSize: 16,
+    marginBottom: 10,
+  },
+  usageStatsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 10,
+  },
+  usageStat: {
+    alignItems: 'center',
+  },
+  usageStatLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  usageStatValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  modalSubMessage: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalCancelButton: {
+    backgroundColor: '#f8f9fa',
+    padding: 10,
+    borderRadius: 5,
+  },
+  modalCancelText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  modalUpgradeButton: {
+    backgroundColor: '#10b981',
+    padding: 10,
+    borderRadius: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  modalUpgradeText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginLeft: 5,
+  },
+  modalCloseButton: {
+    backgroundColor: '#f8f9fa',
+    padding: 10,
+    borderRadius: 5,
+    flex: 1,
+  },
+  modalCloseText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 });
 
