@@ -1,38 +1,65 @@
 {
   "expo": {
-    "name": "kitchai-v2",
+    "name": "KitchAI",
     "slug": "kitchai-v2",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "description": "AI-powered recipe discovery and meal planning app. Scan your pantry, get personalized recipes, and plan your meals with intelligent recommendations.",
+    "keywords": ["recipe", "cooking", "AI", "meal planning", "food", "pantry", "kitchen", "nutrition"],
+    "primaryColor": "#FF6B35",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.chieftitan.kitchai-v2",
+      "buildNumber": "1",
       "infoPlist": {
-        "NSCameraUsageDescription": "Scan pantry items"
+        "NSCameraUsageDescription": "KitchAI uses your camera to scan pantry items and identify ingredients for personalized recipe recommendations.",
+        "NSPhotoLibraryUsageDescription": "KitchAI accesses your photo library to let you select images of ingredients for recipe suggestions.",
+        "CFBundleDisplayName": "KitchAI",
+        "CFBundleName": "KitchAI"
       },
-      "bundleIdentifier": "com.chieftitan.kitchai-v2"
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.chieftitan.kitchaiv2",
+      "versionCode": 1,
+      "compileSdkVersion": 34,
+      "targetSdkVersion": 34,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "permissions": [
         "CAMERA",
-        "CAMERA"
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
       ],
-      "edgeToEdgeEnabled": true,
-      "package": "com.chieftitan.kitchaiv2"
+      "edgeToEdgeEnabled": true
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "06cbb30c-9d18-474e-afbb-b93bed7e5b42"
+      }
+    },
+    "plugins": [
+      "expo-font"
+    ],
+    "privacy": "public"
   }
 }
