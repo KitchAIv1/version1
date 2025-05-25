@@ -93,11 +93,18 @@ export const AuthProvider: React.FC<PropsWithChildren<object>> = ({ children }) 
         .from('user_usage_limits')
         .select('scan_count, ai_recipe_count, last_reset')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle(); // Use maybeSingle() instead of single() to handle missing records
 
       if (error) {
         console.error('AuthProvider: Error fetching usage limits:', error.message);
-        // Set default values if no record exists yet
+        // Set default values if error occurs
+        setUsageLimits({ scan_count: 0, ai_recipe_count: 0, last_reset: null });
+        return;
+      }
+
+      // Handle case where no record exists (data will be null)
+      if (!data) {
+        console.log('AuthProvider: No usage limits record found, creating default values');
         setUsageLimits({ scan_count: 0, ai_recipe_count: 0, last_reset: null });
         return;
       }

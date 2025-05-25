@@ -23,7 +23,6 @@ import { COLORS } from '../constants/theme';
 import { formatDistance } from 'date-fns';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RecipeDetailsData } from '../hooks/useRecipeDetails';
-import { useCacheManager } from '../hooks/useCacheManager';
 
 interface Comment {
   id: string;
@@ -81,7 +80,6 @@ const EmptyComments = memo(() => (
 export default function CommentsModal({ visible, onClose, recipeId }: CommentsModalProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const cacheManager = useCacheManager();
   const { top, bottom } = useSafeAreaInsets();
   const [commentText, setCommentText] = useState('');
   const inputRef = useRef<TextInput>(null);
@@ -91,6 +89,9 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
   
   // Keyboard animation for Instagram-style behavior
   const keyboardAnim = useRef(new Animated.Value(0)).current;
+  
+  // Track if modal has been opened to defer heavy operations
+  const hasOpenedRef = useRef(false);
   
   // Pan responder for swipe to dismiss
   const panResponder = useRef(
@@ -122,16 +123,14 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       (e) => {
         const keyboardHeight = e.endCoordinates.height;
-        const keyboardDuration = e.duration || 250; // Use keyboard's own animation duration
+        const keyboardDuration = e.duration || 250;
         
-        // Move modal UP with a small gap between input field and keyboard
-        const gapSize = 20; // 20px gap between input field and keyboard
+        const gapSize = 20;
         const moveUpDistance = keyboardHeight - gapSize;
         
-        // Sync modal animation with keyboard animation timing
         Animated.timing(keyboardAnim, {
           toValue: -moveUpDistance,
-          duration: keyboardDuration, // Match keyboard's animation duration
+          duration: keyboardDuration,
           useNativeDriver: true,
         }).start();
       }
@@ -140,12 +139,11 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
     const keyboardWillHideListener = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
       (e) => {
-        const keyboardDuration = e.duration || 250; // Use keyboard's own animation duration
+        const keyboardDuration = e.duration || 250;
         
-        // Sync modal animation with keyboard hide timing
         Animated.timing(keyboardAnim, {
           toValue: 0,
-          duration: keyboardDuration, // Match keyboard's animation duration
+          duration: keyboardDuration,
           useNativeDriver: true,
         }).start();
       }
@@ -155,9 +153,9 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
       keyboardWillShowListener.remove();
       keyboardWillHideListener.remove();
     };
-  }, [keyboardAnim, bottom]);
+  }, [keyboardAnim]);
 
-  // Fetch comments
+  // Fetch comments - only when modal is visible
   const {
     data: comments = [],
     isLoading,
@@ -180,43 +178,28 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
     gcTime: 10 * 60 * 1000,
   });
 
-  // Update comment count in recipe details when comments change
+  // Lightweight cache sync - only update comment count when comments actually change
+  // Defer this operation to avoid blocking modal animations
   React.useEffect(() => {
-    // Only sync comment counts when modal is visible and we have actual comment data
-    if (visible && comments && Array.isArray(comments)) {
+    if (!visible || !hasOpenedRef.current || !comments || !Array.isArray(comments)) return;
+    
+    // Use setTimeout to defer cache updates until after animation completes
+    const timeoutId = setTimeout(() => {
       const currentDetails = queryClient.getQueryData<RecipeDetailsData>(['recipeDetails', recipeId, user?.id]);
       
       if (currentDetails && currentDetails.comments_count !== comments.length) {
-        // Update recipe details cache with new comment count
+        // Only update recipe details cache - defer feed cache updates
         queryClient.setQueryData<RecipeDetailsData>(['recipeDetails', recipeId, user?.id], {
           ...currentDetails,
           comments_count: comments.length
         });
-        
-        // Also update feed cache if it exists to keep comment counts in sync
-        queryClient.setQueryData(['feed'], (oldFeedData: any) => {
-          if (!oldFeedData || !Array.isArray(oldFeedData)) return oldFeedData;
-          
-          return oldFeedData.map((item: any) => {
-            if (item.id === recipeId || item.recipe_id === recipeId) {
-              console.log(`[CommentsModal] Syncing feed comment count for recipe ${recipeId}:`, {
-                old_commentsCount: item.commentsCount,
-                new_commentsCount: comments.length,
-                title: item.title
-              });
-              return {
-                ...item,
-                commentsCount: comments.length // Use commentsCount to match feed data structure
-              };
-            }
-            return item;
-          });
-        });
       }
-    }
-  }, [visible, comments, recipeId, queryClient, user?.id]); // Added visible to dependencies
+    }, 100); // Small delay to ensure smooth animations
+    
+    return () => clearTimeout(timeoutId);
+  }, [comments?.length, visible, recipeId, queryClient, user?.id]);
 
-  // Post comment mutation
+  // Optimized comment posting with reduced cache operations
   const postCommentMutation = useMutation({
     mutationFn: async (text: string) => {
       if (!user?.id || !recipeId) throw new Error('User or recipe ID missing');
@@ -232,119 +215,58 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
       if (error) throw error;
     },
     onMutate: async (text: string) => {
-      // Cancel any outgoing refetches
+      // Cancel only essential queries to avoid blocking UI
       await queryClient.cancelQueries({ queryKey: ['recipe-comments', recipeId] });
-      await queryClient.cancelQueries({ queryKey: ['recipeDetails', recipeId, user?.id] });
       
-      // Snapshot the previous values
       const previousComments = queryClient.getQueryData(['recipe-comments', recipeId]);
-      const previousRecipeDetails = queryClient.getQueryData(['recipeDetails', recipeId, user?.id]);
       
       // Create optimistic comment
       const optimisticComment = {
-        id: `temp-${Date.now()}`, // Temporary ID
+        id: `temp-${Date.now()}`,
         comment_text: text,
         created_at: new Date().toISOString(),
         username: user?.user_metadata?.username || user?.email || 'You',
         avatar_url: user?.user_metadata?.avatar_url || null,
       };
       
-      // Optimistically update comments list
+      // Only update comments list optimistically - defer other cache updates
       queryClient.setQueryData(['recipe-comments', recipeId], (oldComments: Comment[] = []) => {
         return [optimisticComment, ...oldComments];
       });
       
-      // Optimistically update recipe details comment count
-      queryClient.setQueryData(['recipeDetails', recipeId, user?.id], (oldDetails: any) => {
-        if (!oldDetails) return oldDetails;
-        return {
-          ...oldDetails,
-          comments_count: (oldDetails.comments_count || 0) + 1
-        };
-      });
-      
-      // Optimistically update feed cache
-      queryClient.setQueryData(['feed'], (oldFeedData: any) => {
-        if (!oldFeedData || !Array.isArray(oldFeedData)) return oldFeedData;
-        
-        return oldFeedData.map((item: any) => {
-          if (item.id === recipeId || item.recipe_id === recipeId) {
-            const newCommentsCount = (item.commentsCount || 0) + 1;
-            console.log(`[CommentsModal] Optimistic feed update for recipe ${recipeId}:`, {
-              old_commentsCount: item.commentsCount,
-              new_commentsCount: newCommentsCount,
-              title: item.title
-            });
-            return {
-              ...item,
-              commentsCount: newCommentsCount // Use commentsCount for feed
-            };
-          }
-          return item;
-        });
-      });
-      
-      // Also optimistically update profile cache if it exists
-      queryClient.setQueryData(['profile'], (oldProfile: any) => {
-        if (!oldProfile) return oldProfile;
-        
-        // Update uploaded recipes if this recipe is in user's recipes
-        const updatedUploadedVideos = oldProfile.uploaded_videos?.map((recipe: any) => {
-          if (recipe.recipe_id === recipeId || recipe.id === recipeId) {
-            return {
-              ...recipe,
-              comments_count: (recipe.comments_count || 0) + 1
-            };
-          }
-          return recipe;
-        });
-        
-        // Update saved recipes if this recipe is in user's saved recipes
-        const updatedSavedRecipes = oldProfile.saved_recipes?.map((recipe: any) => {
-          if (recipe.recipe_id === recipeId || recipe.id === recipeId) {
-            return {
-              ...recipe,
-              comments_count: (recipe.comments_count || 0) + 1
-            };
-          }
-          return recipe;
-        });
-        
-        return {
-          ...oldProfile,
-          uploaded_videos: updatedUploadedVideos || oldProfile.uploaded_videos,
-          saved_recipes: updatedSavedRecipes || oldProfile.saved_recipes
-        };
-      });
-      
-      return { previousComments, previousRecipeDetails };
+      return { previousComments };
     },
     onSuccess: () => {
       setCommentText('');
-      // Invalidate to get the real data from server
+      
+      // Invalidate only essential queries immediately
       queryClient.invalidateQueries({ queryKey: ['recipe-comments', recipeId] });
-      queryClient.invalidateQueries({ queryKey: ['recipeDetails', recipeId, user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['recipe-comments-count', recipeId] });
       
-      // Don't invalidate feed cache here - let the comment count query update it
-      // queryClient.invalidateQueries({ queryKey: ['feed'] });
-      
-      // Invalidate profile caches to update comment counts in user's recipes and saved recipes
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
-      
-      // Invalidate any other recipe-related caches that might show comment counts
-      queryClient.invalidateQueries({ queryKey: ['recipes'] });
-      queryClient.invalidateQueries({ queryKey: ['saved-recipes'] });
+      // Defer other cache invalidations to avoid blocking UI
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['recipeDetails', recipeId, user?.id] });
+        
+        // Update feed cache with new comment count
+        queryClient.setQueryData(['feed'], (oldFeedData: any) => {
+          if (!oldFeedData || !Array.isArray(oldFeedData)) return oldFeedData;
+          
+          return oldFeedData.map((item: any) => {
+            if (item.id === recipeId || item.recipe_id === recipeId) {
+              return {
+                ...item,
+                commentsCount: (item.commentsCount || 0) + 1
+              };
+            }
+            return item;
+          });
+        });
+      }, 200);
     },
     onError: (error, variables, context) => {
-      // Rollback optimistic updates on error
+      // Simple rollback
       if (context?.previousComments) {
         queryClient.setQueryData(['recipe-comments', recipeId], context.previousComments);
       }
-      if (context?.previousRecipeDetails) {
-        queryClient.setQueryData(['recipeDetails', recipeId, user?.id], context.previousRecipeDetails);
-      }
-      
       console.error('Failed to post comment:', error);
     }
   });
@@ -355,55 +277,54 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
   }, [commentText, postCommentMutation]);
 
   const handleClose = useCallback(() => {
-    // Dismiss keyboard first if it's open
+    // Dismiss keyboard first
     Keyboard.dismiss();
     
-    // Animate both slide and keyboard animations simultaneously for smoother close
+    // Smooth parallel animation
     Animated.parallel([
       Animated.timing(slideAnim, {
         toValue: 300,
-        duration: 300, // Slightly longer for smoother animation
+        duration: 250, // Faster for snappier feel
         useNativeDriver: true,
       }),
       Animated.timing(keyboardAnim, {
         toValue: 0,
-        duration: 200, // Match keyboard animation speed
+        duration: 200,
         useNativeDriver: true,
       })
     ]).start(() => {
       onClose();
-      // Reset animations after modal is completely closed
+      // Reset animations after modal is closed
       slideAnim.setValue(0);
       keyboardAnim.setValue(0);
+      hasOpenedRef.current = false;
     });
   }, [onClose, slideAnim, keyboardAnim]);
 
-  // Animate in when modal becomes visible
+  // Optimized modal opening animation
   React.useEffect(() => {
     if (visible) {
-      // Reset animations when modal opens
-      slideAnim.setValue(300); // Start from bottom
-      keyboardAnim.setValue(0); // Start with no keyboard offset
+      // Reset animations
+      slideAnim.setValue(300);
+      keyboardAnim.setValue(0);
       
+      // Fast, smooth spring animation
       Animated.spring(slideAnim, {
         toValue: 0,
-        tension: 65,
+        tension: 80, // Higher tension for snappier animation
         friction: 8,
         useNativeDriver: true,
-      }).start();
-
-      // Fetch and update comment count when modal opens
-      if (recipeId) {
-        cacheManager.updateCommentCount(recipeId, user?.id);
-      }
+      }).start(() => {
+        // Mark as opened after animation completes
+        hasOpenedRef.current = true;
+      });
     }
-  }, [visible, slideAnim, keyboardAnim, recipeId, cacheManager, user?.id]);
+  }, [visible, slideAnim, keyboardAnim]);
 
   const renderComment = useCallback(({ item }: { item: Comment }) => (
     <CommentItem comment={item} />
   ), []);
 
-  // Fixed key extractor to ensure unique keys
   const keyExtractor = useCallback((item: Comment, index: number) => {
     return item.id ? `comment-${item.id}` : `comment-${index}-${item.created_at}`;
   }, []);
@@ -431,7 +352,7 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
               paddingTop: top,
               transform: [
                 { translateY: slideAnim },
-                { translateY: keyboardAnim }, // Instagram-style keyboard adjustment
+                { translateY: keyboardAnim },
               ],
             },
           ]}
@@ -448,7 +369,7 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
             </View>
           </View>
 
-          {/* Comments List - Removed KeyboardAvoidingView since we handle it manually */}
+          {/* Comments List */}
           <View style={styles.content}>
             {isLoading ? (
               <View style={styles.loadingContainer}>
@@ -467,6 +388,10 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={EmptyComments}
                 keyboardShouldPersistTaps="handled"
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={10}
+                windowSize={10}
+                initialNumToRender={8}
               />
             )}
 

@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { supabase } from '../services/supabase';
 
 interface CacheUpdateParams {
@@ -13,6 +13,10 @@ interface CacheUpdateParams {
 
 export const useCacheManager = () => {
   const queryClient = useQueryClient();
+  
+  // Track pending comment count requests to prevent duplicates
+  const pendingCommentRequests = useRef<Set<string>>(new Set());
+  const commentCountTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   // Update all caches simultaneously to prevent inconsistencies
   const updateAllCaches = useCallback((params: CacheUpdateParams) => {
@@ -201,35 +205,75 @@ export const useCacheManager = () => {
     queryClient.invalidateQueries({ queryKey: ['recipe-comments-count', recipeId] });
   }, [queryClient]);
 
-  // Fetch and update comment count for a specific recipe
+  // Optimized comment count update with debouncing and duplicate prevention
   const updateCommentCount = useCallback(async (recipeId: string, userId?: string) => {
-    try {
-      const { data, error } = await supabase
-        .rpc('get_recipe_comments', {
-          p_recipe_id: recipeId
-        });
-      
-      if (error) {
-        console.error(`[useCacheManager] Error fetching comments for recipe ${recipeId}:`, error);
-        return;
-      }
-      
-      const actualCommentCount = (data || []).length;
-      console.log(`[useCacheManager] Fetched comment count for recipe ${recipeId}: ${actualCommentCount}`);
-      
-      // Update all caches with the correct comment count
-      updateAllCaches({
-        recipeId,
-        userId,
-        commentsCount: actualCommentCount
-      });
-      
-      return actualCommentCount;
-    } catch (error) {
-      console.error(`[useCacheManager] Exception fetching comments for recipe ${recipeId}:`, error);
-      return 0;
+    // Check if request is already pending for this recipe
+    if (pendingCommentRequests.current.has(recipeId)) {
+      console.log(`[useCacheManager] Comment count request already pending for recipe ${recipeId}, skipping`);
+      return;
     }
-  }, [updateAllCaches]);
+
+    // Clear any existing timeout for this recipe
+    const existingTimeout = commentCountTimeouts.current.get(recipeId);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+    }
+
+    // Debounce the request
+    const timeoutId = setTimeout(async () => {
+      // Mark request as pending
+      pendingCommentRequests.current.add(recipeId);
+      
+      try {
+        // Check if we already have recent comment data in cache
+        const existingComments = queryClient.getQueryData(['recipe-comments', recipeId]) as any[];
+        if (existingComments && Array.isArray(existingComments)) {
+          console.log(`[useCacheManager] Using cached comment count for recipe ${recipeId}: ${existingComments.length}`);
+          updateAllCaches({
+            recipeId,
+            userId,
+            commentsCount: existingComments.length
+          });
+          return existingComments.length;
+        }
+
+        const { data, error } = await supabase
+          .rpc('get_recipe_comments', {
+            p_recipe_id: recipeId
+          });
+        
+        if (error) {
+          console.error(`[useCacheManager] Error fetching comments for recipe ${recipeId}:`, error);
+          return;
+        }
+        
+        const actualCommentCount = (data || []).length;
+        console.log(`[useCacheManager] Fetched comment count for recipe ${recipeId}: ${actualCommentCount}`);
+        
+        // Update all caches with the correct comment count
+        updateAllCaches({
+          recipeId,
+          userId,
+          commentsCount: actualCommentCount
+        });
+        
+        // Cache the comments data to prevent future requests
+        queryClient.setQueryData(['recipe-comments', recipeId], data || []);
+        
+        return actualCommentCount;
+      } catch (error) {
+        console.error(`[useCacheManager] Exception fetching comments for recipe ${recipeId}:`, error);
+        return 0;
+      } finally {
+        // Remove from pending requests
+        pendingCommentRequests.current.delete(recipeId);
+        commentCountTimeouts.current.delete(recipeId);
+      }
+    }, 300); // 300ms debounce
+
+    // Store the timeout
+    commentCountTimeouts.current.set(recipeId, timeoutId);
+  }, [updateAllCaches, queryClient]);
 
   return {
     updateAllCaches,

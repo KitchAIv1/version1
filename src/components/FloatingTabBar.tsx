@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -28,23 +28,33 @@ const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
   visible,
   offsetTop
 }) => {
-  // Use opacity and transform for smooth transitions
-  const opacity = visible.interpolate({
-    inputRange: [0, 0.2, 0.8, 1],
-    outputRange: [0, 0.4, 0.9, 1], // More gradual opacity change
-  });
-  
-  // Transform for slight slide-in effect with subtle bounce
-  const translateY = visible.interpolate({
-    inputRange: [0, 0.5, 0.8, 1],
-    outputRange: [-15, -8, -2, 0], // More gradual movement with slight bounce
-  });
-  
-  // Scale effect for more dimensionality
-  const scale = visible.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [0.97, 0.98, 1],
-  });
+  // Memoize interpolated values to prevent reading during render
+  const animatedStyles = useMemo(() => {
+    const opacity = visible.interpolate({
+      inputRange: [0, 0.2, 0.8, 1],
+      outputRange: [0, 0.4, 0.9, 1], // More gradual opacity change
+    });
+    
+    // Transform for slight slide-in effect with subtle bounce
+    const translateY = visible.interpolate({
+      inputRange: [0, 0.5, 0.8, 1],
+      outputRange: [-15, -8, -2, 0], // More gradual movement with slight bounce
+    });
+    
+    // Scale effect for more dimensionality
+    const scale = visible.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [0.97, 0.98, 1],
+    });
+
+    return {
+      opacity,
+      transform: [
+        { translateY },
+        { scale }
+      ]
+    };
+  }, [visible]);
 
   // Get the status bar height
   const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 0;
@@ -57,12 +67,8 @@ const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
       style={[
         styles.container,
         {
-          top: finalOffsetTop, 
-          opacity,
-          transform: [
-            { translateY },
-            { scale }
-          ]
+          top: finalOffsetTop,
+          ...animatedStyles
         }
       ]}
     >

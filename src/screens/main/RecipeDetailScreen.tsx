@@ -146,6 +146,10 @@ export default function RecipeDetailScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const isScreenFocused = useIsFocused(); // Added
   
+  // Track modal states to prevent unnecessary operations when returning from modals
+  const [isAnyModalOpen, setIsAnyModalOpen] = useState(false);
+  const lastFocusTimeRef = useRef(Date.now());
+  
   // Meal Planner integration (V2)
   const { addRecipeToSlot } = useDailyMealPlan(format(new Date(), 'yyyy-MM-dd')); // Pass default date
   const [isPlannerModalVisible, setIsPlannerModalVisible] = useState(false);
@@ -186,15 +190,31 @@ export default function RecipeDetailScreen() {
   // Debug logging helper for visibility changes
   const logVisibilityChange = useRef(0);
 
-  // Use useFocusEffect to refresh grocery list when the screen comes into focus
+  // Optimized focus effect - only fetch grocery list when truly needed
   useFocusEffect(
     useCallback(() => {
-      if (user?.id) {
+      if (!user?.id) return;
+      
+      const now = Date.now();
+      const timeSinceLastFocus = now - lastFocusTimeRef.current;
+      
+      // Only fetch if:
+      // 1. More than 5 seconds since last focus (not just returning from modal)
+      // 2. No modals are currently open
+      // 3. This is the initial focus (timeSinceLastFocus > 30000)
+      if (!isAnyModalOpen && (timeSinceLastFocus > 5000 || timeSinceLastFocus > 30000)) {
         console.log('RecipeDetailScreen focused, fetching grocery list...');
-        fetchGroceryList(user.id); 
+        fetchGroceryList(user.id);
       }
-    }, [user?.id, fetchGroceryList]) // Dependencies
+      
+      lastFocusTimeRef.current = now;
+    }, [user?.id, fetchGroceryList, isAnyModalOpen])
   );
+
+  // Track modal state changes
+  useEffect(() => {
+    setIsAnyModalOpen(isPlannerModalVisible || isCommentsModalVisible);
+  }, [isPlannerModalVisible, isCommentsModalVisible]);
 
   // Fetch recipe details
   const {
@@ -216,9 +236,9 @@ export default function RecipeDetailScreen() {
     }
   }, [recipeDetails?.is_liked_by_user, recipeDetails?.likes, recipeDetails?.is_saved_by_user, id]);
 
-  // Log when screen comes into focus
+  // Optimized focus logging - reduce noise
   useEffect(() => {
-    if (isScreenFocused) {
+    if (isScreenFocused && !isAnyModalOpen) {
       console.log(`[RecipeDetailScreen] Screen focused for recipe ${id}, current state:`, {
         is_liked_by_user: recipeDetails?.is_liked_by_user,
         likes: recipeDetails?.likes,
@@ -226,7 +246,7 @@ export default function RecipeDetailScreen() {
         timestamp: new Date().toISOString()
       });
     }
-  }, [isScreenFocused, recipeDetails?.is_liked_by_user, recipeDetails?.likes, recipeDetails?.is_saved_by_user, id]);
+  }, [isScreenFocused, recipeDetails?.is_liked_by_user, recipeDetails?.likes, recipeDetails?.is_saved_by_user, id, isAnyModalOpen]);
 
   // Effect to reset video error when video_url changes
   useEffect(() => {
@@ -365,7 +385,7 @@ export default function RecipeDetailScreen() {
   const cookTime = recipeDetails?.cook_time_minutes;
   const totalTime = (prepTime || 0) + (cookTime || 0);
 
-  // Comment button handler
+  // Comment button handler - track modal state
   const handleCommentPress = () => {
     setIsCommentsModalVisible(true);
   };

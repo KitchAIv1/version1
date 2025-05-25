@@ -142,20 +142,32 @@ export const useFeed = () => {
     // No need for refetchInterval or other complex settings for now
   });
 
-  // Update comment counts after feed data is loaded
+  // Update comment counts for items showing 0 comments - optimized to reduce excessive calls
   useEffect(() => {
-    if (feedQuery.data && feedQuery.data.length > 0) {
-      console.log('[useFeed] Feed data loaded, updating comment counts for items with 0 comments');
+    if (!feedQuery.data || !Array.isArray(feedQuery.data)) return;
+    
+    console.log('[useFeed] Feed data loaded, updating comment counts for items with 0 comments');
+    
+    // Debounce comment count updates to prevent excessive calls
+    const timeoutId = setTimeout(() => {
+      const itemsNeedingUpdate = feedQuery.data.filter((item: FeedItem) => 
+        item.commentsCount === 0 && (item.id || item.recipe_id)
+      );
       
-      // Only update comment counts for items that show 0 comments (likely incorrect)
-      feedQuery.data.forEach(async (item) => {
-        if (item.commentsCount === 0) {
-          console.log(`[useFeed] Updating comment count for recipe ${item.id} (currently showing 0)`);
-          await cacheManager.updateCommentCount(item.id);
+      // Limit to updating only a few items at a time to prevent overwhelming the system
+      const itemsToUpdate = itemsNeedingUpdate.slice(0, 3);
+      
+      itemsToUpdate.forEach((item: FeedItem) => {
+        const recipeId = item.id || item.recipe_id;
+        if (recipeId) {
+          console.log(`[useFeed] Updating comment count for recipe ${recipeId} (currently showing ${item.commentsCount})`);
+          cacheManager.updateCommentCount(recipeId);
         }
       });
-    }
-  }, [feedQuery.data, cacheManager]);
+    }, 1000); // 1 second debounce to allow multiple feed updates to settle
+    
+    return () => clearTimeout(timeoutId);
+  }, [feedQuery.data?.length, cacheManager]); // Only depend on data length, not entire data object
 
   return feedQuery;
 }; 

@@ -73,6 +73,12 @@ export default function FeedScreen() {
             p_recipe_id: recipeItem.id,
           }).then(({ error: rpcError }) => {
             if (rpcError) {
+              // Check if it's a duplicate key error (user already viewed this recipe)
+              if (rpcError.code === '23505') {
+                console.log(`[FeedScreen] View already logged for recipe ${recipeItem.id} - skipping`);
+                setLoggedViews(prev => new Set(prev).add(recipeItem.id)); // Mark as logged to prevent retries
+                return;
+              }
               console.error('[FeedScreen] Error logging view for recipe', recipeItem.id, ':', rpcError.message);
             } else {
               console.log('[FeedScreen] Successfully logged view for recipe', recipeItem.id);

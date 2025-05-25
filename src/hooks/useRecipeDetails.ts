@@ -189,8 +189,13 @@ export const useRecipeDetails = (recipeId: string | undefined, userId?: string):
             p_user_id: userId
           });
           if (logError) {
+            // Check if it's a duplicate key error (user already viewed this recipe)
+            if (logError.code === '23505') {
+              console.log(`[useRecipeDetails] View already logged for recipe ${recipeId}, user ${userId} - skipping`);
+              return; // Don't treat duplicate views as errors
+            }
             console.error('[useRecipeDetails] Error calling log_recipe_view:', logError);
-            // Optionally, don't throw here to avoid breaking the main data fetch if logging fails
+            // Don't throw here to avoid breaking the main data fetch if logging fails
           } else {
             console.log(`[useRecipeDetails] View logged successfully for recipe ${recipeId}. Updating views count only.`);
             // Instead of invalidating the entire query, just update the views_count
@@ -237,13 +242,19 @@ export const useRecipeDetails = (recipeId: string | undefined, userId?: string):
   const recipeResult = results[0];
   const pantryResult = results[1];
 
-  // Update comment count if recipe details show 0 comments
+  // Update comment count if recipe details show 0 comments - optimized to reduce excessive calls
   useEffect(() => {
     if (recipeResult.data && recipeId && recipeResult.data.comments_count === 0) {
       console.log(`[useRecipeDetails] Recipe details loaded with 0 comments, updating count for recipe ${recipeId}`);
-      cacheManager.updateCommentCount(recipeId, userId);
+      
+      // Debounce the comment count update to prevent excessive calls
+      const timeoutId = setTimeout(() => {
+        cacheManager.updateCommentCount(recipeId, userId);
+      }, 500); // 500ms debounce
+      
+      return () => clearTimeout(timeoutId);
     }
-  }, [recipeResult.data, recipeId, userId, cacheManager]);
+  }, [recipeResult.data?.comments_count, recipeId, userId, cacheManager]); // Only depend on comments_count, not entire data object
 
   // Update feed cache when recipe details are successfully fetched
   useEffect(() => {
