@@ -3,6 +3,7 @@ import { supabase } from '../services/supabase';
 import { RecipeItem } from '../types';
 import { useEffect } from 'react';
 import { useCacheManager } from './useCacheManager';
+import { useAuth } from '../providers/AuthProvider';
 
 // Interface for the raw item structure returned by the RPC
 interface RawFeedItem {
@@ -47,127 +48,61 @@ const FEED_PAGE_LIMIT = 10; // Define a limit for the number of items to fetch
 export const useFeed = () => {
   const queryClient = useQueryClient();
   const cacheManager = useCacheManager();
+  const { user } = useAuth();
   
-  const feedQuery = useQuery<
-    FeedItem[], // Data type returned by queryFn
-    Error,      // Error type
-    FeedItem[], // QueryData type (usually same as TData)
-    FeedQueryKey // QueryKey type
-  >({
+  const feedQuery = useQuery<FeedItem[]>({
     queryKey: ['feed'],
     queryFn: async () => {
-      console.log('Fetching feed with limit:', FEED_PAGE_LIMIT);
-
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) {
-        console.error('Auth error or no user:', authError);
-        throw authError || new Error('User not authenticated');
-      }
-      const userIdParam = user.id;
-      console.log('Calling RPC for user ID:', userIdParam);
-
-      const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_community_feed_pantry_match_v3', {
-            user_id_param: userIdParam,
-            p_limit: FEED_PAGE_LIMIT
-        });
-
-      if (rpcError) {
-        console.error('Supabase RPC error (from client):', rpcError);
-        throw rpcError;
+      if (!user?.id) {
+        throw new Error('User not authenticated');
       }
 
-      console.log('Raw rpcData from client:', JSON.stringify(rpcData));
-
-      let rawItems: RawFeedItem[] = [];
-      if (Array.isArray(rpcData)) {
-        rawItems = rpcData;
-      } else if (rpcData && Array.isArray((rpcData as any).result)) {
-        rawItems = (rpcData as any).result;
-      } else if (rpcData && Array.isArray((rpcData as any).get_community_feed_pantry_match_v3)) {
-        rawItems = (rpcData as any).get_community_feed_pantry_match_v3;
-      } else if (rpcData) {
-        console.warn('rpcData is an object but not in an expected array structure:', rpcData);
-      }
-
-      console.log('Extracted rawItems count:', rawItems.length);
-
-      const mappedItems: FeedItem[] = rawItems.map(item => {
-        const totalIngredients = item.output_total_ingredients_count;
-        const userIngredients = item.output_user_ingredients_count;
-        const pantryMatchPct = (totalIngredients > 0)
-            ? Math.round((userIngredients / totalIngredients) * 100)
-            : 0;
-
-        const mappedItem = {
-          id: item.output_id,
-          recipe_id: item.output_id,
-          title: item.output_name,
-          video: item.output_video_url,
-          video_url: item.output_video_url,
-          description: item.output_description,
-          liked: item.output_is_liked,
-          likes: item.output_likes,
-          saved: item.output_is_saved,
-          userName: item.user_name,
-          creatorAvatarUrl: item.out_creator_avatar_url,
-          pantryMatchPct: pantryMatchPct,
-          _userIngredientsCount: userIngredients,
-          _totalIngredientsCount: totalIngredients,
-          commentsCount: item.output_comments_count,
-        };
-
-        // Log like state for debugging inconsistencies
-        console.log(`[useFeed] Recipe ${item.output_id} like mapping:`, {
-          raw_output_is_liked: item.output_is_liked,
-          mapped_liked: mappedItem.liked,
-          raw_output_likes: item.output_likes,
-          mapped_likes: mappedItem.likes,
-          title: item.output_name
-        });
-
-        // Log comment count for debugging
-        console.log(`[useFeed] Recipe ${item.output_id} comment mapping:`, {
-          raw_output_comments_count: item.output_comments_count,
-          mapped_commentsCount: mappedItem.commentsCount,
-          title: item.output_name
-        });
-
-        return mappedItem;
+      console.log('[useFeed] Fetching feed data for user:', user.id);
+      
+      const { data, error } = await supabase.rpc('get_community_feed_pantry_match_v3', {
+        user_id_param: user.id,
+        p_limit: 50
       });
 
-      return mappedItems;
+      if (error) {
+        console.error('[useFeed] RPC Error:', error);
+        throw error;
+      }
+
+      if (!data || !Array.isArray(data)) {
+        console.warn('[useFeed] No data returned or data is not an array');
+        return [];
+      }
+
+      console.log(`[useFeed] Successfully fetched ${data.length} feed items`);
+      
+      // Transform the data to match the expected FeedItem interface
+      const transformedData: FeedItem[] = data.map((item: RawFeedItem) => ({
+        id: item.output_id,
+        recipe_id: item.output_id,
+        title: item.output_name,
+        video_url: item.output_video_url,
+        description: item.output_description,
+        likes: item.output_likes,
+        liked: item.output_is_liked,
+        saved: item.output_is_saved,
+        commentsCount: item.output_comments_count,
+        userName: item.user_name,
+        creatorAvatarUrl: item.out_creator_avatar_url,
+        created_at: item.output_created_at,
+        pantryMatchPct: Math.round((item.output_user_ingredients_count / item.output_total_ingredients_count) * 100),
+        _userIngredientsCount: item.output_user_ingredients_count,
+        _totalIngredientsCount: item.output_total_ingredients_count,
+        source: item.output_feed_type as 'saved' | 'created_by_user' | 'feed'
+      }));
+
+      return transformedData;
     },
-    // getNextPageParam and initialPageParam are removed as they are for useInfiniteQuery
-    // No need for refetchInterval or other complex settings for now
+    enabled: !!user?.id,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
   });
-
-  // Update comment counts for items showing 0 comments - optimized to reduce excessive calls
-  useEffect(() => {
-    if (!feedQuery.data || !Array.isArray(feedQuery.data)) return;
-    
-    console.log('[useFeed] Feed data loaded, updating comment counts for items with 0 comments');
-    
-    // Debounce comment count updates to prevent excessive calls
-    const timeoutId = setTimeout(() => {
-      const itemsNeedingUpdate = feedQuery.data.filter((item: FeedItem) => 
-        item.commentsCount === 0 && (item.id || item.recipe_id)
-      );
-      
-      // Limit to updating only a few items at a time to prevent overwhelming the system
-      const itemsToUpdate = itemsNeedingUpdate.slice(0, 3);
-      
-      itemsToUpdate.forEach((item: FeedItem) => {
-        const recipeId = item.id || item.recipe_id;
-        if (recipeId) {
-          console.log(`[useFeed] Updating comment count for recipe ${recipeId} (currently showing ${item.commentsCount})`);
-          cacheManager.updateCommentCount(recipeId);
-        }
-      });
-    }, 1000); // 1 second debounce to allow multiple feed updates to settle
-    
-    return () => clearTimeout(timeoutId);
-  }, [feedQuery.data?.length, cacheManager]); // Only depend on data length, not entire data object
 
   return feedQuery;
 }; 

@@ -242,20 +242,6 @@ export const useRecipeDetails = (recipeId: string | undefined, userId?: string):
   const recipeResult = results[0];
   const pantryResult = results[1];
 
-  // Update comment count if recipe details show 0 comments - optimized to reduce excessive calls
-  useEffect(() => {
-    if (recipeResult.data && recipeId && recipeResult.data.comments_count === 0) {
-      console.log(`[useRecipeDetails] Recipe details loaded with 0 comments, updating count for recipe ${recipeId}`);
-      
-      // Debounce the comment count update to prevent excessive calls
-      const timeoutId = setTimeout(() => {
-        cacheManager.updateCommentCount(recipeId, userId);
-      }, 500); // 500ms debounce
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [recipeResult.data?.comments_count, recipeId, userId, cacheManager]); // Only depend on comments_count, not entire data object
-
   // Update feed cache when recipe details are successfully fetched
   useEffect(() => {
     if (recipeResult.data && recipeId) {
@@ -272,6 +258,8 @@ export const useRecipeDetails = (recipeId: string | undefined, userId?: string):
               recipe_details_liked: recipeResult.data.is_liked_by_user,
               feed_saved: item.saved,
               recipe_details_saved: recipeResult.data.is_saved_by_user,
+              feed_comments: item.commentsCount,
+              recipe_details_comments: recipeResult.data.comments_count,
               title: item.title
             });
             
