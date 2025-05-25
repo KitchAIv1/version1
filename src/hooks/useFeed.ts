@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { RecipeItem } from '../types';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useCacheManager } from './useCacheManager';
 import { useAuth } from '../providers/AuthProvider';
 
@@ -49,6 +49,7 @@ export const useFeed = () => {
   const queryClient = useQueryClient();
   const cacheManager = useCacheManager();
   const { user } = useAuth();
+  const refreshedRecipeIds = useRef<Set<string>>(new Set());
   
   const feedQuery = useQuery<FeedItem[]>({
     queryKey: ['feed'],
@@ -83,6 +84,30 @@ export const useFeed = () => {
         raw_comments_count: item.output_comments_count,
         raw_comments_field: item.output_comments
       })));
+      
+      // Enhanced debugging: Show ALL comment counts to identify the pattern
+      const commentCountAnalysis = data.map(item => ({
+        recipe_id: item.output_id,
+        title: item.output_name?.substring(0, 30) + '...',
+        comments_count: item.output_comments_count,
+        has_comments_field: item.output_comments !== undefined,
+        created_at: item.output_created_at
+      }));
+      
+      console.log('[useFeed] FULL Comment Count Analysis:', commentCountAnalysis);
+      
+      const zeroCommentItems = commentCountAnalysis.filter(item => item.comments_count === 0);
+      const nonZeroCommentItems = commentCountAnalysis.filter(item => item.comments_count > 0);
+      
+      console.log(`[useFeed] Comment Count Summary: ${nonZeroCommentItems.length} items with comments, ${zeroCommentItems.length} items with 0 comments`);
+      
+      if (zeroCommentItems.length > 0) {
+        console.log('[useFeed] Items with 0 comments (potential issues):', zeroCommentItems.slice(0, 5));
+      }
+      
+      if (nonZeroCommentItems.length > 0) {
+        console.log('[useFeed] Items with comments (working correctly):', nonZeroCommentItems.slice(0, 3));
+      }
       
       // Transform the data to match the expected FeedItem interface
       const transformedData: FeedItem[] = data.map((item: RawFeedItem) => ({
@@ -120,20 +145,21 @@ export const useFeed = () => {
     
     console.log('[useFeed] Checking for items with 0 comment counts to refresh');
     
-    // Find items with 0 comments that might need refreshing
-    const itemsNeedingRefresh = feedQuery.data.filter((item: FeedItem) => 
-      item.commentsCount === 0 && (item.id || item.recipe_id)
-    );
+    // Find items with 0 comments that might need refreshing (exclude already refreshed)
+    const itemsNeedingRefresh = feedQuery.data.filter((item: FeedItem) => {
+      const recipeId = item.id || item.recipe_id;
+      return item.commentsCount === 0 && recipeId && !refreshedRecipeIds.current.has(recipeId);
+    });
     
     if (itemsNeedingRefresh.length === 0) {
       console.log('[useFeed] No items need comment count refresh');
       return;
     }
     
-    console.log(`[useFeed] Found ${itemsNeedingRefresh.length} items with 0 comments, refreshing first 3`);
+    console.log(`[useFeed] Found ${itemsNeedingRefresh.length} items with 0 comments, refreshing first 5`);
     
-    // Refresh comment counts for the first 3 items to avoid overwhelming the system
-    const itemsToRefresh = itemsNeedingRefresh.slice(0, 3);
+    // Refresh comment counts for the first 5 items (increased from 3)
+    const itemsToRefresh = itemsNeedingRefresh.slice(0, 5);
     
     const refreshCommentCounts = async () => {
       for (const item of itemsToRefresh) {
@@ -177,13 +203,16 @@ export const useFeed = () => {
           console.error(`[useFeed] Exception refreshing comment count for recipe ${recipeId}:`, error);
         }
         
+        // Mark this recipe as refreshed to avoid repeated attempts
+        refreshedRecipeIds.current.add(recipeId);
+        
         // Add a small delay between requests to avoid overwhelming the server
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     };
     
-    // Debounce the refresh to avoid excessive calls
-    const timeoutId = setTimeout(refreshCommentCounts, 1000);
+    // Debounce the refresh to avoid excessive calls (reduced for faster response)
+    const timeoutId = setTimeout(refreshCommentCounts, 500);
     
     return () => clearTimeout(timeoutId);
   }, [feedQuery.data?.length, user?.id, queryClient]); // Only depend on data length and user ID
