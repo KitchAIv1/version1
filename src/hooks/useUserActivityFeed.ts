@@ -76,37 +76,22 @@ export const useUserActivityFeed = (userId: string | undefined): UseUserActivity
       }
       
       console.log(`[useUserActivityFeed] Fetched ${activityData.length} activity items`);
-      if (activityData.length > 0) {
-        console.log('[useUserActivityFeed] Sample raw activity item:', JSON.stringify(activityData[0], null, 2));
-      }
-
-      // Transform the raw data to match our expected interface
-      const transformedData: ActivityItem[] = activityData.map((item: RawActivityItem, index: number) => {
-        const transformed: ActivityItem = {
-          id: `activity-${index}-${item.timestamp || Date.now()}`,
-          activity_type: item.type as ActivityItem['activity_type'],
-          created_at: item.timestamp,
-          metadata: {
-            recipe_id: item.recipe_id,
-            recipe_title: item.recipe_title,
-            recipe_name: item.recipe_title, // fallback
-            recipe_thumbnail: item.recipe_thumbnail,
-            thumbnail_url: item.recipe_thumbnail, // fallback
-            ...item.metadata
-          }
-        };
-
-        console.log(`[useUserActivityFeed] Transformed item ${index}:`, {
-          original_type: item.type,
-          transformed_activity_type: transformed.activity_type,
-          original_timestamp: item.timestamp,
-          transformed_created_at: transformed.created_at
-        });
-
-        return transformed;
-      });
       
-      console.log(`[useUserActivityFeed] Transformed ${transformedData.length} activity items`);
+      // Transform the data to match the expected format
+      const transformedData = activityData.map((item: any) => ({
+        id: `activity-${item.timestamp || Date.now()}`,
+        activity_type: item.type as ActivityItem['activity_type'],
+        created_at: item.timestamp,
+        metadata: {
+          recipe_id: item.recipe_id,
+          recipe_title: item.recipe_title,
+          recipe_name: item.recipe_title, // fallback
+          recipe_thumbnail: item.recipe_thumbnail,
+          thumbnail_url: item.recipe_thumbnail, // fallback
+          ...item.metadata
+        }
+      }));
+      
       return transformedData;
     },
     enabled: !!userId,
