@@ -9,7 +9,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { StockItem } from '../../hooks/useStockManager'; // Adjust path as needed
+import { StockItem } from '../../hooks/useStockManager';
 import { formatStockTimestamp, getShortRelativeTime } from '../../utils/dateUtils';
 import { getIconForPantryItem } from '../../utils/iconMapping';
 
@@ -19,8 +19,8 @@ interface StockListProps {
   onDelete: (item: StockItem) => void;
   isLoading: boolean;
   error: string | null;
-  onRefresh?: () => void; // Optional refresh function
-  isRefreshing?: boolean; // Optional state for refresh control
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 export const StockList: React.FC<StockListProps> = ({
@@ -36,7 +36,7 @@ export const StockList: React.FC<StockListProps> = ({
   const renderItem = ({ item }: { item: StockItem }) => {
     const lastUpdated = formatStockTimestamp(item.created_at);
     const shortTime = getShortRelativeTime(item.created_at);
-    const iconName = getIconForPantryItem(item.item_name); // Dynamic icon based on item name
+    const iconName = getIconForPantryItem(item.item_name);
     
     return (
       <TouchableOpacity 
@@ -49,36 +49,37 @@ export const StockList: React.FC<StockListProps> = ({
         </View>
         <View style={styles.itemContent}>
           <View style={styles.itemHeader}>
-            <Text style={styles.itemName}>{item.item_name.charAt(0).toUpperCase() + item.item_name.slice(1)}</Text>
+            <Text style={styles.itemName}>
+              {item.item_name.charAt(0).toUpperCase() + item.item_name.slice(1)}
+            </Text>
             {shortTime && (
               <Text style={styles.timeChip}>{shortTime}</Text>
             )}
           </View>
           <View style={styles.itemDetailsRow}>
-              <View style={styles.quantityChip}>
-                  <Text style={styles.quantityChipText}>
-                      {`${item.quantity} ${item.unit || ''}`.trim()}
-                  </Text>
+            <View style={styles.quantityChip}>
+              <Text style={styles.quantityChipText}>
+                {`${item.quantity} ${item.unit || ''}`.trim()}
+              </Text>
+            </View>
+            {lastUpdated && (
+              <View style={styles.timestampContainer}>
+                <Icon name="time-outline" size={12} color="#999" />
+                <Text style={styles.timestampText}>{lastUpdated}</Text>
               </View>
-              {lastUpdated && (
-                <View style={styles.timestampContainer}>
-                  <Icon name="time-outline" size={12} color="#999" />
-                  <Text style={styles.timestampText}>{lastUpdated}</Text>
-                </View>
-              )}
+            )}
           </View>
           {item.description && (
-              <Text style={styles.itemDescription} numberOfLines={1}>{item.description}</Text>
+            <Text style={styles.itemDescription} numberOfLines={1}>
+              {item.description}
+            </Text>
           )}
         </View>
         <View style={styles.itemActions}>
           <TouchableOpacity onPress={() => onEdit(item)} style={styles.actionButton}>
             <Icon name="create-outline" size={22} color="#757575" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => {
-              // Consider adding a confirmation alert here before deleting
-              onDelete(item);
-          }} style={styles.actionButton}>
+          <TouchableOpacity onPress={() => onDelete(item)} style={styles.actionButton}>
             <Icon name="trash-outline" size={24} color="#F44336" />
           </TouchableOpacity>
         </View>
@@ -102,9 +103,9 @@ export const StockList: React.FC<StockListProps> = ({
         <Text style={styles.errorTitle}>Oops! Something went wrong.</Text>
         <Text style={styles.errorText}>{error}</Text>
         {onRefresh && (
-            <TouchableOpacity style={styles.retryButton} onPress={onRefresh}>
-                <Text style={styles.retryButtonText}>Try Again</Text>
-            </TouchableOpacity>
+          <TouchableOpacity style={styles.retryButton} onPress={onRefresh}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
         )}
       </View>
     );
@@ -126,20 +127,25 @@ export const StockList: React.FC<StockListProps> = ({
     <FlatList
       data={data}
       renderItem={renderItem}
-      keyExtractor={(item) => item.id?.toString() || item.item_name} // Use ID if available, else name
+      keyExtractor={(item) => item.id?.toString() || item.item_name}
       style={styles.list}
       contentContainerStyle={styles.listContentContainer}
       showsVerticalScrollIndicator={false}
       refreshControl={
         onRefresh ? (
-            <RefreshControl
-                refreshing={isRefreshing}
-                onRefresh={onRefresh}
-                colors={["#22c55e"]}
-                tintColor={"#22c55e"}
-            />
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            colors={["#22c55e"]}
+            tintColor={"#22c55e"}
+          />
         ) : undefined
       }
+      removeClippedSubviews={true}
+      maxToRenderPerBatch={10}
+      updateCellsBatchingPeriod={50}
+      initialNumToRender={15}
+      windowSize={10}
     />
   );
 };

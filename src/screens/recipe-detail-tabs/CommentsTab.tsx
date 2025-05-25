@@ -25,6 +25,7 @@ import { supabase } from '../../services/supabase';
 import { COLORS } from '../../constants/theme';
 import { formatDistance } from 'date-fns';
 import { RecipeDetailsData } from '../../hooks/useRecipeDetails';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Comment {
   id: string;
@@ -81,7 +82,8 @@ export default function CommentsTab() {
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [showAllComments, setShowAllComments] = useState(false);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const { bottom } = useSafeAreaInsets();
+  const [inputHeight, setInputHeight] = useState(60);
   
   const VISIBLE_COMMENTS_COUNT = 3; // Number of comments to show initially
   
@@ -166,6 +168,7 @@ export default function CommentsTab() {
       (e: KeyboardEvent) => {
         setIsKeyboardVisible(true);
         setKeyboardHeight(e.endCoordinates.height);
+        console.log('[CommentsTab] Keyboard shown, height:', e.endCoordinates.height);
       }
     );
     
@@ -174,6 +177,7 @@ export default function CommentsTab() {
       () => {
         setIsKeyboardVisible(false);
         setKeyboardHeight(0);
+        console.log('[CommentsTab] Keyboard hidden');
       }
     );
 
@@ -245,14 +249,8 @@ export default function CommentsTab() {
 
   return (
     <View style={styles.container}>
-      {/* Scrollable Comments Section */}
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.scrollView}
-        contentContainerStyle={styles.commentsContainer}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
+      {/* Comments List */}
+      <View style={styles.commentsListContainer}>
         {comments.length === 0 ? (
           <EmptyComments />
         ) : (
@@ -269,25 +267,13 @@ export default function CommentsTab() {
                 </Text>
               </TouchableOpacity>
             )}
-            
-            {/* Extra space at the bottom to prevent the comment input from covering content */}
-            <View style={{ height: 80 }} />
           </>
         )}
-      </ScrollView>
+      </View>
 
-      {/* Fixed comment input field - uses absolute positioning to stay at bottom */}
-      <View 
-        style={[
-          styles.inputWrapper, 
-          // Adjust position when keyboard is visible
-          isKeyboardVisible && { bottom: Platform.OS === 'ios' ? keyboardHeight : 0 }
-        ]}
-      >
-        <View style={[
-          styles.inputContainer,
-          { borderTopColor: isKeyboardVisible ? COLORS.primary : COLORS.border }
-        ]}>
+      {/* Input field - positioned at bottom */}
+      <View style={styles.inputWrapper}>
+        <View style={styles.inputContainer}>
           <TextInput
             ref={inputRef}
             style={styles.input}
@@ -296,6 +282,12 @@ export default function CommentsTab() {
             onChangeText={setCommentText}
             multiline={true}
             maxLength={500}
+            onFocus={() => {
+              console.log('[CommentsTab] Input focused');
+            }}
+            onContentSizeChange={(event) => {
+              setInputHeight(Math.max(40, event.nativeEvent.contentSize.height + 20));
+            }}
           />
           <TouchableOpacity 
             style={[
@@ -321,12 +313,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.white || '#fff',
-    position: 'relative', // Important for absolute positioning of child components
+    minHeight: 500, // Ensure minimum height for proper layout
   },
-  scrollView: {
+  commentsListContainer: {
     flex: 1,
-  },
-  commentsContainer: {
     paddingHorizontal: 24,
     paddingTop: 10,
     paddingBottom: 20,
@@ -413,26 +403,23 @@ const styles = StyleSheet.create({
     color: COLORS.primary || '#00796b',
   },
   inputWrapper: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
     backgroundColor: COLORS.white,
-    zIndex: 999, // Ensure it's above other elements
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border || '#e0e0e0',
+    paddingBottom: 20, // Safe area will be handled by parent
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 8,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderTopWidth: 1,
     backgroundColor: COLORS.white || '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 8,
+    minHeight: 60,
   },
   input: {
     flex: 1,
@@ -458,5 +445,5 @@ const styles = StyleSheet.create({
   disabledButton: {
     backgroundColor: COLORS.border || '#ddd',
     opacity: 0.8,
-  }
+  },
 }); 

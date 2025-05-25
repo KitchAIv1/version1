@@ -80,7 +80,6 @@ const EditProfileScreen = ({ navigation, route }: any) => { // Using any tempora
   }, [initialProfileData, navigation]);
 
   const handleAvatarUrlUpdate = (newUrl: string) => {
-    console.log('[EditProfileScreen] handleAvatarUrlUpdate received newUrl:', newUrl);
     setAvatarUrl(newUrl);
   };
 
@@ -89,7 +88,7 @@ const EditProfileScreen = ({ navigation, route }: any) => { // Using any tempora
   };
 
   const updateProfile = async () => {
-    if (!user || !user.id) { // Check for user and user.id from useAuth()
+    if (!user || !user.id) {
       Alert.alert("Error", "User not available. Cannot update profile.");
       return;
     }
@@ -109,32 +108,25 @@ const EditProfileScreen = ({ navigation, route }: any) => { // Using any tempora
         p_avatar_url: avatarUrl,
         p_bio: bio,
         p_username: username.trim(),
-        p_role: profile?.role,          // Pass current role from AuthContext
-        p_onboarded: profile?.onboarded, // Pass current onboarded status from AuthContext
-        p_diet_tags: processedFoodPreferences, // Use processed preferences
+        p_role: profile?.role,
+        p_onboarded: profile?.onboarded,
+        p_diet_tags: processedFoodPreferences,
       };
-      console.log('[EditProfileScreen] User ID:', user.id); // Added log for user.id
-      console.log('[EditProfileScreen] Calling update_profile RPC with:', profileUpdatePayload);
       
       const { data, error } = await supabase.rpc('update_profile', profileUpdatePayload);
 
       if (error) {
-        console.error('Error updating profile:', error.message); // Log error.message
-        Alert.alert('Failed to update profile', error.message); // Show error.message in alert
-        setSaving(false); // Stop saving indicator on error
+        console.error('Error updating profile:', error.message);
+        Alert.alert('Failed to update profile', error.message);
+        setSaving(false);
         return;
       }
 
-      console.log('[EditProfileScreen] Update profile response:', data); // Log success data
-
       Alert.alert("Profile Updated", "Your profile has been saved.", [
         { text: "OK", onPress: async () => { 
-            console.log('[EditProfileScreen] Invalidating queries for key:', ['profile', user.id]);
             await queryClient.invalidateQueries({ queryKey: ['profile', user.id] }); 
-            console.log('[EditProfileScreen] Invalidating feed query.');
             await queryClient.invalidateQueries({ queryKey: ['feed'] });
             if (refreshProfile) {
-                console.log('[EditProfileScreen] Refreshing AuthContext profile for user:', user.id);
                 await refreshProfile(user.id); 
             }
             navigation.goBack();
@@ -142,8 +134,6 @@ const EditProfileScreen = ({ navigation, route }: any) => { // Using any tempora
         },
       ]);
     } catch (e: any) {
-      // This catch block might be redundant if supabase.rpc errors are caught above, 
-      // but kept for other potential errors.
       console.error("Update profile error (generic catch):", e);
       Alert.alert("Error", e.message || "Could not save profile.");
     } finally {

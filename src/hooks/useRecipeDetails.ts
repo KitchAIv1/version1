@@ -1,6 +1,7 @@
 import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { useMemo, useEffect } from 'react';
+import { useCacheManager } from './useCacheManager';
 
 // Define the RecipeDetailsData interface for type safety
 export interface RecipeDetailsData {
@@ -38,10 +39,19 @@ interface UseRecipeDetailsResult {
 }
 
 // Update fetchRecipeDetails to accept userId and pass it to RPC
-export const fetchRecipeDetails = async (recipeId: string, userId?: string) => {
+export const fetchRecipeDetails = async (recipeId: string, userId?: string, queryClient?: any) => {
   if (!recipeId) throw new Error('Recipe ID is required');
   
   console.log(`[fetchRecipeDetails] Fetching for recipe ${recipeId}, user ${userId}`);
+  
+  // Check if we have existing feed data for this recipe to compare like counts
+  let existingFeedData = null;
+  if (queryClient) {
+    const feedData = queryClient.getQueryData(['feed']);
+    if (feedData && Array.isArray(feedData)) {
+      existingFeedData = feedData.find((item: any) => item.id === recipeId || item.recipe_id === recipeId);
+    }
+  }
   
   // Pass userId to the RPC. Backend RPC needs to handle null/undefined userId gracefully (return is_saved_by_user: false)
   const { data, error } = await supabase.rpc('get_recipe_details', { 
@@ -58,6 +68,34 @@ export const fetchRecipeDetails = async (recipeId: string, userId?: string) => {
     throw new Error('Recipe not found');
   }
   
+  // Add detailed logging for like state and compare with feed data
+  console.log(`[fetchRecipeDetails] Raw like data for recipe ${recipeId}:`, {
+    is_liked_by_user: data.is_liked_by_user,
+    likes: data.likes,
+    user_id: userId,
+    raw_data_keys: Object.keys(data),
+    timestamp: new Date().toISOString()
+  });
+  
+  // Check for discrepancies with feed data
+  if (existingFeedData && existingFeedData.likes !== data.likes) {
+    console.warn(`[fetchRecipeDetails] LIKE COUNT DISCREPANCY for recipe ${recipeId}:`, {
+      feed_likes: existingFeedData.likes,
+      recipe_details_likes: data.likes,
+      feed_liked: existingFeedData.liked,
+      recipe_details_liked: data.is_liked_by_user,
+      title: data.title,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Use the higher like count as it's more likely to be correct
+    // (assuming likes generally increase over time)
+    if (existingFeedData.likes > data.likes) {
+      console.log(`[fetchRecipeDetails] Using feed like count (${existingFeedData.likes}) instead of recipe details (${data.likes})`);
+      data.likes = existingFeedData.likes;
+    }
+  }
+  
   // Log raw and cleaned preparation steps for debugging
   console.log(`[fetchRecipeDetails] Raw data.preparation_steps for recipe ${recipeId}:`, JSON.stringify(data.preparation_steps));
   const cleanedSteps = (data.preparation_steps || []).map(
@@ -66,7 +104,7 @@ export const fetchRecipeDetails = async (recipeId: string, userId?: string) => {
   console.log(`[fetchRecipeDetails] Cleaned preparation_steps for recipe ${recipeId}:`, JSON.stringify(cleanedSteps));
   
   // Return data including the new is_saved_by_user field (assuming RPC provides it)
-  return {
+  const processedData = {
     ...data,
     preparation_steps: cleanedSteps,
     ingredients: data.ingredients || [],
@@ -81,6 +119,16 @@ export const fetchRecipeDetails = async (recipeId: string, userId?: string) => {
     is_saved_by_user: data.is_saved_by_user ?? false, // Default if missing
     comments_count: data.comments_count ?? 0,
   } as RecipeDetailsData; // Cast to ensure type match
+
+  // Log the final processed data for comparison
+  console.log(`[fetchRecipeDetails] Processed like data for recipe ${recipeId}:`, {
+    final_is_liked_by_user: processedData.is_liked_by_user,
+    final_likes: processedData.likes,
+    user_id: userId,
+    timestamp: new Date().toISOString()
+  });
+
+  return processedData;
 };
 
 export const fetchPantryMatch = async (recipeId: string, userId: string) => {
@@ -112,7 +160,7 @@ export const prefetchRecipeDetails = async (queryClient: any, recipeId: string, 
   // Prefetch recipe details
   await queryClient.prefetchQuery({
     queryKey: ['recipeDetails', recipeId, userId],
-    queryFn: () => fetchRecipeDetails(recipeId, userId),
+    queryFn: () => fetchRecipeDetails(recipeId, userId, queryClient), // Pass queryClient
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
@@ -128,6 +176,7 @@ export const prefetchRecipeDetails = async (queryClient: any, recipeId: string, 
 
 export const useRecipeDetails = (recipeId: string | undefined, userId?: string): UseRecipeDetailsResult => {
   const queryClient = useQueryClient();
+  const cacheManager = useCacheManager();
   
   // useEffect to log recipe view
   useEffect(() => {
@@ -143,15 +192,24 @@ export const useRecipeDetails = (recipeId: string | undefined, userId?: string):
             console.error('[useRecipeDetails] Error calling log_recipe_view:', logError);
             // Optionally, don't throw here to avoid breaking the main data fetch if logging fails
           } else {
-            console.log(`[useRecipeDetails] View logged successfully for recipe ${recipeId}. Invalidating query.`);
-            // Invalidate the query to refetch details which should include updated views_count
-            queryClient.invalidateQueries({ queryKey: ['recipeDetails', recipeId, userId] });
+            console.log(`[useRecipeDetails] View logged successfully for recipe ${recipeId}. Updating views count only.`);
+            // Instead of invalidating the entire query, just update the views_count
+            queryClient.setQueryData(['recipeDetails', recipeId, userId], (oldData: any) => {
+              if (!oldData) return oldData;
+              return {
+                ...oldData,
+                views_count: (oldData.views_count || 0) + 1
+              };
+            });
           }
         } catch (e) {
           console.error('[useRecipeDetails] Exception in logView:', e);
         }
       };
-      logView();
+      
+      // Add a small delay to avoid immediate invalidation on mount
+      const timer = setTimeout(logView, 1000);
+      return () => clearTimeout(timer);
     }
   }, [recipeId, userId, queryClient]);
 
@@ -159,7 +217,7 @@ export const useRecipeDetails = (recipeId: string | undefined, userId?: string):
     queries: [
       {
         queryKey: ['recipeDetails', recipeId, userId], // Add userId to queryKey
-        queryFn: () => fetchRecipeDetails(recipeId!, userId), // Pass userId here
+        queryFn: () => fetchRecipeDetails(recipeId!, userId, queryClient), // Pass userId and queryClient here
         // Ensure query is enabled only when both recipeId and userId are available,
         // because the RPC get_recipe_details(p_recipe_id, p_user_id) expects both.
         enabled: !!recipeId && typeof userId !== 'undefined', 
@@ -179,6 +237,47 @@ export const useRecipeDetails = (recipeId: string | undefined, userId?: string):
   const recipeResult = results[0];
   const pantryResult = results[1];
 
+  // Update comment count if recipe details show 0 comments
+  useEffect(() => {
+    if (recipeResult.data && recipeId && recipeResult.data.comments_count === 0) {
+      console.log(`[useRecipeDetails] Recipe details loaded with 0 comments, updating count for recipe ${recipeId}`);
+      cacheManager.updateCommentCount(recipeId, userId);
+    }
+  }, [recipeResult.data, recipeId, userId, cacheManager]);
+
+  // Update feed cache when recipe details are successfully fetched
+  useEffect(() => {
+    if (recipeResult.data && recipeId) {
+      // Update feed cache with recipe details data to keep them in sync
+      queryClient.setQueryData(['feed'], (oldFeedData: any) => {
+        if (!oldFeedData || !Array.isArray(oldFeedData)) return oldFeedData;
+        
+        return oldFeedData.map((item: any) => {
+          if (item.id === recipeId || item.recipe_id === recipeId) {
+            console.log(`[useRecipeDetails] Syncing feed with recipe details for recipe ${recipeId}:`, {
+              feed_likes: item.likes,
+              recipe_details_likes: recipeResult.data.likes,
+              feed_liked: item.liked,
+              recipe_details_liked: recipeResult.data.is_liked_by_user,
+              feed_saved: item.saved,
+              recipe_details_saved: recipeResult.data.is_saved_by_user,
+              title: item.title
+            });
+            
+            return {
+              ...item,
+              likes: recipeResult.data.likes,
+              liked: recipeResult.data.is_liked_by_user,
+              saved: recipeResult.data.is_saved_by_user,
+              commentsCount: recipeResult.data.comments_count
+            };
+          }
+          return item;
+        });
+      });
+    }
+  }, [recipeResult.data, recipeId, queryClient]);
+
   const isLoading = recipeResult.isLoading || (!!userId && pantryResult.isLoading);
   const error = recipeResult.error || pantryResult.error;
   
@@ -195,14 +294,11 @@ export const useRecipeDetails = (recipeId: string | undefined, userId?: string):
     } as RecipeDetailsData;
   }, [recipeResult.data, pantryResult.data]);
 
-  // Update refetch logic if needed, but it might be okay as is
+  // Update refetch logic to include comment count
   const refetch = () => {
     recipeResult.refetch();
     if (userId) {
       pantryResult.refetch();
-    }
-    if (recipeId) {
-      queryClient.invalidateQueries({ queryKey: ['recipe-comments', recipeId] });
     }
   };
 

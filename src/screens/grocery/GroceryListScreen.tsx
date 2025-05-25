@@ -1,11 +1,16 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, SafeAreaView, ActivityIndicator, Button, Alert, StyleSheet, LayoutAnimation, UIManager, Platform, FlatList, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, ActivityIndicator, Button, Alert, StyleSheet, LayoutAnimation, UIManager, Platform, FlatList, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGroceryManager, GroceryItem } from '../../hooks/useGroceryManager';
 import { COLORS, FONTS, SIZES } from '../../constants/theme';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { getIngredientsForMealPlanRange, AggregatedIngredient } from '../../hooks/useMealPlanAggregatedIngredients';
 import { useAuth } from '../../providers/AuthProvider';
 import { startOfWeek, endOfWeek, format, addDays } from 'date-fns';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { MainStackParamList } from '../../navigation/types';
+import { getShortRelativeTime } from '../../utils/dateUtils';
 
 // Enable LayoutAnimation for Android
 if (Platform.OS === 'android') {
@@ -13,6 +18,12 @@ if (Platform.OS === 'android') {
     UIManager.setLayoutAnimationEnabledExperimental(true);
   }
 }
+
+// Navigation type
+type GroceryNavigationProp = NativeStackNavigationProp<MainStackParamList>;
+
+// Constants
+const ACTIVE_COLOR = '#10b981'; // Same as ProfileScreen
 
 // --- Item Icon Mapping ---
 const itemIconMap: { [key: string]: string } = {
@@ -120,6 +131,7 @@ const formatDateTime = (isoString?: string): string => {
 };
 
 export default function GroceryListScreen() {
+  const navigation = useNavigation<GroceryNavigationProp>();
   const {
     groceryList, 
     isLoading: isGroceryManagerLoading,
@@ -213,7 +225,7 @@ export default function GroceryListScreen() {
             {(item.recipe_name || item.created_at) && (
               <View style={styles.metaDataContainer}>
                 {item.recipe_name && <Text style={styles.metaText}><Icon name="restaurant-outline" size={SIZES.body5} /> {item.recipe_name}</Text>}
-                {item.created_at && <Text style={styles.metaText}><Icon name="time-outline" size={SIZES.body5} /> {format(new Date(item.created_at), "MMM d, h:mm a")}</Text>}
+                {item.created_at && <Text style={styles.metaText}><Icon name="time-outline" size={SIZES.body5} /> {getShortRelativeTime(item.created_at)}</Text>}
               </View>
             )}
           </View>
@@ -254,71 +266,88 @@ export default function GroceryListScreen() {
     </View>
   );
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.screenHeader}>
-        <Text style={styles.screenHeaderTitle}>My Grocery List</Text>
-      </View>
-
-      <ScrollView 
-        style={styles.container}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]}/>}
-      >
-        <ListHeader /> 
-
-        {isGroceryManagerLoading && groceryList.length === 0 && <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 20}}/>}
-        {groceryManagerError && <Text style={styles.errorText}>Error loading grocery list: {groceryManagerError}</Text>}
-        
-        {groceryList.length === 0 && !isGroceryManagerLoading && (
-          <Text style={styles.emptyListText}>Your manually added grocery list is empty.</Text>
-        )}
-        {groceryList.length > 0 &&
-            <FlatList
-                data={groceryList.sort((a,b) => Number(a.is_checked) - Number(b.is_checked) || new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())}
-                renderItem={renderItem}
-                keyExtractor={(item) => item.id}
-                style={styles.flatListStyle}
-                scrollEnabled={false}
-            />
-        }
-
-        {isLoadingMealPlanIngredients && <ActivityIndicator size="large" color={COLORS.primary} style={{ marginVertical: 20}} />}
-        {mealPlanIngredientsError && <Text style={styles.errorText}>Error: {mealPlanIngredientsError}</Text>}
-        
-        {mealPlanIngredients.length > 0 && (
-          <View style={styles.mpiSectionContainer}>
-            <Text style={styles.mpiSectionTitle}>From Your Meal Plan (This Week)</Text>
-            <FlatList
-                data={mealPlanIngredients}
-                renderItem={renderAggregatedIngredient}
-                keyExtractor={(item, index) => `${item.name}-${index}`}
-                style={styles.flatListStyle}
-                scrollEnabled={false}
-            />
+  // Header component similar to ProfileScreen
+  const renderGroceryHeader = () => (
+    <View style={styles.groceryHeaderContainer}>
+      {/* Scrollable Header with grocery list title and item count badge - matching ProfileScreen layout */}
+      <View style={styles.scrollableHeader}>
+        <View style={styles.headerSpacer} />
+        <Text style={styles.scrollableHeaderTitle}>My Grocery List</Text>
+        <View style={styles.headerActions}>
+          <View style={styles.itemCountBadge}>
+            <Text style={styles.itemCountText}>
+              {groceryList.length}
+            </Text>
           </View>
-        )}
-        {mealPlanIngredients.length === 0 && !isLoadingMealPlanIngredients && !mealPlanIngredientsError && mealPlanIngredients !== null && (
+        </View>
+      </View>
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      {/* Fixed Green Header - covers status bar area and stays fixed */}
+      <View style={styles.fixedGreenHeader}>
+        <SafeAreaView edges={['top']} />
+      </View>
+      
+      {/* Main Content */}
+      <View style={styles.mainContent}>
+        {renderGroceryHeader()}
+        
+        <ScrollView 
+          style={styles.scrollContainer}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[ACTIVE_COLOR]}/>}
+        >
+          <ListHeader /> 
+
+          {isGroceryManagerLoading && groceryList.length === 0 && <ActivityIndicator size="large" color={ACTIVE_COLOR} style={{ marginTop: 20}}/>}
+          {groceryManagerError && <Text style={styles.errorText}>Error loading grocery list: {groceryManagerError}</Text>}
+          
+          {groceryList.length === 0 && !isGroceryManagerLoading && (
+            <Text style={styles.emptyListText}>Your manually added grocery list is empty.</Text>
+          )}
+          {groceryList.length > 0 &&
+              <FlatList
+                  data={groceryList.sort((a,b) => Number(a.is_checked) - Number(b.is_checked) || new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())}
+                  renderItem={renderItem}
+                  keyExtractor={(item) => item.id}
+                  style={styles.flatListStyle}
+                  scrollEnabled={false}
+              />
+          }
+
+          {isLoadingMealPlanIngredients && <ActivityIndicator size="large" color={ACTIVE_COLOR} style={{ marginVertical: 20}} />}
+          {mealPlanIngredientsError && <Text style={styles.errorText}>Error: {mealPlanIngredientsError}</Text>}
+          
+          {mealPlanIngredients.length > 0 && (
             <View style={styles.mpiSectionContainer}>
-                <Text style={styles.emptyListText}>No ingredients loaded from this week's meal plan. Tap "Plan Ingredients" to load.</Text>
+              <Text style={styles.mpiSectionTitle}>From Your Meal Plan (This Week)</Text>
+              <FlatList
+                  data={mealPlanIngredients}
+                  renderItem={renderAggregatedIngredient}
+                  keyExtractor={(item, index) => `${item.name}-${index}`}
+                  style={styles.flatListStyle}
+                  scrollEnabled={false}
+              />
             </View>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+          )}
+          {mealPlanIngredients.length === 0 && !isLoadingMealPlanIngredients && !mealPlanIngredientsError && mealPlanIngredients !== null && (
+              <View style={styles.mpiSectionContainer}>
+                  <Text style={styles.emptyListText}>No ingredients loaded from this week's meal plan. Tap "Plan Ingredients" to load.</Text>
+              </View>
+          )}
+        </ScrollView>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.background }, 
-  container: { flex: 1 },
-  screenHeader: {
-    paddingHorizontal: SIZES.medium, 
-    paddingVertical: SIZES.medium, 
-    backgroundColor: COLORS.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    alignItems: 'center',
+  container: { 
+    flex: 1, 
+    backgroundColor: '#fff',
   },
-  screenHeaderTitle: { fontSize: SIZES.h2, fontWeight: 'bold', color: COLORS.primary },
   listHeaderButtonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -387,4 +416,70 @@ const styles = StyleSheet.create({
   mpiAppearance: { flexDirection: 'row', marginLeft: SIZES.medium, alignItems: 'center' },
   mpiQuantityUnit: { fontSize: SIZES.body4, color: COLORS.text },
   mpiRecipeName: { fontSize: SIZES.body5, color: COLORS.textSecondary }, // Use textSecondary
+  groceryHeaderContainer: {
+    backgroundColor: '#fff',
+  },
+  scrollableHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  scrollableHeaderTitle: {
+    color: '#1f2937',
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    flex: 1,
+    letterSpacing: 0.5,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 80,
+    justifyContent: 'flex-end',
+  },
+  itemCountBadge: {
+    backgroundColor: ACTIVE_COLOR,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginLeft: 8,
+    minWidth: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: ACTIVE_COLOR,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  itemCountText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  fixedGreenHeader: {
+    backgroundColor: ACTIVE_COLOR,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+  },
+  mainContent: {
+    flex: 1,
+    paddingTop: 50, // Account for fixed green header
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  headerSpacer: {
+    width: 40,
+  },
 }); 

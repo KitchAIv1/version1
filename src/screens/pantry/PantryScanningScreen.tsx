@@ -5,7 +5,7 @@ import {
   Alert,
   StyleSheet,
   Text,
-  SafeAreaView,
+  StatusBar,
 } from 'react-native';
 import {
   CameraView,
@@ -16,6 +16,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as Haptics from 'expo-haptics';
 import { useNavigation } from '@react-navigation/native';
 import { Button } from 'react-native-paper';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { 
   ScanningLoadingOverlay, 
@@ -31,13 +32,12 @@ import {
 import { supabase } from '../../services/supabase';
 
 export default function PantryScanningScreen() {
-  console.log('[PantryScanningScreen] Component RENDERED or RE-RENDERED - Enhanced with V1 features');
-
   // ---------- refs & state ----------
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [isCameraVisible, setIsCameraVisible] = useState(false);
   const nav = useNavigation();
+  const queryClient = useQueryClient();
   
   // Enhanced state management for V1 features
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -57,6 +57,10 @@ export default function PantryScanningScreen() {
 
   // Camera management functions
   const openCamera = () => setIsCameraVisible(true);
+  const closeCamera = () => {
+    setIsCameraVisible(false);
+    nav.goBack(); // Navigate back to previous screen
+  };
   
   const ensureCameraPermission = async (): Promise<boolean> => {
     if (!permission) return false;
@@ -77,7 +81,6 @@ export default function PantryScanningScreen() {
 
   // ---------- ask once on mount / manage camera visibility ----------
   useEffect(() => {
-    console.log('[PantryScanningScreen] useEffect for manageCamera RUNNING');
     const manageCamera = async () => {
       const hasPermission = await ensureCameraPermission();
       if (hasPermission) {
@@ -120,7 +123,6 @@ export default function PantryScanningScreen() {
     }
 
     setIsAnalyzing(true);
-    console.log('[PantryScanningScreen] Starting enhanced analysis with V1 features');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
@@ -132,8 +134,6 @@ export default function PantryScanningScreen() {
         base64: true,
       });
 
-      console.log('[PantryScanningScreen] Picture taken, processing with AI...');
-      
       // Process image with AI recognition
       const recognitionResult = await processImageWithAI(photo.base64!);
       
@@ -144,7 +144,6 @@ export default function PantryScanningScreen() {
         setIsAnalyzing(false);
         Alert.alert('No Items Recognized', 'Could not detect items. Try a different angle or better lighting?');
       } else {
-        console.log('[PantryScanningScreen] Items recognized:', recognitionResult.items);
         setScannedItems(recognitionResult.items);
         setIsAnalyzing(false);
       }
@@ -157,7 +156,6 @@ export default function PantryScanningScreen() {
 
   // ---------- Enhanced confirmation handlers ----------
   const handleConfirmItems = async (itemsToUpsert: ItemToUpsert[]) => {
-    console.log('[PantryScanningScreen] Confirmation confirmed with enhanced logic:', itemsToUpsert);
     setScannedItems(null); // Close confirmation modal
     setIsSaving(true);
 
@@ -175,7 +173,11 @@ export default function PantryScanningScreen() {
           throw error;
         }
         
-        console.log('[PantryScanningScreen] Items saved successfully');
+        // Invalidate React Query cache to refresh all pantry-related data
+        queryClient.invalidateQueries({ queryKey: ['stock'] });
+        queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
+        queryClient.invalidateQueries({ queryKey: ['feed'] });
+        
         Alert.alert('Success', `${itemsToUpsert.length} items added to your pantry!`);
       }
     } catch (error) {
@@ -189,7 +191,6 @@ export default function PantryScanningScreen() {
   };
 
   const handleCancelConfirmation = () => {
-    console.log('[PantryScanningScreen] Confirmation cancelled');
     setScannedItems(null);
     // Reopen camera
     if (!isCameraVisible) openCamera();
@@ -222,36 +223,48 @@ export default function PantryScanningScreen() {
     );
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Enhanced Camera Interface */}
-      {isCameraVisible && !scannedItems && (
-        <CameraInterface
-          ref={cameraRef}
-          onCapturePress={handleCameraCapture}
-          isAnalyzing={isAnalyzing}
-          instructionText="Position your pantry items clearly in the frame and tap to scan"
-        />
-      )}
-
-      {/* Enhanced Item Confirmation Modal */}
-      {scannedItems && (
-        <ItemConfirmationModal
-          isVisible={!!scannedItems}
-          items={scannedItems}
-          onConfirm={handleConfirmItems}
-          onCancel={handleCancelConfirmation}
-          isProcessing={isSaving}
-        />
-      )}
-
-      {/* Enhanced Loading Overlay */}
-      <ScanningLoadingOverlay
-        isVisible={isAnalyzing || isSaving}
-        isAnalyzing={isAnalyzing}
-        isSaving={isSaving}
-        analysisMessage={analysisMessage}
+    <>
+      {/* Status bar configuration */}
+      <StatusBar 
+        barStyle="light-content" 
+        backgroundColor="transparent" 
+        translucent={true}
+        hidden={isCameraVisible && !scannedItems} 
       />
-    </SafeAreaView>
+      
+      <View style={styles.container}>
+        {/* Enhanced Camera Interface */}
+        {isCameraVisible && !scannedItems && (
+          <CameraInterface
+            ref={cameraRef}
+            onCapturePress={handleCameraCapture}
+            onExitPress={closeCamera}
+            isAnalyzing={isAnalyzing}
+            showExitButton={true}
+            instructionText="Position your pantry items clearly in the frame and tap to scan"
+          />
+        )}
+
+        {/* Enhanced Item Confirmation Modal */}
+        {scannedItems && (
+          <ItemConfirmationModal
+            isVisible={!!scannedItems}
+            items={scannedItems}
+            onConfirm={handleConfirmItems}
+            onCancel={handleCancelConfirmation}
+            isProcessing={isSaving}
+          />
+        )}
+
+        {/* Enhanced Loading Overlay */}
+        <ScanningLoadingOverlay
+          isVisible={isAnalyzing || isSaving}
+          isAnalyzing={isAnalyzing}
+          isSaving={isSaving}
+          analysisMessage={analysisMessage}
+        />
+      </View>
+    </>
   );
 }
 
@@ -264,7 +277,7 @@ const Centered = ({ children }: { children: React.ReactNode }) => (
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: '#000' 
+    backgroundColor: '#000',
   },
   center: { 
     flex: 1, 

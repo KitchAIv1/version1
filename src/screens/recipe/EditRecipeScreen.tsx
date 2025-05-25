@@ -22,6 +22,7 @@ import { useEditableRecipeDetails, RecipeEditableData, Ingredient } from '../../
 import { decode } from 'base64-arraybuffer';
 import { useAuth } from '../../providers/AuthProvider'; // Import useAuth
 import * as FileSystem from 'expo-file-system'; // Import expo-file-system
+import { compressImageWithPreset, needsCompression } from '../../utils/imageCompression'; // Import compression utilities
 
 // Reusable CollapsibleCard (can be moved to a shared components folder)
 const CollapsibleCard: React.FC<{ title: string; children: React.ReactNode; defaultCollapsed?: boolean }> = ({ title, children, defaultCollapsed = false }) => {
@@ -66,6 +67,7 @@ const EditRecipeScreen: React.FC<EditRecipeScreenProps> = ({ route, navigation }
   
   const [isUpdating, setIsUpdating] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0); // For thumbnail upload if needed
+  const [compressionInfo, setCompressionInfo] = useState<string>(''); // Add compression info state
 
   // --- Effect to populate form when initialRecipeData loads & set screen title --- 
   useEffect(() => {
@@ -133,17 +135,63 @@ const EditRecipeScreen: React.FC<EditRecipeScreenProps> = ({ route, navigation }
       Alert.alert('Permission Required', 'Camera roll permission is needed to select a thumbnail.');
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'images',
-      allowsEditing: true,
-      aspect: [16, 9], // Or your desired aspect ratio for thumbnails
-      quality: 0.8,
-      base64: true, // Request base64 for upload
-    });
 
-    if (!result.canceled && result.assets && result.assets[0]) {
-      setNewLocalThumbnailUri(result.assets[0].uri);
-      setCurrentThumbnailUrl(result.assets[0].uri); // Show local URI immediately for preview
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: 'images',
+        allowsEditing: true,
+        aspect: [16, 9], // Maintain 16:9 aspect ratio for recipe thumbnails
+        quality: 1.0, // Start with highest quality, we'll compress it ourselves
+        base64: false, // We'll get base64 from compression
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const asset = result.assets[0];
+        await processAndCompressThumbnail(asset.uri);
+      }
+    } catch (error: any) {
+      console.error('Error selecting thumbnail:', error);
+      Alert.alert('Selection Failed', error.message || 'Could not select thumbnail.');
+    }
+  };
+
+  const processAndCompressThumbnail = async (uri: string) => {
+    try {
+      setCompressionInfo('Checking image size...');
+
+      // Check if compression is needed (target 300KB for recipe thumbnails)
+      const { needsCompression: shouldCompress, currentSizeKB } = await needsCompression(uri, 300);
+      
+      if (shouldCompress) {
+        setCompressionInfo(`Compressing ${Math.round(currentSizeKB)}KB image...`);
+        
+        // Compress using HIGH_QUALITY preset (800x800, ~300KB target) - good for recipe thumbnails
+        const compressionResult = await compressImageWithPreset(uri, 'HIGH_QUALITY');
+        
+        const finalSizeKB = compressionResult.fileSize ? Math.round(compressionResult.fileSize / 1024) : 0;
+        const compressionPercent = compressionResult.compressionRatio ? Math.round(compressionResult.compressionRatio * 100) : 0;
+        
+        setCompressionInfo(`Optimized: ${finalSizeKB}KB (${compressionPercent}% smaller)`);
+        
+        // Set the compressed image
+        setNewLocalThumbnailUri(compressionResult.uri);
+        setCurrentThumbnailUrl(compressionResult.uri); // Show compressed image immediately for preview
+      } else {
+        setCompressionInfo(`Image already optimized (${Math.round(currentSizeKB)}KB)`);
+        
+        // Image is already small enough, but still compress for consistency
+        const compressionResult = await compressImageWithPreset(uri, 'HIGH_QUALITY');
+        setNewLocalThumbnailUri(compressionResult.uri);
+        setCurrentThumbnailUrl(compressionResult.uri);
+      }
+
+      // Clear compression info after a delay
+      setTimeout(() => setCompressionInfo(''), 3000);
+
+    } catch (error: any) {
+      console.error("Thumbnail processing error:", error);
+      Alert.alert('Processing Failed', error.message || 'Could not process thumbnail.');
+      setCompressionInfo('');
     }
   };
 
@@ -168,31 +216,35 @@ const EditRecipeScreen: React.FC<EditRecipeScreenProps> = ({ route, navigation }
       if (newLocalThumbnailUri && newLocalThumbnailUri !== initialRecipeData.thumbnail_url) {
         console.log('New thumbnail selected, attempting upload:', newLocalThumbnailUri);
         setUploadProgress(0.25);
-        const localUri = newLocalThumbnailUri;
-        const fileExt = localUri.split('.').pop()?.toLowerCase() || 'jpg';
-        const fileName = `recipe-thumb-${recipeId}-${Date.now()}.${fileExt}`;
         
-        // Ensure 'file' is ArrayBuffer
-        let file: ArrayBuffer;
-        if (Platform.OS === 'web' && localUri.startsWith('blob:')) {
-          // For web, convert blob URI to ArrayBuffer
-          const response = await fetch(localUri);
-          file = await response.arrayBuffer();
-        } else {
-          // For native, convert file URI to ArrayBuffer via base64
-          const base64 = await convertUriToBase64(localUri);
-          file = Uint8Array.from(atob(base64), c => c.charCodeAt(0)).buffer;
+        // Get the compressed image data
+        let base64Data: string;
+        try {
+          // Since we compressed the image, we need to get its base64 representation
+          const compressionResult = await compressImageWithPreset(newLocalThumbnailUri, 'HIGH_QUALITY');
+          if (!compressionResult.base64) {
+            throw new Error('Failed to get base64 data from compressed image');
+          }
+          base64Data = compressionResult.base64;
+        } catch (compressionError) {
+          console.error('Error getting compressed image data:', compressionError);
+          // Fallback to original conversion method
+          base64Data = await convertUriToBase64(newLocalThumbnailUri);
         }
+        
+        const fileExt = 'jpg'; // Always use jpg for recipe thumbnails (better compression)
+        const fileName = `recipe-thumb-${recipeId}-${Date.now()}.${fileExt}`;
+        const contentType = 'image/jpeg';
         
         const filePath = `${user?.id || 'public'}/${fileName}`;
         console.log(`Uploading to path: ${filePath}`);
 
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('recipe-thumbnails')
-          .upload(filePath, file, { // Use the 'file' directly which should be ArrayBuffer
+          .upload(filePath, decode(base64Data), {
             cacheControl: '3600',
             upsert: true, // Important for replacing existing thumbnail if any
-            contentType: fileExt === 'jpg' ? 'image/jpeg' : `image/${fileExt}`, // Ensure correct content type
+            contentType, // Use jpeg content type
           });
 
         if (uploadError) {
@@ -338,6 +390,10 @@ const EditRecipeScreen: React.FC<EditRecipeScreenProps> = ({ route, navigation }
           <TouchableOpacity style={styles.button} onPress={handleSelectThumbnail}>
             <Text style={styles.buttonText}>Change Thumbnail</Text>
           </TouchableOpacity>
+          {/* Compression info display */}
+          {compressionInfo && (
+            <Text style={styles.compressionInfo}>{compressionInfo}</Text>
+          )}
         </View>
       </CollapsibleCard>
       
@@ -455,7 +511,15 @@ const styles = StyleSheet.create({
   saveButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   progressBarContainer: { marginHorizontal:16, marginTop: 10, height: 20, backgroundColor: '#e0e0e0', borderRadius: 10, overflow: 'hidden', justifyContent: 'center' },
   progressBar: { height: '100%', backgroundColor: '#22c55e' },
-  progressText: { position: 'absolute', alignSelf: 'center', color: '#333', fontWeight: 'bold' }
+  progressText: { position: 'absolute', alignSelf: 'center', color: '#333', fontWeight: 'bold' },
+  compressionInfo: {
+    fontSize: 12,
+    color: '#10B981',
+    textAlign: 'center',
+    marginTop: 8,
+    fontWeight: '500',
+    minHeight: 16,
+  },
 });
 
 export default EditRecipeScreen; 

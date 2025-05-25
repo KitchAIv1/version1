@@ -141,30 +141,24 @@ export const handleDuplicateUserDecision = (
             const existingQty = parseFloat(String(existingDetails.quantity)) || 0;
             const newTotalQty = existingQty + convertedQuantity;
             
-            console.log(`[duplicateHandling] Adding quantity for ${item.currentName}: ${existingQty} + ${convertedQuantity} = ${newTotalQty}`);
-            
             resolve({
               user_id: userId,
-              item_name: item.currentName,
+              item_name: item.currentName.toLowerCase(),
               quantity: newTotalQty,
-              unit: existingDetails.unit, // Keep existing unit
+              unit: backendUnit,
               description: null,
-              created_at: new Date().toISOString()
             });
           }
         },
         {
           text: "Replace Entry",
           onPress: () => {
-            console.log(`[duplicateHandling] Replacing ${item.currentName} with ${convertedQuantity} ${backendUnit}`);
-            
             resolve({
               user_id: userId,
-              item_name: item.currentName,
+              item_name: item.currentName.toLowerCase(),
               quantity: convertedQuantity,
               unit: backendUnit,
               description: null,
-              created_at: new Date().toISOString()
             });
           }
         },
@@ -172,7 +166,6 @@ export const handleDuplicateUserDecision = (
           text: "Cancel",
           style: "cancel",
           onPress: () => {
-            console.log(`[duplicateHandling] Skipping duplicate: ${item.currentName}`);
             resolve(null);
           }
         }

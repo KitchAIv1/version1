@@ -3,7 +3,7 @@ import { Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import FeedScreen from '../screens/main/FeedScreen';
 // import DiscoverScreen from '../screens/main/DiscoverScreen';
-import MyStockScreen from '../screens/main/MyStockScreen';
+import PantryScreen from '../screens/main/PantryScreen';
 // import CreateScreen from '../screens/main/CreateScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import GroceryListScreen from '../screens/grocery/GroceryListScreen';
@@ -63,7 +63,7 @@ const MainTabs = () => {
           },
         })}
       />
-      <Tab.Screen name="Pantry" component={MyStockScreen} />
+      <Tab.Screen name="Pantry" component={PantryScreen} />
       {/* Discover, Create screens are fully removed for this test */}
       <Tab.Screen 
         name="GroceryList" 

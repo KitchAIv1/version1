@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Alert } from 'react-native';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
-import { useQueryClient } from '@tanstack/react-query';
 import { useGroceryContext } from '../providers/GroceryProvider';
 
 // Define basic types within the hook for now, can be moved to a types file later
@@ -34,112 +34,155 @@ export const DEFAULT_UNIT_OPTIONS: UnitOption[] = [
     { label: 'Cups', value: 'cups' },
 ];
 
+// Fetch user session
+const fetchUserSession = async () => {
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  return session?.user?.id || null;
+};
+
+// Fetch stock data
+const fetchStockData = async (userId: string): Promise<StockItem[]> => {
+  const { data, error } = await supabase
+    .from('stock')
+    .select('id, item_name, quantity, unit, description, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  return data?.map((item: RawStockItem) => ({ 
+    ...item, 
+    quantity: Number(item.quantity) 
+  })) || [];
+};
+
 export const useStockManager = () => {
-  const [stockData, setStockData] = useState<StockItem[]>([]);
-  const [userId, setUserId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { removeGroceryItem: removeGroceryItemFromList } = useGroceryContext();
 
-  // Loading states
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  // Error states
-  const [error, setError] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-
   // Modal Visibility States
   const [isManualModalVisible, setIsManualModalVisible] = useState(false);
-
-  // Editing State
   const [editingItem, setEditingItem] = useState<StockItem | null>(null);
 
-  // Fetch user ID on mount
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        console.error('Error fetching session:', sessionError.message);
-        setError('Failed to initialize user session.');
-        return;
-      }
-      if (session?.user) {
-        setUserId(session.user.id);
+  // Fetch user ID with React Query
+  const { data: userId } = useQuery({
+    queryKey: ['userSession'],
+    queryFn: fetchUserSession,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 1,
+  });
+
+  // Fetch stock data with React Query
+  const { 
+    data: stockData = [], 
+    isLoading, 
+    error: queryError,
+    refetch: fetchStock 
+  } = useQuery({
+    queryKey: ['stock', userId],
+    queryFn: () => fetchStockData(userId!),
+    enabled: !!userId,
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  const error = queryError?.message || null;
+
+  // Save item mutation
+  const saveItemMutation = useMutation({
+    mutationFn: async ({ itemToSave, originalItemName }: { 
+      itemToSave: StockItem; 
+      originalItemName?: string 
+    }) => {
+      if (!userId) throw new Error('User not authenticated');
+
+      const itemData = {
+        user_id: userId,
+        item_name: itemToSave.item_name.trim().toLowerCase(),
+        quantity: itemToSave.quantity,
+        unit: itemToSave.unit || 'units',
+        description: itemToSave.description?.trim() || null,
+        ...(editingItem ? {} : { created_at: new Date().toISOString() })
+      };
+
+      if (editingItem && originalItemName) {
+        const { error } = await supabase
+          .from('stock')
+          .update(itemData)
+          .eq('user_id', userId)
+          .eq('item_name', originalItemName.toLowerCase());
+        if (error) throw error;
       } else {
-        console.warn('No active user session.');
-        setError('No active user session. Please login.');
+        const { error } = await supabase
+          .from('stock')
+          .upsert(itemData, { onConflict: 'user_id, item_name' });
+        if (error) throw error;
       }
-    };
-    fetchUser();
-  }, []);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stock', userId] });
+      queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      closeManualModal();
+    },
+    onError: (error: any) => {
+      Alert.alert("Save Error", error.message || "Could not save the item. Please try again.");
+    },
+  });
 
-  // Fetch Stock Data
-  const fetchStock = useCallback(async (currentUserId?: string | null) => {
-    const idToUse = currentUserId || userId;
-    if (!idToUse) {
-      setError("User ID not available. Cannot fetch stock.");
-      console.warn("[useStockManager] fetchStock aborted: No user ID.");
-      return;
-    }
+  // Delete item mutation
+  const deleteItemMutation = useMutation({
+    mutationFn: async (itemToDelete: StockItem) => {
+      if (!userId) throw new Error('User not authenticated');
 
-    console.log(`[useStockManager] Fetching stock for user: ${idToUse}`);
-    setIsLoading(true);
-    setError(null);
-    try {
-      const { data, error: dbError } = await supabase
+      const { error } = await supabase
         .from('stock')
-        .select('id, item_name, quantity, unit, description, created_at')
-        .eq('user_id', idToUse)
-        .order('created_at', { ascending: false });
+        .delete()
+        .eq('user_id', userId)
+        .eq('item_name', itemToDelete.item_name.toLowerCase());
 
-      if (dbError) throw dbError;
+      if (error) throw error;
+    },
+    onMutate: async (itemToDelete) => {
+      // Optimistic update
+      await queryClient.cancelQueries({ queryKey: ['stock', userId] });
+      const previousStock = queryClient.getQueryData(['stock', userId]);
+      
+      queryClient.setQueryData(['stock', userId], (old: StockItem[] = []) =>
+        old.filter(item => item.item_name !== itemToDelete.item_name)
+      );
 
-      console.log("[useStockManager] Raw stock data received:", data);
-      const formattedData = data?.map((item: RawStockItem) => ({ 
-          ...item, 
-          quantity: Number(item.quantity) 
-        })) || [];
-      setStockData(formattedData);
-    } catch (err: any) {
-      console.error("[useStockManager] Error fetching stock:", err);
-      setError(err.message || "Failed to load stock data.");
-      setStockData([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [userId]);
-
-  // Effect to fetch stock when userId is set
-  useEffect(() => {
-    if (userId) {
-      fetchStock(userId);
-    }
-  }, [userId, fetchStock]);
+      return { previousStock };
+    },
+    onError: (error: any, itemToDelete, context) => {
+      // Rollback on error
+      queryClient.setQueryData(['stock', userId], context?.previousStock);
+      Alert.alert("Delete Error", error.message || "Could not delete the item. Please try again.");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['stock', userId] });
+      queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+    },
+  });
 
   // Modal Handlers
-  const openManualModal = (itemToEdit?: StockItem) => {
+  const openManualModal = useCallback((itemToEdit?: StockItem) => {
     setEditingItem(itemToEdit || null);
     setIsManualModalVisible(true);
-  };
+  }, []);
 
-  const closeManualModal = () => {
+  const closeManualModal = useCallback(() => {
     setIsManualModalVisible(false);
     setEditingItem(null);
-  };
+  }, []);
 
-  const prepareEditItem = (item: StockItem) => {
-    console.log("[useStockManager] Preparing to edit item:", item);
+  const prepareEditItem = useCallback((item: StockItem) => {
     openManualModal(item);
-  };
+  }, [openManualModal]);
 
-  const handleSaveItem = async (itemToSave: StockItem, originalItemName?: string): Promise<boolean> => {
-    if (!userId) {
-      Alert.alert("Error", "User not authenticated.");
-      return false;
-    }
-
+  const handleSaveItem = useCallback(async (itemToSave: StockItem, originalItemName?: string): Promise<boolean> => {
     if (!itemToSave.item_name?.trim()) {
       Alert.alert("Validation Error", "Item name is required.");
       return false;
@@ -150,97 +193,30 @@ export const useStockManager = () => {
       return false;
     }
 
-    setIsSaving(true);
-    setSaveError(null);
-
     try {
-      const itemData = {
-        user_id: userId,
-        item_name: itemToSave.item_name.trim().toLowerCase(),
-        quantity: itemToSave.quantity,
-        unit: itemToSave.unit || 'units',
-        description: itemToSave.description?.trim() || null,
-        ...(editingItem ? {} : { created_at: new Date().toISOString() }) // Only set created_at for new items
-      };
-
-      if (editingItem && originalItemName) {
-        // Update existing item
-        const { error: updateError } = await supabase
-          .from('stock')
-          .update(itemData)
-          .eq('user_id', userId)
-          .eq('item_name', originalItemName.toLowerCase());
-
-        if (updateError) throw updateError;
-        console.log("[useStockManager] Item updated successfully");
-      } else {
-        // Create new item or upsert
-        const { error: upsertError } = await supabase
-          .from('stock')
-          .upsert(itemData, { onConflict: 'user_id, item_name' });
-
-        if (upsertError) throw upsertError;
-        console.log("[useStockManager] Item saved successfully");
-      }
-
-      fetchStock();
-      queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
-      queryClient.invalidateQueries({ queryKey: ['feed'] });
-      closeManualModal();
+      await saveItemMutation.mutateAsync({ itemToSave, originalItemName });
       return true;
-
-    } catch (err: any) {
-      console.error("[useStockManager] Error saving item:", err);
-      setSaveError(err.message || "Failed to save item.");
-      Alert.alert("Save Error", err.message || "Could not save the item. Please try again.");
-      return false;
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const deleteStockItem = async (itemToDelete: StockItem) => {
-    if (!userId) {
-      Alert.alert("Error", "User not authenticated.");
+    } catch {
       return false;
     }
+  }, [saveItemMutation]);
 
-    setIsDeleting(true);
-    setDeleteError(null);
-
+  const deleteStockItem = useCallback(async (itemToDelete: StockItem) => {
     try {
-      const { error: deleteError } = await supabase
-        .from('stock')
-        .delete()
-        .eq('user_id', userId)
-        .eq('item_name', itemToDelete.item_name.toLowerCase());
-
-      if (deleteError) throw deleteError;
-
-      console.log('[useStockManager] Item deleted successfully. Refreshing stock...');
-      fetchStock();
-      queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
-      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      await deleteItemMutation.mutateAsync(itemToDelete);
       return true;
-    } catch (err: any) {
-      console.error("[useStockManager] Error deleting item:", err);
-      setDeleteError(err.message || "Failed to delete item.");
-      Alert.alert("Delete Error", err.message || "Could not delete the item. Please try again.");
+    } catch {
       return false;
-    } finally {
-      setIsDeleting(false);
     }
-  };
+  }, [deleteItemMutation]);
 
   return {
     stockData,
     userId,
     isLoading,
-    isSaving,
-    isDeleting,
+    isSaving: saveItemMutation.isPending,
+    isDeleting: deleteItemMutation.isPending,
     error,
-    saveError,
-    deleteError,
 
     // Manual Add Modal related
     isManualModalVisible,

@@ -15,25 +15,22 @@ export interface RecognitionResult {
  * @returns Promise with recognized items
  */
 export const processImageWithAI = async (base64Image: string): Promise<RecognitionResult> => {
-  console.log('[imageProcessing] Starting AI recognition...');
-  
   try {
     const { data, error: functionError } = await supabase.functions.invoke('recognize-stock', {
-      body: { image: base64Image },
+      body: { image: base64Image }
     });
 
     if (functionError) {
       console.error('[imageProcessing] Supabase function error:', functionError);
-      throw functionError;
+      throw new Error(`Function error: ${functionError.message}`);
     }
 
-    if (!data || !data.items || !Array.isArray(data.items)) {
+    if (!data || !Array.isArray(data.items)) {
       console.error('[imageProcessing] Invalid data format:', data);
-      throw new Error('Invalid data format from recognition service.');
+      throw new Error('Invalid response format from AI service');
     }
 
-    console.log('[imageProcessing] Items recognized:', data.items);
-    return data as RecognitionResult;
+    return { items: data.items };
   } catch (error) {
     console.error('[imageProcessing] Recognition error:', error);
     throw error;
@@ -45,15 +42,11 @@ export const processImageWithAI = async (base64Image: string): Promise<Recogniti
  * @param startTime - Timestamp when analysis started
  * @param minimumDisplayTime - Minimum time to show loading (default 4000ms)
  */
-export const enforceMinimumDisplayTime = async (
-  startTime: number, 
-  minimumDisplayTime: number = 4000
-): Promise<void> => {
-  const elapsedTime = Date.now() - startTime;
+export const enforceMinimumDisplayTime = async (startTime: number, minTime: number): Promise<void> => {
+  const elapsed = Date.now() - startTime;
+  const remainingTime = Math.max(0, minTime - elapsed);
   
-  if (elapsedTime < minimumDisplayTime) {
-    const remainingTime = minimumDisplayTime - elapsedTime;
-    console.log(`[imageProcessing] Enforcing minimum display time: ${remainingTime}ms`);
+  if (remainingTime > 0) {
     await new Promise(resolve => setTimeout(resolve, remainingTime));
   }
 };

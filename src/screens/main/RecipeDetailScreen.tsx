@@ -14,6 +14,9 @@ import {
   Animated,
   LayoutChangeEvent,
   StatusBar,
+  Keyboard,
+  KeyboardEvent,
+  Platform,
 } from 'react-native';
 import { useRoute, RouteProp, useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
@@ -33,13 +36,14 @@ import ActionOverlay from '../../components/ActionOverlay';
 import IngredientsTab from '../recipe-detail-tabs/IngredientsTab';
 import StepsTab from '../recipe-detail-tabs/StepsTab';
 import MacrosTab from '../recipe-detail-tabs/MacrosTab';
-import CommentsTab from '../recipe-detail-tabs/CommentsTab';
 import { supabase } from '../../services/supabase';
 import { useGroceryManager } from '../../hooks/useGroceryManager';
 import { COLORS } from '../../constants/theme';
 import FloatingTabBar from '../../components/FloatingTabBar';
 import { useDailyMealPlan, MealSlot } from '../../hooks/useDailyMealPlan';
 import AddToMealPlannerModal from '../../components/modals/AddToMealPlannerModal';
+import CommentsModal from '../../components/CommentsModal';
+import { useLikeMutation, useSaveMutation } from '../../hooks/useRecipeMutations';
 
 // Define route prop type
 type RecipeDetailScreenRouteProp = RouteProp<
@@ -55,7 +59,6 @@ const TAB_ROUTES = {
   INGREDIENTS: 'Ingredients',
   STEPS: 'Steps',
   MACROS: 'Macros',
-  COMMENTS: 'Comments'
 };
 
 // Create custom Tab Navigator to handle scroll issues
@@ -147,6 +150,9 @@ export default function RecipeDetailScreen() {
   const { addRecipeToSlot } = useDailyMealPlan(format(new Date(), 'yyyy-MM-dd')); // Pass default date
   const [isPlannerModalVisible, setIsPlannerModalVisible] = useState(false);
   
+  // Comments Modal state
+  const [isCommentsModalVisible, setIsCommentsModalVisible] = useState(false);
+  
   // Track original tab bar measurements
   // const tabBarRef = useRef<View>(null);
   // const [tabBarPosition, setTabBarPosition] = useState(0);
@@ -162,7 +168,6 @@ export default function RecipeDetailScreen() {
     [TAB_ROUTES.INGREDIENTS]: 0,
     [TAB_ROUTES.STEPS]: 0,
     [TAB_ROUTES.MACROS]: 0,
-    [TAB_ROUTES.COMMENTS]: 0,
   });
   
   const [currentScrollPosition, setCurrentScrollPosition] = useState(0);
@@ -198,6 +203,31 @@ export default function RecipeDetailScreen() {
     error,
   } = useRecipeDetails(id, user?.id);
   
+  // Log when recipe details change, especially like state
+  useEffect(() => {
+    if (recipeDetails) {
+      console.log(`[RecipeDetailScreen] Recipe details updated for ${id}:`, {
+        is_liked_by_user: recipeDetails.is_liked_by_user,
+        likes: recipeDetails.likes,
+        is_saved_by_user: recipeDetails.is_saved_by_user,
+        title: recipeDetails.title,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, [recipeDetails?.is_liked_by_user, recipeDetails?.likes, recipeDetails?.is_saved_by_user, id]);
+
+  // Log when screen comes into focus
+  useEffect(() => {
+    if (isScreenFocused) {
+      console.log(`[RecipeDetailScreen] Screen focused for recipe ${id}, current state:`, {
+        is_liked_by_user: recipeDetails?.is_liked_by_user,
+        likes: recipeDetails?.likes,
+        is_saved_by_user: recipeDetails?.is_saved_by_user,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, [isScreenFocused, recipeDetails?.is_liked_by_user, recipeDetails?.likes, recipeDetails?.is_saved_by_user, id]);
+
   // Effect to reset video error when video_url changes
   useEffect(() => {
     setVideoPlayerError(null); // Clear previous errors when new video data comes in
@@ -254,6 +284,10 @@ export default function RecipeDetailScreen() {
   };
   // --- End Video Player ---
 
+  // Use optimized mutation hooks
+  const likeMutation = useLikeMutation(user?.id);
+  const saveMutation = useSaveMutation(user?.id);
+
   // Measure tab bar position after render and when recipe details change
   // useLayoutEffect(() => {
   //   if (!isLoading && recipeDetails) {
@@ -283,59 +317,7 @@ export default function RecipeDetailScreen() {
   // }, [isLoading, recipeDetails]);
 
   // --- Optimistic updates for like/save --- 
-  const likeMut = useMutation<void, Error, void, any>({
-    mutationFn: async () => { 
-      if (!id) throw new Error('Recipe ID missing'); 
-      // Assuming 'toggle_like_recipe' RPC and it handles user internally
-      const { error: likeError } = await supabase.rpc('toggle_like_recipe', { p_recipe_id: id }); 
-      if (likeError) throw likeError; 
-    },
-    onSuccess: () => {
-      // Optimistically update UI or simply refetch for consistency
-      queryClient.invalidateQueries({ queryKey: ['recipeDetails', id, user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['profile'] }); // If likes affect profile display
-      queryClient.invalidateQueries({ queryKey: ['feed'] });
-    },
-    // onError: (err, _vars, context) => {
-    //   queryClient.setQueryData(['recipeDetails', id, user?.id], context?.previousDetails);
-    // },
-  });
-
-  // Updated saveMut for the new 'save_recipe_video' RPC
-  const saveRecipeVideoMut = useMutation<void, Error, void, any>({
-    mutationFn: async () => { 
-      const userId = user?.id;
-      if (!id || !userId) { 
-        throw new Error('Recipe ID or User ID missing for save action'); 
-      }
-      // Call the new RPC, passing both recipe_id and user_id
-      const { error: saveError } = await supabase.rpc('save_recipe_video', { 
-        p_recipe_id: id, 
-        p_user_id: userId // Pass user ID
-      }); 
-      if (saveError) {
-        console.error('Error saving recipe video:', saveError);
-        throw saveError; 
-      }
-    },
-    onSuccess: () => {
-      console.log('Recipe save/unsave successful, invalidating queries...');
-      // Invalidate recipe details to refetch and get updated is_saved_by_user status
-      queryClient.invalidateQueries({ queryKey: ['recipeDetails', id, user?.id] });
-      // Invalidate profile data as the saved list will change
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
-      // Optionally, invalidate feed if saved status affects feed items
-      queryClient.invalidateQueries({ queryKey: ['feed'] }); 
-      // Invalidate the user recipes list for the meal planner modal
-      if (user?.id) {
-        queryClient.invalidateQueries({ queryKey: ['userRecipesForPlanner', user.id] });
-      }
-    },
-    onError: (saveError) => {
-      console.error('Mutation error for save_recipe_video:', saveError);
-      Alert.alert('Error', 'Could not update save status. Please try again.');
-    }
-  });
+  // Removed old mutation logic - now using optimized hooks
 
   // --- Share Functionality ---
   const handleShare = async () => { 
@@ -385,12 +367,7 @@ export default function RecipeDetailScreen() {
 
   // Comment button handler
   const handleCommentPress = () => {
-    setActiveTab(TAB_ROUTES.COMMENTS);
-    
-    // Scroll down to show comments
-    setTimeout(() => {
-      scrollViewRef.current?.scrollTo({ y: HEADER_HEIGHT + 250, animated: true });
-    }, 100);
+    setIsCommentsModalVisible(true);
   };
   
   // Handle tab content layout changes to measure their heights
@@ -430,10 +407,6 @@ export default function RecipeDetailScreen() {
 
     let shouldShow = scrollY > tabBarExitPoint && scrollY < contentDeepPoint;
 
-    if (activeTab === TAB_ROUTES.COMMENTS && scrollY > (HEADER_HEIGHT + screenHeight * 0.2)) { 
-        shouldShow = false;
-    }
-    
     if (shouldShow !== shouldShowFloatingBar && !floatingBarAnimating.current) {
       floatingBarAnimating.current = true;
       logVisibilityChange.current++;
@@ -477,15 +450,6 @@ export default function RecipeDetailScreen() {
             onLayout={(e) => handleTabContentLayout(TAB_ROUTES.MACROS, e)}
           >
             <MacrosTab />
-          </View>
-        );
-      case TAB_ROUTES.COMMENTS:
-        return (
-          <View 
-            key="comments-tab"
-            onLayout={(e) => handleTabContentLayout(TAB_ROUTES.COMMENTS, e)}
-          >
-            <CommentsTab />
           </View>
         );
       default:
@@ -537,6 +501,10 @@ export default function RecipeDetailScreen() {
     }
     setIsPlannerModalVisible(false); // Close modal on success or failure
     // Modal closes itself - original comment, keeping it but also explicitly closing
+  };
+
+  const handleCloseCommentsModal = () => {
+    setIsCommentsModalVisible(false);
   };
 
   // --- Render Logic ---
@@ -648,7 +616,7 @@ export default function RecipeDetailScreen() {
         contentContainerStyle={[
           styles.scrollContent,
           { 
-            paddingBottom: activeTab === TAB_ROUTES.COMMENTS ? 0 : 80, // No extra padding for Comments tab
+            paddingBottom: 80, // Standard padding for all tabs
           }
         ]}
         showsVerticalScrollIndicator={false}
@@ -707,15 +675,28 @@ export default function RecipeDetailScreen() {
           {/* Action Row (Like, Save, Comment, Share) */}
           <View style={styles.actionRow}>
             <TouchableOpacity 
-              style={styles.actionButton} 
-              onPress={() => likeMut.mutate()}
-              disabled={likeMut.isPending}
+              style={[
+                styles.actionButton,
+                (!user?.id || likeMutation.isPending) && styles.actionButtonDisabled
+              ]} 
+              onPress={() => {
+                if (!user?.id) {
+                  Alert.alert('Authentication Required', 'Please log in to like recipes.');
+                  return;
+                }
+                likeMutation.mutate(id);
+              }}
+              disabled={!user?.id || likeMutation.isPending}
             >
-              <Ionicons 
-                name={recipeDetails?.is_liked_by_user ? "heart" : "heart-outline"} 
-                size={26} 
-                color={recipeDetails?.is_liked_by_user ? COLORS.error : COLORS.primary} 
-              />
+              {likeMutation.isPending ? (
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              ) : (
+                <Ionicons 
+                  name={recipeDetails?.is_liked_by_user ? "heart" : "heart-outline"} 
+                  size={26} 
+                  color={recipeDetails?.is_liked_by_user ? COLORS.error : COLORS.primary} 
+                />
+              )}
               {recipeDetails?.likes !== undefined && (
                 <Text style={styles.actionCount}>{recipeDetails.likes}</Text>
               )}
@@ -723,8 +704,8 @@ export default function RecipeDetailScreen() {
             
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => saveRecipeVideoMut.mutate()}
-              disabled={saveRecipeVideoMut.isPending}
+              onPress={() => saveMutation.mutate(id)}
+              disabled={saveMutation.isPending}
             >
               <Ionicons 
                 name={recipeDetails?.is_saved_by_user ? "bookmark" : "bookmark-outline"}
@@ -777,6 +758,12 @@ export default function RecipeDetailScreen() {
         onClose={handleClosePlannerModal}
         onAddToPlan={handleAddToMealPlan}
         recipeName={recipeDetails?.title}
+      />
+
+      <CommentsModal
+        visible={isCommentsModalVisible}
+        onClose={handleCloseCommentsModal}
+        recipeId={id}
       />
     </View>
   );
@@ -968,6 +955,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 6,
     minWidth: 70,
+  },
+  actionButtonDisabled: {
+    backgroundColor: COLORS.surface || '#f0f0f0',
+    opacity: 0.6,
   },
   actionCount: {
     marginLeft: 8,

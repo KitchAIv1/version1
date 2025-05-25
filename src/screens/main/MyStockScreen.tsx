@@ -5,51 +5,50 @@ import {
   StyleSheet,
   View,
   Alert,
-  Text,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useStockManager, StockItem } from '../../hooks/useStockManager'; // Re-enabled hook import
-import { StockHeader } from '../../components/stock/StockHeader'; // Use named import
-import { StockList } from '../../components/stock/StockList'; // Use named import
-import { ManualAddModal } from '../../components/stock/ManualAddModal'; // Uncommented component import
-import { COLORS as ThemeColors } from '../../constants/theme'; // Import real COLORS, maybe alias
-
-// const COLORS = { background: '#FFF' }; // Remove mock
+import { useStockManager, StockItem } from '../../hooks/useStockManager';
+import { StockHeader } from '../../components/stock/StockHeader';
+import { StockList } from '../../components/stock/StockList';
+import { ManualAddModal } from '../../components/stock/ManualAddModal';
+import { COLORS as ThemeColors } from '../../constants/theme';
 
 export default function MyStockScreen() {
   const navigation = useNavigation();
   
-  // Re-enabled hook call and destructuring
   const {
-    stockData, // Keep even if StockList is commented, hook fetches it
+    stockData,
     isLoading,
     error,
     isSaving,
-    isManualModalVisible, // Needed for ManualAddModal
+    isManualModalVisible,
     openManualModal, 
-    closeManualModal, // Needed for ManualAddModal
+    closeManualModal,
     editingItem,      
     prepareEditItem,  
     handleSaveItem,   
     deleteStockItem,  
     fetchStock,       
-    unitOptions,      // Needed for ManualAddModal
+    unitOptions,
   } = useStockManager(); 
 
   const [searchQuery, setSearchQuery] = useState(''); 
 
-  // Re-enabled filtered data derivation
-  const filteredStockData = useMemo(() => 
-    stockData.filter((item: StockItem) => 
-      item.item_name.toLowerCase().includes(searchQuery.toLowerCase())
-    ), [stockData, searchQuery]);
+  // Enhanced filtered data with better performance
+  const filteredStockData = useMemo(() => {
+    if (!searchQuery.trim()) return stockData;
+    
+    const query = searchQuery.toLowerCase();
+    return stockData.filter((item: StockItem) => 
+      item.item_name.toLowerCase().includes(query) ||
+      item.description?.toLowerCase().includes(query)
+    );
+  }, [stockData, searchQuery]);
 
   const handleNavigateToScanner = () => {
-    // Navigate to our enhanced PantryScanningScreen
     navigation.navigate('PantryScan' as never);
   };
 
-  // Re-enabled delete handler
   const handleDeleteWithConfirmation = (item: StockItem) => {
     Alert.alert(
       "Confirm Delete",
@@ -70,16 +69,15 @@ export default function MyStockScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Use ThemeColors from import */}
       <StatusBar barStyle="dark-content" backgroundColor={ThemeColors.background || '#FFF'} /> 
       
       <StockHeader 
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         onScanPress={handleNavigateToScanner} 
-        onManualPress={() => openManualModal()} // Uses openManualModal from hook
-        isScanning={false} // No longer using old scanning state
-        isAddingManually={isSaving} // Uses isSaving from hook
+        onManualPress={() => openManualModal()}
+        isScanning={false}
+        isAddingManually={isSaving}
       />
 
       <View style={styles.listContainer}>
@@ -94,7 +92,6 @@ export default function MyStockScreen() {
         />
       </View>
 
-      {/* Keep ManualAddModal for manual entry */}
       <ManualAddModal
         visible={isManualModalVisible}
         onClose={closeManualModal}
@@ -110,14 +107,7 @@ export default function MyStockScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: ThemeColors.background || '#f8f9fa', // Use ThemeColors
-  },
-  container: { 
-    flex: 1,
-    // Adjust layout if header takes space - perhaps remove centering?
-    // justifyContent: 'center',
-    // alignItems: 'center',
-    padding: 10, // Add some padding
+    backgroundColor: ThemeColors.background || '#f8f9fa',
   },
   listContainer: {
     flex: 1,

@@ -1,6 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { RecipeItem } from '../types';
+import { useEffect } from 'react';
+import { useCacheManager } from './useCacheManager';
 
 // Interface for the raw item structure returned by the RPC
 interface RawFeedItem {
@@ -30,7 +32,10 @@ interface RpcResponse {
 }
 
 // Renamed from FeedPageItem, removed cursor
-export interface FeedItem extends RecipeItem {}
+export interface FeedItem extends RecipeItem {
+  id: string; // Keep the original id property for compatibility
+  video?: string; // Keep the original video property for compatibility
+}
 
 type FeedQueryKey = ['feed'];
 const FEED_PAGE_LIMIT = 10; // Define a limit for the number of items to fetch
@@ -39,8 +44,11 @@ const FEED_PAGE_LIMIT = 10; // Define a limit for the number of items to fetch
  * Hook to fetch feed data using infinite scrolling.
  * Currently uses dummy data.
  */
-export const useFeed = () =>
-  useQuery<
+export const useFeed = () => {
+  const queryClient = useQueryClient();
+  const cacheManager = useCacheManager();
+  
+  const feedQuery = useQuery<
     FeedItem[], // Data type returned by queryFn
     Error,      // Error type
     FeedItem[], // QueryData type (usually same as TData)
@@ -91,10 +99,12 @@ export const useFeed = () =>
             ? Math.round((userIngredients / totalIngredients) * 100)
             : 0;
 
-        return {
+        const mappedItem = {
           id: item.output_id,
+          recipe_id: item.output_id,
           title: item.output_name,
           video: item.output_video_url,
+          video_url: item.output_video_url,
           description: item.output_description,
           liked: item.output_is_liked,
           likes: item.output_likes,
@@ -106,10 +116,46 @@ export const useFeed = () =>
           _totalIngredientsCount: totalIngredients,
           commentsCount: item.output_comments_count,
         };
+
+        // Log like state for debugging inconsistencies
+        console.log(`[useFeed] Recipe ${item.output_id} like mapping:`, {
+          raw_output_is_liked: item.output_is_liked,
+          mapped_liked: mappedItem.liked,
+          raw_output_likes: item.output_likes,
+          mapped_likes: mappedItem.likes,
+          title: item.output_name
+        });
+
+        // Log comment count for debugging
+        console.log(`[useFeed] Recipe ${item.output_id} comment mapping:`, {
+          raw_output_comments_count: item.output_comments_count,
+          mapped_commentsCount: mappedItem.commentsCount,
+          title: item.output_name
+        });
+
+        return mappedItem;
       });
 
       return mappedItems;
     },
     // getNextPageParam and initialPageParam are removed as they are for useInfiniteQuery
     // No need for refetchInterval or other complex settings for now
-  }); 
+  });
+
+  // Update comment counts after feed data is loaded
+  useEffect(() => {
+    if (feedQuery.data && feedQuery.data.length > 0) {
+      console.log('[useFeed] Feed data loaded, updating comment counts for items with 0 comments');
+      
+      // Only update comment counts for items that show 0 comments (likely incorrect)
+      feedQuery.data.forEach(async (item) => {
+        if (item.commentsCount === 0) {
+          console.log(`[useFeed] Updating comment count for recipe ${item.id} (currently showing 0)`);
+          await cacheManager.updateCommentCount(item.id);
+        }
+      });
+    }
+  }, [feedQuery.data, cacheManager]);
+
+  return feedQuery;
+}; 

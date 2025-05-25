@@ -14,6 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../services/supabase'; // Corrected path
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { decode } from 'base64-arraybuffer'; // For handling base64 upload
+import { compressImageWithPreset, needsCompression } from '../utils/imageCompression';
 
 const MAX_BIO_LENGTH = 150; // Define max bio length
 
@@ -35,6 +36,7 @@ export const AvatarEditorAndBio: React.FC<AvatarEditorAndBioProps> = ({
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
   const [bio, setBio] = useState(initialBio);
   const [uploading, setUploading] = useState(false);
+  const [compressionInfo, setCompressionInfo] = useState<string>('');
 
   // Update internal state if initial props change (e.g., after saving)
   useEffect(() => {
@@ -58,34 +60,70 @@ export const AvatarEditorAndBio: React.FC<AvatarEditorAndBioProps> = ({
       mediaTypes: 'images',
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.8,
-      base64: true, // Request base64 for easier upload handling
+      quality: 1.0, // Start with highest quality, we'll compress it ourselves
+      base64: false, // We'll get base64 from compression
     });
 
     if (!result.canceled && result.assets && result.assets[0]) {
       const asset = result.assets[0];
-      if (asset.base64) {
-        uploadAvatar(asset.base64, asset.uri);
-      } else {
-        // Fallback if base64 is not available (shouldn't happen with base64: true)
-        Alert.alert('Error', 'Could not get image data.');
-      }
+      await processAndUploadImage(asset.uri);
     }
   };
 
-  const uploadAvatar = async (base64: string, uri: string) => {
+  const processAndUploadImage = async (uri: string) => {
     if (!userId) {
       Alert.alert('Error', 'User ID is missing.');
       return;
     }
+
     try {
       setUploading(true);
-      const fileExt = uri.split('.').pop()?.toLowerCase() ?? 'jpeg';
+      setCompressionInfo('Checking image size...');
+
+      // Check if compression is needed
+      const { needsCompression: shouldCompress, currentSizeKB } = await needsCompression(uri, 100);
+      
+      if (shouldCompress) {
+        setCompressionInfo(`Compressing ${Math.round(currentSizeKB)}KB image...`);
+        
+        // Compress using AVATAR preset (400x400, ~100KB target)
+        const compressionResult = await compressImageWithPreset(uri, 'AVATAR');
+        
+        const finalSizeKB = compressionResult.fileSize ? Math.round(compressionResult.fileSize / 1024) : 0;
+        const compressionPercent = compressionResult.compressionRatio ? Math.round(compressionResult.compressionRatio * 100) : 0;
+        
+        setCompressionInfo(`Optimized: ${finalSizeKB}KB (${compressionPercent}% smaller)`);
+        
+        // Upload the compressed image
+        await uploadAvatar(compressionResult.base64!, compressionResult.uri);
+      } else {
+        setCompressionInfo(`Image already optimized (${Math.round(currentSizeKB)}KB)`);
+        
+        // Image is already small enough, but still compress for consistency
+        const compressionResult = await compressImageWithPreset(uri, 'AVATAR');
+        await uploadAvatar(compressionResult.base64!, compressionResult.uri);
+      }
+
+      // Clear compression info after a delay
+      setTimeout(() => setCompressionInfo(''), 3000);
+
+    } catch (error: any) {
+      console.error("Image processing error:", error);
+      Alert.alert('Processing Failed', error.message || 'Could not process image.');
+      setCompressionInfo('');
+    }
+  };
+
+  const uploadAvatar = async (base64: string, uri: string) => {
+    try {
+      setCompressionInfo('Uploading to cloud...');
+      
+      const fileExt = 'jpg'; // Always use jpg for avatars (better compression)
       const path = `${userId}/${userId}-${Date.now()}.${fileExt}`;
-      const contentType = `image/${fileExt}`;
+      const contentType = 'image/jpeg';
 
       const { error: uploadError } = await supabase.storage
-        .from('avatars') // Assuming 'avatars' bucket
+        .from('avatars')
         .upload(path, decode(base64), { contentType });
 
       if (uploadError) {
@@ -95,13 +133,15 @@ export const AvatarEditorAndBio: React.FC<AvatarEditorAndBioProps> = ({
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
       const newUrl = urlData.publicUrl;
       
-      console.log('New avatar URL:', newUrl);
       setAvatarUrl(newUrl); 
       onAvatarChange(newUrl);
+      setCompressionInfo('Upload complete!');
 
     } catch (error: any) {
       console.error("Avatar upload error:", error);
       Alert.alert('Upload Failed', error.message || 'Could not upload avatar.');
+      setCompressionInfo('');
+      throw error;
     } finally {
       setUploading(false);
     }
@@ -118,13 +158,20 @@ export const AvatarEditorAndBio: React.FC<AvatarEditorAndBioProps> = ({
           </View>
         )}
         {uploading ? (
-          <ActivityIndicator style={styles.uploadIndicator} size="large" color="#fff" />
+          <View style={styles.uploadIndicator}>
+            <ActivityIndicator size="large" color="#fff" />
+          </View>
         ) : (
           <View style={styles.editIconContainer}>
              <Icon name="edit" size={18} color="#fff" />
           </View>
         )}
       </TouchableOpacity>
+      
+      {/* Compression info display */}
+      {compressionInfo && (
+        <Text style={styles.compressionInfo}>{compressionInfo}</Text>
+      )}
       
       <Text style={styles.bioLabel}>Bio</Text>
       <TextInput
@@ -149,7 +196,7 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginBottom: 20,
-    position: 'relative', // For positioning upload indicator/icon
+    position: 'relative',
   },
   avatar: {
     width: 120,
@@ -170,9 +217,14 @@ const styles = StyleSheet.create({
   },
   uploadIndicator: {
     position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
+    top: 0, 
+    left: 0, 
+    right: 0, 
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.5)',
     borderRadius: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   editIconContainer: {
     position: 'absolute',
@@ -181,6 +233,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     padding: 6,
     borderRadius: 15,
+  },
+  compressionInfo: {
+    fontSize: 12,
+    color: '#10B981',
+    textAlign: 'center',
+    marginBottom: 8,
+    fontWeight: '500',
+    minHeight: 16,
   },
   bioLabel: {
     fontSize: 16,

@@ -58,6 +58,7 @@ export type MainStackParamList = {
   OnboardingStep2User: undefined; // Added Onboarding Step 2 User
   OnboardingStep2Creator: undefined; // Added Onboarding Step 2 Creator
   OnboardingFinal: undefined; // Added Onboarding Final Step
+  UpgradeScreen: undefined; // Added UpgradeScreen for PREMIUM upgrades
   // Add other stack screens here if needed (e.g., Settings)
 };
 
@@ -76,4 +77,5 @@ export type DiscoverScreenProps = BottomTabScreenProps<MainTabsParamList, 'Disco
 // Prop types for screens within MainStack
 export type SearchResultsProps = NativeStackScreenProps<MainStackParamList, 'SearchResults'>;
 export type RecipeDetailProps = NativeStackScreenProps<MainStackParamList, 'RecipeDetail'>;
-export type PantryScanProps = NativeStackScreenProps<MainStackParamList, 'PantryScan'>; // Add prop type for PantryScan 
+export type PantryScanProps = NativeStackScreenProps<MainStackParamList, 'PantryScan'>; // Add prop type for PantryScan
+export type UpgradeScreenProps = NativeStackScreenProps<MainStackParamList, 'UpgradeScreen'>; // Add prop type for UpgradeScreen 

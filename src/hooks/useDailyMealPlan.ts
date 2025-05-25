@@ -94,6 +94,11 @@ export const useDailyMealPlan = (date: string) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
       console.log('Successfully added/updated recipe, invalidated query:', queryKey);
+      
+      // Invalidate activity feed to show the meal planning action
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: ['userActivityFeed', user.id] });
+      }
     },
     onError: (err: Error) => {
       console.error('Error in addRecipeMutation:', err);

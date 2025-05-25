@@ -12,29 +12,51 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 interface CameraInterfaceProps {
   onCapturePress: () => void;
   onSkipPress?: () => void;
+  onExitPress?: () => void;
   isAnalyzing: boolean;
   showSkipButton?: boolean;
+  showExitButton?: boolean;
   instructionText?: string;
 }
 
 const CameraInterface = forwardRef<CameraView, CameraInterfaceProps>(({
   onCapturePress,
   onSkipPress,
+  onExitPress,
   isAnalyzing,
   showSkipButton = false,
+  showExitButton = true,
   instructionText = "Position your pantry items clearly in the frame.",
 }, ref) => {
   return (
-    <CameraView
-      ref={ref}
-      style={styles.camera}
-      facing="back"
-    >
+    <View style={styles.container}>
+      {/* Camera View - No children allowed */}
+      <CameraView
+        ref={ref}
+        style={styles.camera}
+        facing="back"
+      />
+      
+      {/* Overlay with absolute positioning */}
       <View style={styles.overlay}>
+        {/* Top Bar with Exit Button */}
+        <View style={styles.topBar}>
+          {showExitButton && (
+            <TouchableOpacity 
+              style={styles.exitButton} 
+              onPress={onExitPress}
+            >
+              <Ionicons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* Instructions */}
-        <Text style={styles.instructions}>
-          {instructionText}
-        </Text>
+        <View style={styles.instructionsContainer}>
+          <Text style={styles.instructions}>
+            {instructionText}
+          </Text>
+        </View>
 
         {/* Bottom Controls */}
         <View style={styles.bottomBar}>
@@ -68,59 +90,111 @@ const CameraInterface = forwardRef<CameraView, CameraInterfaceProps>(({
           <View style={styles.spacer} />
         </View>
       </View>
-    </CameraView>
+    </View>
   );
 });
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    position: 'relative',
+  },
   camera: {
     flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   overlay: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'transparent',
     justifyContent: 'space-between',
+    pointerEvents: 'box-none', // Allow touches to pass through to camera except for buttons
+  },
+  topBar: {
+    height: 80 + (Platform.OS === 'ios' ? 44 : 24), // Increased height for better coverage
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    paddingTop: Platform.OS === 'ios' ? 44 : 24, // Add top padding for status bar
+    pointerEvents: 'box-none',
+  },
+  exitButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    pointerEvents: 'auto',
+  },
+  instructionsContainer: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    paddingTop: 40, // Increased padding to avoid overlap with top bar
+    pointerEvents: 'none',
   },
   instructions: {
     color: '#fff',
     textAlign: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 12,
-    marginTop: 32 + (Platform.OS === 'ios' ? 20 : 0),
-    marginHorizontal: 16,
-    borderRadius: 8,
-    fontSize: 14,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: 16,
+    marginHorizontal: 20,
+    borderRadius: 12,
+    fontSize: 16,
+    fontWeight: '500',
+    lineHeight: 22,
   },
   bottomBar: {
-    height: 100,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    height: 120,
+    backgroundColor: 'rgba(0,0,0,0.8)',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 32,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    pointerEvents: 'box-none',
   },
   captureButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+    borderWidth: 4,
+    borderColor: '#22c55e',
+    pointerEvents: 'auto',
   },
   captureButtonDisabled: {
     backgroundColor: '#f0f0f0',
+    borderColor: '#ccc',
     opacity: 0.6,
   },
   skipButtonTouch: {
-    padding: 8,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    pointerEvents: 'auto',
   },
   skipButtonText: {
     color: '#fff',
@@ -128,7 +202,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   spacer: {
-    width: 50,
+    width: 60,
+    pointerEvents: 'none',
   },
 });
 

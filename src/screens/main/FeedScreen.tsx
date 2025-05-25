@@ -2,56 +2,59 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { View, ActivityIndicator, Text, StyleSheet, StatusBar, Dimensions } from 'react-native';
 import { FlashList, ViewToken } from '@shopify/flash-list';
 import { useFeed } from '../../hooks/useFeed';
+import { useLikeMutation, useSaveMutation } from '../../hooks/useRecipeMutations';
 import RecipeCard from '../../components/RecipeCard';
 import { supabase } from '../../services/supabase';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { FeedItem } from '../../hooks/useFeed';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../providers/AuthProvider';
 import { useIsFocused } from '@react-navigation/native';
 
-interface MutationContext {
-  previousFeed?: FeedItem[];
-}
-
 export default function FeedScreen() {
+  const { user } = useAuth();
   const {
-    data: feedItems,
+    data: feedData,
     isLoading,
     error: feedError,
   } = useFeed();
   const isFeedScreenFocused = useIsFocused();
   const flashListRef = useRef<FlashList<FeedItem>>(null);
-  const prevFeedItemsRef = useRef<FeedItem[] | undefined>();
-  const { user } = useAuth();
+  const prevFeedItemsRef = useRef<FeedItem[] | undefined>(undefined);
+  const insets = useSafeAreaInsets();
+  const windowDims = Dimensions.get('window');
+
+  // Use optimized mutation hooks
+  const likeMutation = useLikeMutation(user?.id);
+  const saveMutation = useSaveMutation(user?.id);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [layoutReady, setLayoutReady] = useState(false);
   const [itemHeight, setItemHeight] = useState(Dimensions.get('window').height);
   const [loggedViews, setLoggedViews] = useState<Set<string>>(new Set());
-  const insets = useSafeAreaInsets();
-  const windowDims = Dimensions.get('window');
 
-  const itemsToRender: FeedItem[] = feedItems || [];
+  const itemsToRender: FeedItem[] = feedData || [];
 
   useEffect(() => {
     console.log('FeedScreen Insets:', JSON.stringify(insets), 'WindowHeight:', windowDims.height, 'WindowWidth:', windowDims.width);
   }, [insets, windowDims]);
 
   useEffect(() => {
+    // Don't auto-scroll if any mutation is in progress (cache update from mutation)
     if (
       isFeedScreenFocused &&
-      feedItems &&
-      feedItems.length > 0 &&
+      feedData &&
+      feedData.length > 0 &&
       flashListRef.current &&
       prevFeedItemsRef.current !== undefined &&
-      prevFeedItemsRef.current !== feedItems
+      prevFeedItemsRef.current !== feedData &&
+      !likeMutation.isPending && // Prevent scroll during like mutations
+      !saveMutation.isPending   // Prevent scroll during save mutations
     ) {
-      console.log('[FeedScreen] Feed items updated, scrolling to top.');
+      console.log('[FeedScreen] Feed items updated (not from mutation), scrolling to top.');
       flashListRef.current.scrollToIndex({ index: 0, animated: true });
     }
-    prevFeedItemsRef.current = feedItems;
-  }, [feedItems, isFeedScreenFocused]);
+    prevFeedItemsRef.current = feedData;
+  }, [feedData, isFeedScreenFocused, likeMutation.isPending, saveMutation.isPending]);
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: Array<ViewToken> }) => {
@@ -105,62 +108,6 @@ export default function FeedScreen() {
   }, [itemHeight]);
   
 
-  const queryClient = useQueryClient();
-
-  const likeMut = useMutation<void, Error, string, MutationContext>({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.rpc('like_recipe', { recipe_id: id });
-      if (error) throw error;
-    },
-    onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: ['feed'] });
-      const previousFeed = queryClient.getQueryData<FeedItem[]>(['feed']);
-      queryClient.setQueryData<FeedItem[]>(['feed'], (oldData) => {
-        if (!oldData) return [];
-        return oldData.map((item) =>
-          item.id === id
-            ? { ...item, liked: !item.liked, likes: item.liked ? (item.likes ?? 1) - 1 : (item.likes ?? 0) + 1 }
-            : item
-        );
-      });
-      return { previousFeed };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previousFeed) {
-        queryClient.setQueryData(['feed'], context.previousFeed);
-      }
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['feed'] });
-    },
-  });
-
-  const saveMut = useMutation<void, Error, string, MutationContext>({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.rpc('save_recipe', { recipe_id: id });
-      if (error) throw error;
-    },
-    onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: ['feed'] });
-      const previousFeed = queryClient.getQueryData<FeedItem[]>(['feed']);
-      queryClient.setQueryData<FeedItem[]>(['feed'], (oldData) => {
-        if (!oldData) return [];
-        return oldData.map((item) =>
-          item.id === id ? { ...item, saved: !item.saved } : item
-        );
-      });
-      return { previousFeed };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previousFeed) {
-        queryClient.setQueryData(['feed'], context.previousFeed);
-      }
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['feed'] });
-    },
-  });
-
   return (
     <SafeAreaView style={styles.safeAreaOuter} edges={['left', 'right']}>
       <StatusBar 
@@ -191,8 +138,8 @@ export default function FeedScreen() {
                 <RecipeCard
                   item={{
                     ...item,
-                    onLike: () => likeMut.mutate(item.id),
-                    onSave: () => saveMut.mutate(item.id),
+                    onLike: () => likeMutation.mutate(item.id),
+                    onSave: () => saveMutation.mutate(item.id),
                   }}
                   isActive={index === currentIndex}
                   containerHeight={itemHeight}

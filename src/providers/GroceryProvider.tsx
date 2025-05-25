@@ -1,6 +1,7 @@
 import React, { createContext, useState, useCallback, useEffect, useContext, ReactNode } from 'react';
 import { supabase } from '../services/supabase'; // Adjusted path
 import { PostgrestError } from '@supabase/supabase-js';
+import { useQueryClient } from '@tanstack/react-query';
 
 // --- Interfaces (copied from original useGroceryManager) ---
 export interface GroceryItem {
@@ -70,6 +71,7 @@ export const GroceryProvider: React.FC<GroceryProviderProps> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -147,6 +149,11 @@ export const GroceryProvider: React.FC<GroceryProviderProps> = ({ children }) =>
         throw upsertError;
       }
       await fetchGroceryList(uid);
+      
+      // Invalidate activity feed to show the grocery addition
+      if (uid) {
+        queryClient.invalidateQueries({ queryKey: ['userActivityFeed', uid] });
+      }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred while adding item.");
       throw err;

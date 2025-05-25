@@ -7,6 +7,7 @@ import PantryScanningScreen from '../screens/pantry/PantryScanningScreen'; // Un
 import EditProfileScreen from '../screens/EditProfileScreen'; // Uncommented
 import VideoRecipeUploaderScreen from '../screens/recipe/VideoRecipeUploaderScreen';
 import EditRecipeScreen from '../screens/recipe/EditRecipeScreen'; // Import EditRecipeScreen
+import UpgradeScreen from '../screens/UpgradeScreen'; // Import UpgradeScreen
 import { MainStackParamList } from './types';
 
 // Import Onboarding Screens
@@ -42,7 +43,11 @@ const MainStack: React.FC<MainStackProps> = ({ userOnboarded }) => {
       <Stack.Screen 
         name="PantryScan" 
         component={PantryScanningScreen} 
-        options={{ presentation: 'modal' }} 
+        options={{ 
+          presentation: 'fullScreenModal',
+          headerShown: false,
+          gestureEnabled: false, // Disable swipe to dismiss
+        }} 
       />
       <Stack.Screen 
         name="EditProfile" // Changed from EditProfileScreen to EditProfile for brevity
@@ -67,6 +72,14 @@ const MainStack: React.FC<MainStackProps> = ({ userOnboarded }) => {
         options={{ 
           headerShown: true, 
           title: 'Edit Recipe' // Default title, screen will override
+        }} 
+      />
+      <Stack.Screen 
+        name="UpgradeScreen" 
+        component={UpgradeScreen} 
+        options={{ 
+          headerShown: false, // UpgradeScreen has its own header
+          presentation: 'modal', // Present as modal for better UX
         }} 
       />
       {/* Add other stack screens like Settings here */}

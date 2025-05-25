@@ -50,7 +50,8 @@ export const formatDetailedTimestamp = (timestamp: string | undefined): string =
 };
 
 /**
- * Gets a short relative time string (e.g., "2h", "3d", "1w")
+ * Gets a short relative time string optimized for pantry/grocery items
+ * Best practice: relative time for recent, absolute for older
  */
 export const getShortRelativeTime = (timestamp: string | undefined): string => {
   if (!timestamp) return '';
@@ -60,27 +61,35 @@ export const getShortRelativeTime = (timestamp: string | undefined): string => {
     const now = new Date();
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
     
-    if (diffInMinutes < 60) {
-      return diffInMinutes < 1 ? 'now' : `${diffInMinutes}m`;
+    // Less than 1 minute: "now"
+    if (diffInMinutes < 1) {
+      return 'now';
     }
     
+    // 1-59 minutes: "5m ago"
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes}m ago`;
+    }
+    
+    // 1-23 hours: "3h ago"
     const diffInHours = Math.floor(diffInMinutes / 60);
     if (diffInHours < 24) {
-      return `${diffInHours}h`;
+      return `${diffInHours}h ago`;
     }
     
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 7) {
-      return `${diffInDays}d`;
+    // 24+ hours: switch to absolute time for clarity
+    // If yesterday, show "Yesterday"
+    if (isYesterday(date)) {
+      return 'Yesterday';
     }
     
-    const diffInWeeks = Math.floor(diffInDays / 7);
-    if (diffInWeeks < 4) {
-      return `${diffInWeeks}w`;
+    // If this year, show "Dec 15"
+    if (date.getFullYear() === now.getFullYear()) {
+      return format(date, 'MMM d');
     }
     
-    const diffInMonths = Math.floor(diffInDays / 30);
-    return `${diffInMonths}mo`;
+    // If older, show "Dec 15, 2023"
+    return format(date, 'MMM d, yyyy');
   } catch (error) {
     console.error('Error getting short relative time:', error);
     return '';
