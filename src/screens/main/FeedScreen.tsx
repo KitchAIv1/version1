@@ -9,9 +9,13 @@ import { FeedItem } from '../../hooks/useFeed';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../providers/AuthProvider';
 import { useIsFocused } from '@react-navigation/native';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCacheManager } from '../../hooks/useCacheManager';
 
 export default function FeedScreen() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const cacheManager = useCacheManager();
   const {
     data: feedData,
     isLoading,
@@ -38,8 +42,70 @@ export default function FeedScreen() {
     console.log('FeedScreen Insets:', JSON.stringify(insets), 'WindowHeight:', windowDims.height, 'WindowWidth:', windowDims.width);
   }, [insets, windowDims]);
 
+  // Automatic comment count refresh when screen is focused and feed data is available
+  useEffect(() => {
+    if (isFeedScreenFocused && feedData && feedData.length > 0 && user?.id) {
+      console.log('[FeedScreen] Screen focused, refreshing comment counts for all feed items');
+      
+      // Refresh comment counts for ALL feed items, not just first 5
+      feedData.forEach((item: FeedItem, index: number) => {
+        // Add a small delay between requests to avoid overwhelming the server
+        setTimeout(() => {
+          cacheManager.updateCommentCount(item.id, user.id);
+        }, index * 50); // Reduced delay to 50ms for faster refresh
+      });
+    }
+  }, [isFeedScreenFocused, feedData, user?.id, cacheManager]);
+
+  // Additional refresh when user scrolls to new items
+  useEffect(() => {
+    if (feedData && feedData.length > 0 && user?.id && currentIndex >= 0) {
+      const currentItem = feedData[currentIndex];
+      if (currentItem) {
+        // Refresh comment count for currently visible item and next few items
+        const itemsToRefresh = feedData.slice(currentIndex, currentIndex + 3);
+        itemsToRefresh.forEach((item: FeedItem, relativeIndex: number) => {
+          setTimeout(() => {
+            cacheManager.updateCommentCount(item.id, user.id);
+          }, relativeIndex * 100);
+        });
+      }
+    }
+  }, [currentIndex, feedData, user?.id, cacheManager]);
+
+  // Reset comment refresh tracking when feed data changes (removed the blocking mechanism)
+  useEffect(() => {
+    if (feedData) {
+      // Don't block refreshes anymore - allow multiple refreshes for accuracy
+      console.log('[FeedScreen] Feed data updated, comment counts will be refreshed');
+    }
+  }, [feedData]);
+
+  // Periodic refresh of comment counts for currently visible items
+  useEffect(() => {
+    if (!isFeedScreenFocused || !feedData || !user?.id) return;
+
+    const refreshInterval = setInterval(() => {
+      // Refresh comment counts for currently visible item and nearby items
+      const startIndex = Math.max(0, currentIndex - 1);
+      const endIndex = Math.min(feedData.length, currentIndex + 2);
+      const visibleItems = feedData.slice(startIndex, endIndex);
+      
+      console.log(`[FeedScreen] Periodic refresh of comment counts for ${visibleItems.length} visible items`);
+      
+      visibleItems.forEach((item: FeedItem, index: number) => {
+        setTimeout(() => {
+          cacheManager.updateCommentCount(item.id, user.id);
+        }, index * 200); // Stagger the requests
+      });
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(refreshInterval);
+  }, [isFeedScreenFocused, currentIndex, feedData, user?.id, cacheManager]);
+
   useEffect(() => {
     // Don't auto-scroll if any mutation is in progress (cache update from mutation)
+    // Also don't scroll if user is actively viewing content (not at the top)
     if (
       isFeedScreenFocused &&
       feedData &&
@@ -48,13 +114,14 @@ export default function FeedScreen() {
       prevFeedItemsRef.current !== undefined &&
       prevFeedItemsRef.current !== feedData &&
       !likeMutation.isPending && // Prevent scroll during like mutations
-      !saveMutation.isPending   // Prevent scroll during save mutations
+      !saveMutation.isPending && // Prevent scroll during save mutations
+      currentIndex === 0 // Only scroll if user is already at the top
     ) {
       console.log('[FeedScreen] Feed items updated (not from mutation), scrolling to top.');
       flashListRef.current.scrollToIndex({ index: 0, animated: true });
     }
     prevFeedItemsRef.current = feedData;
-  }, [feedData, isFeedScreenFocused, likeMutation.isPending, saveMutation.isPending]);
+  }, [feedData, isFeedScreenFocused, likeMutation.isPending, saveMutation.isPending, currentIndex]);
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: Array<ViewToken> }) => {
@@ -112,7 +179,6 @@ export default function FeedScreen() {
         console.log(`FeedScreen: itemHeight set from layout: ${itemHeight}`);
     }
   }, [itemHeight]);
-  
 
   return (
     <SafeAreaView style={styles.safeAreaOuter} edges={['left', 'right']}>

@@ -35,8 +35,18 @@ export default function IngredientsTab() {
     return () => clearTimeout(timer);
   }, []);
 
-  const matchedSet = useMemo(() => new Set((recipeDetails?.matched_ingredients || []).map(name => name.trim().toLowerCase())), [recipeDetails]);
-  const missingSet = useMemo(() => new Set((recipeDetails?.missing_ingredient_names || []).map(name => name.trim().toLowerCase())), [recipeDetails]);
+  const matchedSet = useMemo(() => new Set((recipeDetails?.matched_ingredients || []).filter(name => name && typeof name === 'string').map(name => name.trim().toLowerCase())), [recipeDetails]);
+  const missingSet = useMemo(() => new Set((recipeDetails?.missing_ingredient_names || [])
+    .filter((item: any) => item && (typeof item === 'string' || (typeof item === 'object' && item.name)))
+    .map((item: any) => {
+      if (typeof item === 'string') {
+        return item.trim().toLowerCase();
+      } else if (typeof item === 'object' && item.name) {
+        return item.name.trim().toLowerCase();
+      }
+      return '';
+    })
+    .filter(name => name)), [recipeDetails]);
 
   const ingredients = useMemo(() => {
     if (!recipeDetails?.ingredients) return [];
@@ -62,6 +72,17 @@ export default function IngredientsTab() {
   };
 
   console.log(`IngredientsTab rendering with groceryList length: ${groceryList.length}`);
+  
+  // Debug the pantry match data structure
+  if (recipeDetails) {
+    console.log('[IngredientsTab] Pantry match debug:', {
+      matched_ingredients: recipeDetails.matched_ingredients,
+      missing_ingredient_names: recipeDetails.missing_ingredient_names,
+      missing_ingredients: recipeDetails.missing_ingredients,
+      pantry_match: recipeDetails.pantry_match,
+      ingredients_count: recipeDetails.ingredients?.length || 0
+    });
+  }
 
   if (isLoading) {
     return <View style={styles.centered}><ActivityIndicator size="large" /></View>;
@@ -88,7 +109,7 @@ export default function IngredientsTab() {
       {ingredients.length > 0 ? (
         <View style={styles.ingredientsContainer}>
           {ingredients.map((ing, index) => {
-            const ingName = ing.name?.trim().toLowerCase();
+            const ingName = ing.name?.trim()?.toLowerCase() || '';
             const matched = matchedSet.has(ingName);
             const missing = missingSet.has(ingName);
             
