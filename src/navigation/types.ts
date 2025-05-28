@@ -17,7 +17,7 @@ export type MainTabsParamList = {
   Discover: undefined;
   Pantry: undefined;
   Create: undefined;
-  Profile: undefined;
+  Profile: { userId?: string }; // Added userId parameter for viewing other users' profiles
   GroceryList: undefined;
   // SearchResults removed from here, moved to MainStack
 };
@@ -44,6 +44,41 @@ export type EditRecipeParams = {
   recipeId: string;
 };
 
+// Types for "What Can I Cook?" feature screens
+export type IngredientSelectionParams = {
+  pantryItems: Array<{
+    id: string;
+    item_name: string;
+    quantity: number;
+    unit: string;
+  }>;
+  preSelectedItems?: string[];
+};
+
+export type RecipeResultsParams = {
+  selectedIngredients: string[];
+  databaseMatches?: Array<{
+    recipe_id: string;
+    recipe_title: string;
+    match_percentage: number;
+    missing_ingredients: string[];
+    thumbnail_url?: string;
+  }>;
+};
+
+export type AIRecipeGenerationParams = {
+  selectedIngredients: string[];
+  recipeData?: {
+    recipe_name: string;
+    ingredients: string[];
+    preparation_steps: string[];
+    prep_time_minutes: number;
+    cook_time_minutes: number;
+    servings: number;
+    difficulty: string;
+  };
+};
+
 // For the main application stack (after login)
 export type MainStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabsParamList>;
@@ -59,6 +94,10 @@ export type MainStackParamList = {
   OnboardingStep2Creator: undefined; // Added Onboarding Step 2 Creator
   OnboardingFinal: undefined; // Added Onboarding Final Step
   UpgradeScreen: undefined; // Added UpgradeScreen for PREMIUM upgrades
+  // "What Can I Cook?" feature screens
+  IngredientSelection: IngredientSelectionParams;
+  RecipeResults: RecipeResultsParams;
+  AIRecipeGeneration: AIRecipeGenerationParams;
   // Add other stack screens here if needed (e.g., Settings)
 };
 

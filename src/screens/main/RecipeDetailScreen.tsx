@@ -527,6 +527,19 @@ export default function RecipeDetailScreen() {
     setIsCommentsModalVisible(false);
   };
 
+  // Handle navigation to author's profile
+  const handleNavigateToAuthorProfile = () => {
+    if (recipeDetails?.user_id) {
+      console.log(`[RecipeDetailScreen] Navigating to profile for user: ${recipeDetails.user_id}`);
+      navigation.navigate('MainTabs', { 
+        screen: 'Profile', 
+        params: { userId: recipeDetails.user_id } 
+      });
+    } else {
+      console.warn('[RecipeDetailScreen] No user_id available for profile navigation');
+    }
+  };
+
   // --- Render Logic ---
   if (isLoading) {
     return (
@@ -657,7 +670,7 @@ export default function RecipeDetailScreen() {
 
           {/* Author Info Row */}
           {recipeDetails?.username && (
-            <View style={styles.authorInfoRow}>
+            <TouchableOpacity style={styles.authorInfoRow} onPress={handleNavigateToAuthorProfile}>
               {recipeDetails.avatar_url ? (
                 <Image 
                   source={{ uri: recipeDetails.avatar_url }} 
@@ -671,7 +684,7 @@ export default function RecipeDetailScreen() {
               <Text style={styles.authorNameText}>
                 {recipeDetails.username || 'Unknown Author'}
               </Text>
-            </View>
+            </TouchableOpacity>
           )}
 
           {/* Pantry Badge Row */}

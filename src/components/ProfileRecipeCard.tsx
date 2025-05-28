@@ -18,7 +18,7 @@ interface ProfileRecipeCardProps {
     creator_user_id: string; // Ensured creator_user_id is part of the item prop
   };
   onPress?: () => void;
-  context: 'myRecipes' | 'savedRecipes'; // Added context prop
+  context: 'myRecipes' | 'savedRecipes' | 'otherUserRecipes'; // Added otherUserRecipes context
 }
 
 const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/150/D3D3D3/808080?text=No+Image';
@@ -191,9 +191,11 @@ const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = React.memo(({ item, 
             onError={(e) => console.error(`[ProfileRecipeCard] Image load error for ${item.recipe_name}:`, e.nativeEvent.error)}
           />
           {/* Optional overlay gradient could go here */}
-          <TouchableOpacity onPress={handleMenuPress} style={styles.menuButton}>
-            <Feather name="more-vertical" size={22} color={COLORS.white || '#fff'} />
-          </TouchableOpacity>
+          {context !== 'otherUserRecipes' && (
+            <TouchableOpacity onPress={handleMenuPress} style={styles.menuButton}>
+              <Feather name="more-vertical" size={22} color={COLORS.white || '#fff'} />
+            </TouchableOpacity>
+          )}
         </View>
         
         <View style={styles.infoContainer}>

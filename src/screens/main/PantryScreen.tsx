@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -25,114 +25,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { getShortRelativeTime } from '../../utils/dateUtils';
 import ManualAddSheet from '../../components/ManualAddSheet';
+import { useQueryClient } from '@tanstack/react-query';
+
+// Import optimized hooks and components
+import { usePantryData, useRefreshPantryData, usePantryMutations, PantryItem } from '../../hooks/usePantryData';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { PantryItemComponent } from '../../components/PantryItemComponent';
+
+// Import "What Can I Cook?" components
+import WhatCanICookButton from '../../components/WhatCanICookButton';
+import InsufficientItemsModal from '../../components/modals/InsufficientItemsModal';
+import { useWhatCanICook } from '../../hooks/useWhatCanICook';
 
 // Navigation type
 type PantryNavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
 // Constants
 const ACTIVE_COLOR = '#10b981'; // Same as ProfileScreen and GroceryListScreen
-
-// --- Item Icon Mapping (same as grocery list) ---
-const itemIconMap: { [key: string]: string } = {
-  // Fruits
-  apple: 'nutrition-outline',
-  banana: 'nutrition-outline',
-  orange: 'nutrition-outline',
-  strawberry: 'nutrition-outline',
-  grapes: 'nutrition-outline',
-  blueberry: 'nutrition-outline',
-  raspberry: 'nutrition-outline',
-  avocado: 'leaf-outline',
-
-  // Vegetables
-  tomato: 'leaf-outline',
-  potato: 'leaf-outline',
-  onion: 'leaf-outline',
-  lettuce: 'leaf-outline',
-  carrot: 'leaf-outline',
-  broccoli: 'leaf-outline',
-  cucumber: 'leaf-outline',
-  bellpepper: 'leaf-outline',
-  garlic: 'leaf-outline',
-  spinach: 'leaf-outline',
-
-  // Dairy & Alternatives
-  milk: 'pint-outline',
-  cheese: 'cube-outline',
-  cheddar: 'cube-outline',
-  mozzarella: 'ellipse-outline',
-  yogurt: 'ice-cream-outline',
-  butter: 'layers-outline',
-  "almond milk": 'pint-outline',
-  "soy milk": 'pint-outline',
-  
-  // Bakery
-  bread: 'restaurant-outline',
-  "white bread": 'restaurant-outline',
-  "whole wheat bread": 'restaurant-outline',
-  bagel: 'ellipse-outline',
-  croissant: 'restaurant-outline',
-
-  // Proteins
-  eggs: 'egg-outline',
-  chicken: 'logo-twitter',
-  "chicken breast": 'logo-twitter',
-  beef: 'restaurant-outline',
-  steak: 'restaurant-outline',
-  pork: 'restaurant-outline',
-  bacon: 'remove-outline',
-  fish: 'fish-outline',
-  salmon: 'fish-outline',
-  shrimp: 'fish-outline',
-  tofu: 'square-outline',
-
-  // Pantry Staples
-  pasta: 'restaurant-outline',
-  rice: 'ellipse-outline',
-  flour: 'folder-outline',
-  sugar: 'cube-outline',
-  salt: 'cube-outline',
-  pepper: 'ellipse-outline',
-  "olive oil": 'water-outline',
-  vinegar: 'water-outline',
-  cereal: 'apps-outline',
-  oats: 'apps-outline',
-  coffee: 'cafe-outline',
-  tea: 'cafe-outline',
-  
-  // Drinks
-  juice: 'water-outline',
-  "apple juice": 'water-outline',
-  "orange juice": 'water-outline',
-  soda: 'beer-outline',
-  water: 'water-outline',
-
-  // Default
-  default: 'cube-outline',
-};
-
-const getIconForItem = (itemName: string): string => {
-  const lowerItemName = itemName.toLowerCase();
-  const sortedKeys = Object.keys(itemIconMap).sort((a, b) => b.length - a.length);
-  for (const key of sortedKeys) {
-    if (lowerItemName.includes(key)) {
-      return itemIconMap[key];
-    }
-  }
-  return itemIconMap['default'];
-};
-
-// Types
-interface PantryItem {
-  id: string;
-  user_id: string;
-  item_name: string;
-  quantity: number;
-  unit: string;
-  description?: string;
-  created_at: string;
-  updated_at?: string;
-}
 
 interface UnitOption {
   label: string;
@@ -142,6 +51,7 @@ interface UnitOption {
 export default function PantryScreen() {
   const navigation = useNavigation<PantryNavigationProp>();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { 
     performPantryScan, 
     canPerformScan, 
@@ -150,13 +60,36 @@ export default function PantryScreen() {
     FREEMIUM_SCAN_LIMIT 
   } = useAccessControl();
   
+  // Use optimized React Query hook for data fetching
+  const { 
+    data: pantryItems = [], 
+    isLoading, 
+    error: fetchError, 
+    refetch 
+  } = usePantryData(user?.id);
+  
+  // Use optimized hooks for cache management
+  const refreshPantryData = useRefreshPantryData();
+  const { invalidatePantryCache } = usePantryMutations(user?.id);
+  
   // State
-  const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
-  const [filteredItems, setFilteredItems] = useState<PantryItem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Debounced search for better performance
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
+  
+  // Memoized filtered items for better performance
+  const filteredItems = useMemo(() => {
+    if (!debouncedSearchQuery.trim()) {
+      return pantryItems;
+    }
+    
+    const lowerQuery = debouncedSearchQuery.toLowerCase();
+    return pantryItems.filter(item =>
+      item.item_name.toLowerCase().includes(lowerQuery)
+    );
+  }, [debouncedSearchQuery, pantryItems]);
   
   // Manual Add Sheet state
   const [isManualAddSheetVisible, setIsManualAddSheetVisible] = useState(false);
@@ -169,8 +102,8 @@ export default function PantryScreen() {
   const scanButtonScale = useRef(new Animated.Value(1)).current;
   const addButtonScale = useRef(new Animated.Value(1)).current;
 
-  // Get usage data for display
-  const usageData = getUsageDisplay();
+  // Memoize usage data to prevent unnecessary recalculations
+  const usageData = useMemo(() => getUsageDisplay(), [getUsageDisplay]);
 
   // Unit options
   const unitOptions: UnitOption[] = [
@@ -184,58 +117,23 @@ export default function PantryScreen() {
     { label: 'Pounds', value: 'lbs' }
   ];
 
-  // Fetch pantry data
+  // Legacy fetch function for backward compatibility (now uses React Query internally)
   const fetchPantryData = useCallback(async () => {
-    if (!user?.id) return;
-    
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('stock')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      
-      if (fetchError) throw fetchError;
-      
-      const items = data || [];
-      setPantryItems(items);
-      setFilteredItems(items);
-    } catch (err: any) {
-      console.error('[PantryScreen] Error fetching pantry data:', err);
-      setError(err.message || 'Failed to load pantry data');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user?.id]);
+    // This now triggers React Query refetch
+    await refetch();
+  }, [refetch]);
 
-  // Filter items based on search query
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredItems(pantryItems);
-    } else {
-      const filtered = pantryItems.filter(item =>
-        item.item_name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredItems(filtered);
-    }
-  }, [searchQuery, pantryItems]);
-
-  // Fetch data on screen focus
-  useFocusEffect(
-    useCallback(() => {
-      fetchPantryData();
-    }, [fetchPantryData])
-  );
-
-  // Refresh handler
+  // Refresh handler - now uses React Query
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchPantryData();
-    setRefreshing(false);
-  }, [fetchPantryData]);
+    try {
+      await refetch();
+    } catch (error) {
+      console.error('[PantryScreen] Refresh error:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
   // Animation helper
   const animateButtonPress = (animatedValue: Animated.Value, toValue: number) => {
@@ -264,12 +162,13 @@ export default function PantryScreen() {
     setIsManualAddSheetVisible(true);
   };
 
-  const handleEditItem = (item: PantryItem) => {
+  // Memoized event handlers for better performance
+  const handleEditItem = useCallback((item: PantryItem) => {
     setEditingItem(item);
     setIsManualAddSheetVisible(true);
-  };
+  }, []);
 
-  const handleDeleteItem = (item: PantryItem) => {
+  const handleDeleteItem = useCallback((item: PantryItem) => {
     Alert.alert(
       'Delete Item',
       `Are you sure you want to remove "${item.item_name}" from your pantry?`,
@@ -286,7 +185,9 @@ export default function PantryScreen() {
                 .eq('id', item.id);
               
               if (error) throw error;
-              await fetchPantryData();
+              
+              // Invalidate cache to refresh data
+              invalidatePantryCache();
             } catch (err: any) {
               Alert.alert('Error', 'Failed to delete item');
             }
@@ -294,7 +195,7 @@ export default function PantryScreen() {
         }
       ]
     );
-  };
+  }, [invalidatePantryCache]);
 
   // Handle manual add sheet submission
   const handleSaveItemFromSheet = async (submittedItem: any) => {
@@ -304,6 +205,8 @@ export default function PantryScreen() {
     }
 
     try {
+      let result;
+      
       if (submittedItem.original_item_name) {
         // Edit mode
         const { error: updateError } = await supabase
@@ -318,6 +221,7 @@ export default function PantryScreen() {
           .eq('item_name', submittedItem.original_item_name);
         
         if (updateError) throw updateError;
+        result = 'updated';
       } else {
         // Add mode
         const { error: insertError } = await supabase
@@ -331,11 +235,32 @@ export default function PantryScreen() {
           });
         
         if (insertError) throw insertError;
+        result = 'added';
       }
 
+      // Close the sheet first for immediate feedback
       setIsManualAddSheetVisible(false);
       setEditingItem(null);
-      await fetchPantryData();
+      
+      // Immediately invalidate and refetch pantry data
+      invalidatePantryCache();
+      await refetch();
+      
+      // Also invalidate feed cache to refresh recipe matches
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      
+      // CRITICAL: Invalidate recipe details and pantry match caches
+      // This ensures ingredients tabs update immediately
+      queryClient.invalidateQueries({ queryKey: ['recipeDetails'] });
+      queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
+      
+      // Show success feedback
+      Alert.alert(
+        'Success!', 
+        `Item ${result} successfully. ${result === 'added' ? 'Checking for recipe matches...' : ''}`,
+        [{ text: 'OK', style: 'default' }]
+      );
+      
     } catch (err: any) {
       console.error('Error saving item:', err);
       Alert.alert('Error', `Failed to save item: ${err.message}`);
@@ -382,110 +307,112 @@ export default function PantryScreen() {
         </View>
       </View>
 
-      {/* Action Buttons Section */}
+      {/* Action Buttons Section - Award-Winning Design */}
       <View style={styles.actionButtonsSection}>
-        <Pressable
-          style={[styles.actionButton, styles.scanButton, (isProcessing || !canPerformScan()) && styles.disabledButton]}
-          onPress={handleScanPress}
-          onPressIn={() => !(isProcessing) && animateButtonPress(scanButtonScale, 0.95)}
-          onPressOut={() => !(isProcessing) && animateButtonPress(scanButtonScale, 1)}
-          disabled={isProcessing}
-        >
-          <Animated.View style={[styles.buttonContent, { transform: [{ scale: scanButtonScale }] }]}>
-            {(isProcessing) ? (
-              <ActivityIndicator size={20} color={ACTIVE_COLOR} />
-            ) : (
-              <Ionicons name="camera-outline" size={20} color={canPerformScan() ? ACTIVE_COLOR : '#9ca3af'} />
-            )}
-            <View style={styles.scanButtonTextContainer}>
-              <Text style={[styles.actionButtonText, styles.scanButtonText, !canPerformScan() && styles.disabledButtonText]}>
-                {(isProcessing) ? 'Processing...' : 'Scan Pantry'}
-              </Text>
-              {/* Scan Counter Badge */}
-              {usageData.showUsage && (
-                <View style={[styles.scanCounterBadge, !canPerformScan() && styles.scanCounterBadgeWarning]}>
-                  <Text style={[styles.scanCounterText, !canPerformScan() && styles.scanCounterTextWarning]}>
-                    {(() => {
-                      const [used, total] = usageData.scanUsage.split('/').map(Number);
-                      const remaining = total - used;
-                      return `${remaining} left`;
-                    })()}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </Animated.View>
-        </Pressable>
+        {/* Primary Action - What Can I Cook? (Hero Button) */}
+        <View style={styles.heroButtonContainer}>
+          <WhatCanICookButton
+            pantryItemCount={pantryItemCount}
+            onPress={handleWhatCanICookPress}
+            style={styles.heroButton}
+            variant="primary"
+          />
+        </View>
 
-        <Pressable
-          style={[styles.actionButton, styles.manualButton]}
-          onPress={handleManualAddPress}
-          onPressIn={() => animateButtonPress(addButtonScale, 0.95)}
-          onPressOut={() => animateButtonPress(addButtonScale, 1)}
-        >
-          <Animated.View style={[styles.buttonContent, { transform: [{ scale: addButtonScale }] }]}>
-            <Ionicons name="add-circle-outline" size={20} color="#fff" />
-            <Text style={[styles.actionButtonText, styles.manualButtonText]}>Add Manually</Text>
-          </Animated.View>
-        </Pressable>
+        {/* Secondary Actions - Scan & Add (Side by Side) */}
+        <View style={styles.secondaryActionsContainer}>
+          <Pressable
+            style={[
+              styles.secondaryActionButton, 
+              styles.scanButton, 
+              (isProcessing || !canPerformScan()) && styles.disabledButton
+            ]}
+            onPress={handleScanPress}
+            onPressIn={() => !(isProcessing) && animateButtonPress(scanButtonScale, 0.95)}
+            onPressOut={() => !(isProcessing) && animateButtonPress(scanButtonScale, 1)}
+            disabled={isProcessing}
+          >
+            <Animated.View style={[styles.secondaryButtonContent, { transform: [{ scale: scanButtonScale }] }]}>
+              <View style={styles.secondaryButtonIconContainer}>
+                {(isProcessing) ? (
+                  <ActivityIndicator size={24} color={ACTIVE_COLOR} />
+                ) : (
+                  <Ionicons 
+                    name="camera" 
+                    size={24} 
+                    color={canPerformScan() ? ACTIVE_COLOR : '#9ca3af'} 
+                  />
+                )}
+              </View>
+              <View style={styles.secondaryButtonTextContainer}>
+                <Text style={[
+                  styles.secondaryButtonTitle, 
+                  !canPerformScan() && styles.disabledButtonText
+                ]}>
+                  {(isProcessing) ? 'Processing...' : 'Scan'}
+                </Text>
+                <Text style={[
+                  styles.secondaryButtonSubtitle, 
+                  !canPerformScan() && styles.disabledButtonText
+                ]}>
+                  Use camera
+                </Text>
+                {/* Scan Counter Badge */}
+                {usageData.showUsage && (
+                  <View style={[
+                    styles.modernScanBadge, 
+                    !canPerformScan() && styles.modernScanBadgeWarning
+                  ]}>
+                    <Text style={[
+                      styles.modernScanBadgeText, 
+                      !canPerformScan() && styles.modernScanBadgeTextWarning
+                    ]}>
+                      {(() => {
+                        const [used, total] = usageData.scanUsage.split('/').map(Number);
+                        const remaining = total - used;
+                        return `${remaining} left`;
+                      })()}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </Animated.View>
+          </Pressable>
+
+          <Pressable
+            style={[styles.secondaryActionButton, styles.addButton]}
+            onPress={handleManualAddPress}
+            onPressIn={() => animateButtonPress(addButtonScale, 0.95)}
+            onPressOut={() => animateButtonPress(addButtonScale, 1)}
+          >
+            <Animated.View style={[styles.secondaryButtonContent, { transform: [{ scale: addButtonScale }] }]}>
+              <View style={[styles.secondaryButtonIconContainer, styles.addButtonIconContainer]}>
+                <Ionicons name="add-circle" size={24} color={ACTIVE_COLOR} />
+              </View>
+              <View style={styles.secondaryButtonTextContainer}>
+                <Text style={styles.secondaryButtonTitleWhite}>Add</Text>
+                <Text style={styles.secondaryButtonSubtitleWhite}>Manually</Text>
+              </View>
+            </Animated.View>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
 
-  // Render pantry item with grocery list format
-  const renderPantryItem = ({ item }: { item: PantryItem }) => {
-    const itemIconName = getIconForItem(item.item_name) as any; // Type assertion for Ionicons
-    
+  // Optimized render function using memoized component
+  const renderPantryItem = useCallback(({ item }: { item: PantryItem }) => {
     return (
-      <TouchableOpacity 
-        style={styles.itemContainer}
-        onPress={() => handleEditItem(item)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.itemIcon}>
-          <Ionicons name={itemIconName} size={24} color={ACTIVE_COLOR} />
-        </View>
-        <View style={styles.itemTextContainer}>
-          <Text style={styles.itemText} numberOfLines={1} ellipsizeMode="tail">
-            {item.item_name.charAt(0).toUpperCase() + item.item_name.slice(1)}
-          </Text>
-          <View style={styles.metaDataContainer}>
-            <Text style={styles.metaText}>
-              <Ionicons name="cube-outline" size={12} /> {item.quantity} {item.unit}
-            </Text>
-            {item.created_at && (
-              <Text style={styles.metaText}>
-                <Ionicons name="time-outline" size={12} /> {getShortRelativeTime(item.created_at)}
-              </Text>
-            )}
-          </View>
-          {item.description && (
-            <Text style={styles.itemDescription} numberOfLines={1}>
-              {item.description}
-            </Text>
-          )}
-        </View>
-        <TouchableOpacity
-          style={styles.itemActionButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            handleEditItem(item);
-          }}
-        >
-          <Ionicons name="create-outline" size={22} color="#757575" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.itemActionButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            handleDeleteItem(item);
-          }}
-        >
-          <Ionicons name="trash-outline" size={22} color="#ef4444" />
-        </TouchableOpacity>
-      </TouchableOpacity>
+      <PantryItemComponent 
+        item={item} 
+        onEdit={handleEditItem} 
+        onDelete={handleDeleteItem} 
+      />
     );
-  };
+  }, [handleEditItem, handleDeleteItem]);
+
+  // Memoized key extractor
+  const keyExtractor = useCallback((item: PantryItem) => item.id, []);
 
   // Empty state
   const renderEmptyState = () => (
@@ -498,6 +425,18 @@ export default function PantryScreen() {
     </View>
   );
 
+  // Convert error to string for display
+  const error = fetchError ? (fetchError as any).message || 'Failed to load pantry data' : null;
+
+  // "What Can I Cook?" feature hook
+  const {
+    pantryItemCount,
+    showInsufficientModal,
+    handleWhatCanICookPress,
+    handleCloseModal,
+    handleNavigateToPantry,
+  } = useWhatCanICook();
+
   return (
     <View style={styles.container}>
       {/* Fixed Green Header - covers status bar area and stays fixed */}
@@ -505,30 +444,29 @@ export default function PantryScreen() {
         <SafeAreaView edges={['top']} />
       </View>
       
-      {/* Main Content */}
+      {/* Main Content - Now using optimized FlatList instead of nested ScrollView */}
       <View style={styles.mainContent}>
-        {renderPantryHeader()}
-        
-        <ScrollView 
-          style={styles.scrollContainer}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[ACTIVE_COLOR]}/>}
-        >
-          {isLoading && pantryItems.length === 0 ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={ACTIVE_COLOR} />
-              <Text style={styles.loadingText}>Loading your pantry...</Text>
-            </View>
-          ) : error ? (
-            <View style={styles.errorContainer}>
-              <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
-              <Text style={styles.errorTitle}>Something went wrong</Text>
-              <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity style={styles.retryButton} onPress={fetchPantryData}>
-                <Text style={styles.retryButtonText}>Try Again</Text>
-              </TouchableOpacity>
-            </View>
-          ) : filteredItems.length === 0 ? (
-            searchQuery ? (
+        <FlatList
+          data={filteredItems}
+          renderItem={renderPantryItem}
+          keyExtractor={keyExtractor}
+          ListHeaderComponent={renderPantryHeader}
+          ListEmptyComponent={
+            isLoading && pantryItems.length === 0 ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={ACTIVE_COLOR} />
+                <Text style={styles.loadingText}>Loading your pantry...</Text>
+              </View>
+            ) : error ? (
+              <View style={styles.errorContainer}>
+                <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
+                <Text style={styles.errorTitle}>Something went wrong</Text>
+                <Text style={styles.errorText}>{error}</Text>
+                <TouchableOpacity style={styles.retryButton} onPress={fetchPantryData}>
+                  <Text style={styles.retryButtonText}>Try Again</Text>
+                </TouchableOpacity>
+              </View>
+            ) : searchQuery ? (
               <View style={styles.emptyStateContainer}>
                 <Ionicons name="search-outline" size={48} color="#cbd5e1" />
                 <Text style={styles.emptyStateTitle}>No items found</Text>
@@ -539,17 +477,22 @@ export default function PantryScreen() {
             ) : (
               renderEmptyState()
             )
-          ) : (
-            <FlatList
-              data={filteredItems}
-              renderItem={renderPantryItem}
-              keyExtractor={(item) => item.id}
-              style={styles.list}
-              scrollEnabled={false}
-              showsVerticalScrollIndicator={false}
+          }
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh} 
+              colors={[ACTIVE_COLOR]}
+              tintColor={ACTIVE_COLOR}
             />
-          )}
-        </ScrollView>
+          }
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          initialNumToRender={8}
+          contentContainerStyle={styles.listContentContainer}
+        />
       </View>
 
       {/* Manual Add/Edit Sheet */}
@@ -606,6 +549,14 @@ export default function PantryScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* "What Can I Cook?" Insufficient Items Modal */}
+      <InsufficientItemsModal
+        visible={showInsufficientModal}
+        onClose={handleCloseModal}
+        onNavigateToPantry={handleNavigateToPantry}
+        currentItemCount={pantryItemCount}
+      />
     </View>
   );
 }
@@ -707,49 +658,91 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   actionButtonsSection: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 20,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
+    gap: 16,
   },
-  actionButton: {
+  heroButtonContainer: {
+    width: '100%',
+  },
+  heroButton: {
+    backgroundColor: ACTIVE_COLOR,
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    shadowColor: ACTIVE_COLOR,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  secondaryActionsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  secondaryActionButton: {
     flex: 1,
-    borderRadius: 12,
-    paddingVertical: 12,
+    borderRadius: 16,
+    paddingVertical: 16,
     paddingHorizontal: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
   scanButton: {
-    backgroundColor: 'rgba(16, 185, 129, 0.08)',
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    backgroundColor: '#f8fafc',
+    borderWidth: 2,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
   },
-  manualButton: {
+  addButton: {
     backgroundColor: ACTIVE_COLOR,
-    marginLeft: 8,
   },
-  buttonContent: {
-    flexDirection: 'row',
+  secondaryButtonContent: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  secondaryButtonIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  actionButtonText: {
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: '600',
+  secondaryButtonTextContainer: {
+    alignItems: 'center',
   },
-  scanButtonText: {
-    color: ACTIVE_COLOR,
+  secondaryButtonTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1f2937',
+    textAlign: 'center',
   },
-  manualButtonText: {
+  secondaryButtonSubtitle: {
+    fontSize: 13,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  secondaryButtonTitleWhite: {
+    fontSize: 16,
+    fontWeight: '700',
     color: '#fff',
+    textAlign: 'center',
+  },
+  secondaryButtonSubtitleWhite: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    marginTop: 2,
   },
   disabledButton: {
     opacity: 0.5,
@@ -759,53 +752,6 @@ const styles = StyleSheet.create({
   },
   list: {
     flex: 1,
-    paddingHorizontal: 16,
-  },
-  itemContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginVertical: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-    borderWidth: 1,
-    borderColor: '#f3f4f6',
-  },
-  itemIcon: {
-    marginRight: 12,
-  },
-  itemTextContainer: {
-    flex: 1,
-  },
-  itemText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 4,
-  },
-  metaDataContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  metaText: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginRight: 4,
-  },
-  itemDescription: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 4,
-  },
-  itemActionButton: {
-    padding: 8,
-    marginLeft: 8,
   },
   loadingContainer: {
     flex: 1,
@@ -870,28 +816,6 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     textAlign: 'center',
     lineHeight: 20,
-  },
-  scanButtonTextContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  scanCounterBadge: {
-    backgroundColor: ACTIVE_COLOR,
-    borderRadius: 12,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    marginLeft: 8,
-  },
-  scanCounterBadgeWarning: {
-    backgroundColor: '#ef4444',
-  },
-  scanCounterText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  scanCounterTextWarning: {
-    color: '#fff',
   },
   modalOverlay: {
     flex: 1,
@@ -980,5 +904,45 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     marginLeft: 8,
+  },
+  listContentContainer: {
+    paddingHorizontal: 16,
+  },
+  whatCanICookContainer: {
+    flex: 1,
+    marginRight: 8,
+  },
+  whatCanICookButton: {
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  modernScanBadge: {
+    backgroundColor: ACTIVE_COLOR,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginTop: 4,
+    alignSelf: 'center',
+  },
+  modernScanBadgeWarning: {
+    backgroundColor: '#ef4444',
+  },
+  modernScanBadgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  modernScanBadgeTextWarning: {
+    color: '#fff',
+  },
+  addButtonIconContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
   },
 }); 

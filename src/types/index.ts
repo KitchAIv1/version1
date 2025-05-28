@@ -1,8 +1,10 @@
 // src/types/index.ts
 export interface RecipeItem {
+  id: string;                 // Unique identifier for the recipe
   recipe_id: string;          // From your log data
   title: string;              // From your log data
   video_url?: string;         // From your log data (main video/image)
+  video?: string;             // Alternative video property for compatibility
   thumbnail_url?: string;     // From your log data (specific thumbnail)
   created_at?: string;        // From your log data
   
@@ -15,6 +17,7 @@ export interface RecipeItem {
   saves?: number;
   userName?: string;
   creatorAvatarUrl?: string | null;
+  creator_user_id?: string;   // Added for navigation to user profiles
   
   // comments?: any;
   commentsCount?: number;

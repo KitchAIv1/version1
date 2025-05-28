@@ -6,7 +6,7 @@ import { useAuth } from '../../providers/AuthProvider';
 import { parseIngredients, Ingredient } from '../../utils/parseIngredients';
 import IngredientRow from '../../components/IngredientRow';
 import { supabase } from '../../services/supabase';
-import { useNavigation, RouteProp, useRoute } from '@react-navigation/native';
+import { useNavigation, RouteProp, useRoute, useFocusEffect } from '@react-navigation/native';
 import { MainStackParamList } from '../../navigation/types';
 import { Feather } from '@expo/vector-icons';
 import { useGroceryManager, GroceryItemInput, GroceryItem } from '../../hooks/useGroceryManager';
@@ -21,12 +21,56 @@ export default function IngredientsTab() {
   const queryClient = useQueryClient();
   const { data: recipeDetails, isLoading, error } = useRecipeDetails(recipeId, user?.id);
   const [forceRenderKey, setForceRenderKey] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const {
     addGroceryItem,
     groceryList,
     fetchGroceryList
   } = useGroceryManager();
+
+  // Focus-based refresh - refresh data when tab becomes focused
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[IngredientsTab] Tab focused, checking for data refresh...');
+      
+      // Invalidate recipe details to get fresh pantry match data
+      queryClient.invalidateQueries({ 
+        queryKey: ['recipeDetails', recipeId, user?.id] 
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ['pantryMatch', recipeId, user?.id] 
+      });
+      
+      // Force re-render to ensure UI updates
+      setForceRenderKey(prev => prev + 1);
+    }, [recipeId, user?.id, queryClient])
+  );
+
+  // Manual refresh function
+  const handleRefresh = useCallback(async () => {
+    if (!recipeId || !user?.id) return;
+    
+    setIsRefreshing(true);
+    try {
+      // Invalidate all relevant caches
+      await queryClient.invalidateQueries({ 
+        queryKey: ['recipeDetails', recipeId, user.id] 
+      });
+      await queryClient.invalidateQueries({ 
+        queryKey: ['pantryMatch', recipeId, user.id] 
+      });
+      await queryClient.invalidateQueries({ 
+        queryKey: ['pantryData', user.id] 
+      });
+      
+      console.log('[IngredientsTab] Manual refresh completed');
+    } catch (error) {
+      console.error('[IngredientsTab] Refresh error:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [recipeId, user?.id, queryClient]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -97,9 +141,23 @@ export default function IngredientsTab() {
   return (
     <View key={`ingredients-tab-${forceRenderKey}`} style={styles.container} className="flex-1 bg-white">
       <View style={styles.headerContainer}>
-        <Text style={styles.headerTitle}>
-          {totalIngredientsCount} Ingredients
-        </Text>
+        <View style={styles.headerTitleRow}>
+          <Text style={styles.headerTitle}>
+            {totalIngredientsCount} Ingredients
+          </Text>
+          
+          <TouchableOpacity 
+            style={styles.refreshButton}
+            onPress={handleRefresh}
+            disabled={isRefreshing}
+          >
+            <Feather 
+              name="refresh-cw" 
+              size={20} 
+              color={isRefreshing ? '#9ca3af' : '#10b981'} 
+            />
+          </TouchableOpacity>
+        </View>
         
         <Text style={styles.matchSummary}>
           {matchedSet.size} available in your pantry
@@ -159,11 +217,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
   },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: '#111827',
     marginBottom: 4,
+  },
+  refreshButton: {
+    padding: 4,
   },
   matchSummary: {
     fontSize: 15,

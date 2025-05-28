@@ -16,6 +16,9 @@ import OnboardingStep2UserScreen from '../screens/onboarding/OnboardingStep2User
 import OnboardingStep2CreatorScreen from '../screens/onboarding/OnboardingStep2CreatorScreen';
 import OnboardingFinalScreen from '../screens/onboarding/OnboardingFinalScreen';
 
+// Import "What Can I Cook?" Screens
+import IngredientSelectionScreen from '../screens/recipe-generation/IngredientSelectionScreen';
+
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
 // Define props for MainStack
@@ -82,6 +85,17 @@ const MainStack: React.FC<MainStackProps> = ({ userOnboarded }) => {
           presentation: 'modal', // Present as modal for better UX
         }} 
       />
+      
+      {/* "What Can I Cook?" Feature Screens */}
+      <Stack.Screen 
+        name="IngredientSelection" 
+        component={IngredientSelectionScreen} 
+        options={{ 
+          headerShown: false, // Screen has its own header
+          presentation: 'card', // Standard card presentation
+        }} 
+      />
+      
       {/* Add other stack screens like Settings here */}
     </Stack.Navigator>
   );

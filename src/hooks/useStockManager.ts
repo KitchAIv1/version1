@@ -3,6 +3,8 @@ import { Alert } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { useGroceryContext } from '../providers/GroceryProvider';
+import { useAuth } from '../providers/AuthProvider';
+import { refreshFeedPantryMatches } from './useFeed';
 
 // Define basic types within the hook for now, can be moved to a types file later
 export interface StockItem {
@@ -124,6 +126,10 @@ export const useStockManager = () => {
       queryClient.invalidateQueries({ queryKey: ['stock', userId] });
       queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
       queryClient.invalidateQueries({ queryKey: ['feed'] });
+      
+      // Refresh feed pantry matches specifically
+      refreshFeedPantryMatches(queryClient);
+      
       closeManualModal();
     },
     onError: (error: any) => {
@@ -164,6 +170,9 @@ export const useStockManager = () => {
       queryClient.invalidateQueries({ queryKey: ['stock', userId] });
       queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
       queryClient.invalidateQueries({ queryKey: ['feed'] });
+      
+      // Refresh feed pantry matches specifically
+      refreshFeedPantryMatches(queryClient);
     },
   });
 

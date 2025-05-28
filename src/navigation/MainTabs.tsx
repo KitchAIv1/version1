@@ -54,16 +54,45 @@ const MainTabs = () => {
             const state = navigation.getState();
             if (state.routes[state.index].name === 'Feed') {
               console.log(
-                'Feed tab pressed while it is the current tab. Refreshing feed.'
+                'Feed tab pressed while it is the current tab. Master refresh initiated.'
               );
+              
+              // Master refresh - invalidate all relevant caches
               queryClient.invalidateQueries({ queryKey: ['feed'] });
+              queryClient.invalidateQueries({ queryKey: ['pantryData'] });
+              queryClient.invalidateQueries({ queryKey: ['recipeDetails'] });
+              queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
+              queryClient.invalidateQueries({ queryKey: ['groceryList'] });
+              
+              console.log('Master refresh completed - all caches invalidated');
             }
 
             navigation.jumpTo('Feed');
           },
         })}
       />
-      <Tab.Screen name="Pantry" component={PantryScreen} />
+      <Tab.Screen 
+        name="Pantry" 
+        component={PantryScreen}
+        listeners={({ navigation, route }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+
+            const state = navigation.getState();
+            if (state.routes[state.index].name === 'Pantry') {
+              console.log(
+                'Pantry tab pressed while it is the current tab. Refreshing pantry and related data.'
+              );
+              queryClient.invalidateQueries({ queryKey: ['pantryData'] });
+              queryClient.invalidateQueries({ queryKey: ['recipeDetails'] });
+              queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
+              queryClient.invalidateQueries({ queryKey: ['feed'] });
+            }
+
+            navigation.jumpTo('Pantry');
+          },
+        })}
+      />
       {/* Discover, Create screens are fully removed for this test */}
       <Tab.Screen 
         name="GroceryList" 
@@ -72,7 +101,19 @@ const MainTabs = () => {
           tabBarLabel: 'Grocery',
         }}
       />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen 
+        name="Profile" 
+        component={ProfileScreen}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            // Prevent default navigation
+            e.preventDefault();
+            
+            // Navigate to Profile without any parameters to ensure own profile is shown
+            navigation.navigate('Profile', {});
+          },
+        })}
+      />
     </Tab.Navigator>
   );
 };

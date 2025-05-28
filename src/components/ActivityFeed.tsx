@@ -128,14 +128,71 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ data, isLoading, error }) =
       case 'cooked_recipe':
         return `You cooked: ${metadata?.recipe_title || metadata?.recipe_name || 'Unknown Recipe'}`;
       case 'manual_pantry_add':
+        const groupedActivitiesManual = metadata?.grouped_activities;
+        const totalItemsManual = metadata?.total_items;
+        const itemNamesManual = metadata?.item_names;
+        
+        // Handle grouped manual pantry activities
+        if (groupedActivitiesManual && totalItemsManual > 1) {
+          if (itemNamesManual && itemNamesManual.length > 0) {
+            const displayNames = itemNamesManual.slice(0, 3);
+            if (totalItemsManual <= 3) {
+              return `You added ${displayNames.join(', ')} to your pantry`;
+            } else {
+              return `You added ${displayNames.join(', ')} and ${totalItemsManual - 3} more items to your pantry`;
+            }
+          } else {
+            return `You added ${totalItemsManual} items to your pantry`;
+          }
+        }
+        
+        // Handle single manual add (existing logic)
         return `You added "${metadata?.item_name || 'Unknown Item'}" to your pantry`;
       case 'successful_scan':
         const itemsCount = metadata?.items_count;
         const scanType = metadata?.scan_type;
-        if (itemsCount && itemsCount > 1) {
-          return `You scanned ${itemsCount} items${scanType ? ` via ${scanType}` : ''}`;
+        const scannedItems = metadata?.scanned_items || metadata?.items;
+        const groupedActivities = metadata?.grouped_activities;
+        const totalItems = metadata?.total_items;
+        const itemNames = metadata?.item_names;
+        
+        // Handle grouped scanning activities
+        if (groupedActivities && totalItems > 1) {
+          if (itemNames && itemNames.length > 0) {
+            const displayNames = itemNames.slice(0, 3);
+            if (totalItems <= 3) {
+              return `You added ${displayNames.join(', ')} to your pantry`;
+            } else {
+              return `You added ${displayNames.join(', ')} and ${totalItems - 3} more items to your pantry`;
+            }
+          } else {
+            return `You added ${totalItems} items to your pantry`;
+          }
         }
-        return `You successfully scanned an item${scanType ? ` via ${scanType}` : ''}`;
+        
+        // Handle single scanning activity (existing logic)
+        let scanDescription = '';
+        if (scannedItems && Array.isArray(scannedItems) && scannedItems.length > 0) {
+          const itemNames = scannedItems.slice(0, 3).map(item => 
+            typeof item === 'string' ? item : item?.name || item?.item_name || 'Unknown'
+          );
+          if (scannedItems.length <= 3) {
+            scanDescription = `You scanned: ${itemNames.join(', ')}`;
+          } else {
+            scanDescription = `You scanned: ${itemNames.join(', ')} and ${scannedItems.length - 3} more items`;
+          }
+        } else if (itemsCount && itemsCount > 1) {
+          scanDescription = `You scanned ${itemsCount} pantry items`;
+        } else {
+          scanDescription = `You successfully scanned pantry items`;
+        }
+        
+        // Add scan type if available
+        if (scanType) {
+          scanDescription += ` via ${scanType}`;
+        }
+        
+        return scanDescription;
       case 'pantry_update':
         const itemName = metadata?.item_name || 'Unknown Item';
         const newQty = metadata?.new_quantity;
@@ -228,11 +285,17 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ data, isLoading, error }) =
 
   return (
     <View style={styles.listContainer}>
-      {data.map((item, index) => (
-        <View key={item.id || `activity-${index}-${item.created_at || Date.now()}`}>
-          {renderActivityItem({ item })}
-        </View>
-      ))}
+      {data.map((item, index) => {
+        // Always generate a unique key with index to avoid backend ID duplicates
+        const uniqueKey = `activity-${index}-${item.activity_type}-${item.created_at?.replace(/[:.]/g, '')}-${Math.random().toString(36).substr(2, 9)}`;
+        console.log('[ActivityFeed] Generated key:', uniqueKey);
+        console.log('[ActivityFeed] Item details:', { id: item.id, activity_type: item.activity_type, created_at: item.created_at, index });
+        return (
+          <View key={uniqueKey}>
+            {renderActivityItem({ item })}
+          </View>
+        );
+      })}
     </View>
   );
 };
@@ -318,4 +381,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ActivityFeed; 
+export default ActivityFeed;

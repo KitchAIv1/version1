@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   RefreshControl,
   RefreshControlProps,
   Modal,
+  Dimensions
 } from 'react-native';
 import { useQuery, QueryKey, useQueryClient } from '@tanstack/react-query';
 import { Tabs, MaterialTabBar } from 'react-native-collapsible-tab-view';
@@ -19,7 +20,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { supabase } from '../../services/supabase';
 import ProfileRecipeCard from '../../components/ProfileRecipeCard'; // Import the new card
 import ActivityFeed from '../../components/ActivityFeed'; // Import ActivityFeed instead of ActivityList
-import { useNavigation } from '@react-navigation/native'; // Import useNavigation
+import { useNavigation, useRoute } from '@react-navigation/native'; // Import useNavigation and useRoute
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // Import navigation type
 import { MainStackParamList } from '../../navigation/types'; // Import param list
 import { useAuth } from '../../providers/AuthProvider'; // Import useAuth
@@ -30,6 +31,7 @@ import { ProfileScreenSkeleton, RecipeGridSkeleton } from '../../components/Prof
 import { useUserActivityFeed } from '../../hooks/useUserActivityFeed'; // Import the activity feed hook
 import { useAccessControl } from '../../hooks/useAccessControl'; // Import access control hook
 import { TierDisplay } from '../../components/TierDisplay'; // Added TierDisplay import
+import { FollowButton } from '../../components/FollowButton'; // Import FollowButton
 
 // Define types for profile and post data
 interface VideoPostData { 
@@ -49,7 +51,12 @@ interface ProfileData {
   bio?: string | null;
   videos: VideoPostData[]; // User's uploaded videos/recipes
   saved_recipes: VideoPostData[]; // Add array for saved recipes
-  // Add other fields from get_profile_details if needed
+  user_id?: string; // Add user_id for follow functionality
+}
+
+// Route params for ProfileScreen
+interface ProfileScreenParams {
+  userId?: string; // Optional userId to view other users' profiles
 }
 
 const ACTIVE_COLOR = '#22c55e'; // Defined active color
@@ -57,9 +64,17 @@ const ACTIVE_COLOR = '#22c55e'; // Defined active color
 // -----------------------------------------------------------------------------
 // Hooks (data)
 // -----------------------------------------------------------------------------
-const useProfile = () => {
+const useProfile = (targetUserId?: string) => {
   const { user } = useAuth(); 
-  const userId = user?.id;
+  const userId = targetUserId || user?.id; // Use targetUserId if provided, otherwise current user
+
+  // Debug logging for useProfile
+  console.log('[useProfile] Hook called with:', {
+    targetUserId: targetUserId,
+    currentUserId: user?.id,
+    resolvedUserId: userId,
+    timestamp: new Date().toISOString()
+  });
 
   return useQuery<ProfileData, Error, ProfileData, QueryKey>({
     queryKey: ['profile', userId], 
@@ -81,34 +96,93 @@ const useProfile = () => {
       console.log('[useProfile] rawData from RPC:', JSON.stringify(rawData, null, 2)); // Log the raw data
       const profileDataBackend = rawData as any;
       
-      // Map uploaded recipes (from backend 'recipes' to frontend 'videos')
+      // Enhanced debug logging for recipes
+      console.log('[useProfile] Enhanced Debug Info:', {
+        userId: userId,
+        recipesType: typeof profileDataBackend.recipes,
+        recipesIsArray: Array.isArray(profileDataBackend.recipes),
+        recipesLength: profileDataBackend.recipes?.length,
+        firstRecipe: profileDataBackend.recipes?.[0],
+        allKeys: Object.keys(profileDataBackend),
+        timestamp: new Date().toISOString()
+      });
+      
+      // Map uploaded recipes with robust field mapping and fallbacks
       let processedUploadedVideos: VideoPostData[] = [];
       if (Array.isArray(profileDataBackend.recipes)) {
-        processedUploadedVideos = profileDataBackend.recipes.map((recipe: any) => ({
-          recipe_id: recipe.recipe_id,
-          recipe_name: recipe.title, // Map title to recipe_name
-          video_url: recipe.video_url,
-          thumbnail_url: recipe.thumbnail_url,
-          created_at: recipe.created_at,
-          creator_user_id: recipe.creator_user_id, // Corrected mapping
-        }));
+        processedUploadedVideos = profileDataBackend.recipes.map((recipe: any, index: number) => {
+          console.log(`[useProfile] Processing recipe ${index}:`, recipe);
+          
+          const mappedRecipe = {
+            recipe_id: recipe.recipe_id || recipe.id || `recipe_${index}`,
+            recipe_name: recipe.title || recipe.recipe_name || recipe.name || 'Untitled Recipe',
+            video_url: recipe.video_url || recipe.videoUrl || '',
+            thumbnail_url: recipe.thumbnail_url || recipe.thumbnailUrl || null,
+            created_at: recipe.created_at || recipe.createdAt || new Date().toISOString(),
+            creator_user_id: recipe.creator_user_id || recipe.creatorUserId || recipe.user_id || userId,
+          };
+          
+          console.log(`[useProfile] Mapped recipe ${index}:`, mappedRecipe);
+          return mappedRecipe;
+        });
+        
+        // Validate processed data
+        const validRecipes = processedUploadedVideos.filter((recipe, index) => {
+          const isValid = recipe.recipe_id && recipe.recipe_name;
+          if (!isValid) {
+            console.warn(`[useProfile] Filtering out invalid recipe at index ${index}:`, recipe);
+          }
+          return isValid;
+        });
+        
+        processedUploadedVideos = validRecipes;
+        console.log(`[useProfile] Successfully processed ${processedUploadedVideos.length} valid recipes out of ${profileDataBackend.recipes.length} total`);
       } else {
-        console.warn('[useProfile] profileDataBackend.recipes is not an array or is missing.');
+        console.warn('[useProfile] profileDataBackend.recipes is not an array or is missing:', {
+          type: typeof profileDataBackend.recipes,
+          value: profileDataBackend.recipes,
+          allKeys: Object.keys(profileDataBackend),
+          userId: userId
+        });
       }
 
       // Map saved recipes (from backend 'saved_recipes' to frontend 'saved_recipes')
       let processedSavedRecipes: VideoPostData[] = [];
       if (Array.isArray(profileDataBackend.saved_recipes)) {
-        processedSavedRecipes = profileDataBackend.saved_recipes.map((recipe: any) => ({
-          recipe_id: recipe.recipe_id,
-          recipe_name: recipe.title, // Map title to recipe_name
-          video_url: recipe.video_url,
-          thumbnail_url: recipe.thumbnail_url,
-          created_at: recipe.created_at,
-          creator_user_id: recipe.creator_user_id, // Corrected mapping
-        }));
+        processedSavedRecipes = profileDataBackend.saved_recipes.map((recipe: any, index: number) => {
+          console.log(`[useProfile] Processing saved recipe ${index}:`, recipe);
+          
+          const mappedRecipe = {
+            recipe_id: recipe.recipe_id || recipe.id || `saved_recipe_${index}`,
+            recipe_name: recipe.title || recipe.recipe_name || recipe.name || 'Untitled Recipe',
+            video_url: recipe.video_url || recipe.videoUrl || '',
+            thumbnail_url: recipe.thumbnail_url || recipe.thumbnailUrl || null,
+            created_at: recipe.created_at || recipe.createdAt || new Date().toISOString(),
+            creator_user_id: recipe.creator_user_id || recipe.creatorUserId || recipe.user_id || userId,
+          };
+          
+          console.log(`[useProfile] Mapped saved recipe ${index}:`, mappedRecipe);
+          return mappedRecipe;
+        });
+        
+        // Validate processed saved recipes
+        const validSavedRecipes = processedSavedRecipes.filter((recipe, index) => {
+          const isValid = recipe.recipe_id && recipe.recipe_name;
+          if (!isValid) {
+            console.warn(`[useProfile] Filtering out invalid saved recipe at index ${index}:`, recipe);
+          }
+          return isValid;
+        });
+        
+        processedSavedRecipes = validSavedRecipes;
+        console.log(`[useProfile] Successfully processed ${processedSavedRecipes.length} valid saved recipes out of ${profileDataBackend.saved_recipes.length} total`);
       } else {
-        console.warn('[useProfile] profileDataBackend.saved_recipes is not an array or is missing.');
+        console.warn('[useProfile] profileDataBackend.saved_recipes is not an array or is missing:', {
+          type: typeof profileDataBackend.saved_recipes,
+          value: profileDataBackend.saved_recipes,
+          allKeys: Object.keys(profileDataBackend),
+          userId: userId
+        });
       }
       
       // Construct the final ProfileData object for the frontend
@@ -119,7 +193,8 @@ const useProfile = () => {
         following: profileDataBackend.following ?? 0,
         bio: profileDataBackend.bio,
         videos: processedUploadedVideos, // Use the processed uploaded videos
-        saved_recipes: processedSavedRecipes // Use the processed saved recipes
+        saved_recipes: processedSavedRecipes, // Use the processed saved recipes
+        user_id: userId // Add user_id for follow functionality
       };
       
       console.log(`[useProfile] Processed ${processedUploadedVideos.length} uploaded, ${processedSavedRecipes.length} saved recipes.`);
@@ -213,7 +288,7 @@ const Bio: React.FC<{
 // Lazy Tab Content Component
 const LazyTabContent: React.FC<{ 
   data: VideoPostData[]; 
-  context: 'myRecipes' | 'savedRecipes';
+  context: 'myRecipes' | 'savedRecipes' | 'otherUserRecipes';
   emptyLabel: string;
   refreshControl?: React.ReactElement<RefreshControlProps>;
 }> = React.memo(({ data, context, emptyLabel, refreshControl }) => {
@@ -256,24 +331,42 @@ const LazyTabContent: React.FC<{
 // -----------------------------------------------------------------------------
 export const ProfileScreen: React.FC = () => {
   const { user } = useAuth();
-  const { data: profile, isLoading: profileLoading, isError, error: profileFetchError, refetch: refetchProfile } = useProfile();
+  const route = useRoute();
   const navigation = useNavigation<ProfileNavigationProp>();
-  const queryClient = useQueryClient(); // Get query client instance
+  const queryClient = useQueryClient();
+  
+  // Get userId from route params (for viewing other users' profiles)
+  const routeParams = route.params as ProfileScreenParams | undefined;
+  const targetUserId = routeParams?.userId;
+  const isOwnProfile = !targetUserId || targetUserId === user?.id;
+  
+  // Debug logging to identify the issue
+  console.log('[ProfileScreen] Debug info:', {
+    routeName: route.name,
+    routeParams: routeParams,
+    targetUserId: targetUserId,
+    currentUserId: user?.id,
+    isOwnProfile: isOwnProfile,
+    timestamp: new Date().toISOString()
+  });
+  
+  // Use the profile hook with targetUserId
+  const { data: profile, isLoading: profileLoading, isError, error: profileFetchError, refetch: refetchProfile } = useProfile(targetUserId);
 
-  // Add access control hook
+  // Add access control hook (only for own profile)
   const { getUsageDisplay } = useAccessControl();
   const usageData = getUsageDisplay();
 
   // Modal state for tier badge
   const [showTierModal, setShowTierModal] = useState(false);
 
-  // Add activity feed hook
+  // Add activity feed hook (only for own profile)
   const { 
     data: activityData, 
     isLoading: activityLoading, 
     error: activityError,
     refetch: refetchActivity
-  } = useUserActivityFeed(user?.id);
+  } = useUserActivityFeed(isOwnProfile ? user?.id : undefined);
 
   // Pull-to-refresh state and functionality
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -283,19 +376,24 @@ export const ProfileScreen: React.FC = () => {
     setIsRefreshing(true);
     try {
       // Refresh all data sources in parallel
-      await Promise.all([
+      const refreshPromises = [
         refetchProfile(),
-        refetchActivity(),
-        // Invalidate any other relevant queries
         queryClient.invalidateQueries({ queryKey: ['profile'] }),
-        queryClient.invalidateQueries({ queryKey: ['userActivityFeed'] }),
-      ]);
+      ];
+      
+      await Promise.all(refreshPromises);
+      
+      // Refresh activity for own profile separately
+      if (isOwnProfile && refetchActivity) {
+        await refetchActivity();
+        queryClient.invalidateQueries({ queryKey: ['userActivityFeed'] });
+      }
     } catch (error) {
       console.error('[ProfileScreen] Refresh error:', error);
     } finally {
       setIsRefreshing(false);
     }
-  }, [refetchProfile, refetchActivity, queryClient]);
+  }, [refetchProfile, refetchActivity, queryClient, isOwnProfile]);
 
   // Create RefreshControl component
   const refreshControl = (
@@ -379,34 +477,69 @@ export const ProfileScreen: React.FC = () => {
 
   const renderProfileInfo = () => (
     <View style={styles.profileInfoContainer}>
-      {/* Header content moved here - now part of scrollable content */}
-      <View style={styles.scrollableHeader}>
-        <View style={styles.headerSpacer} />
-        <Text style={styles.scrollableHeaderTitle}>Kitch Hub</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.iconBtn} onPress={handleAddRecipePress}>
-            <Icon name="add-box" size={26} color="#10b981" />
+      {/* Header content */}
+      {isOwnProfile ? (
+        // Own Profile: Show "Kitch Hub" header with actions
+        <View style={styles.scrollableHeader}>
+          <View style={styles.headerSpacer} />
+          <Text style={styles.scrollableHeaderTitle}>Kitch Hub</Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.iconBtn} onPress={handleAddRecipePress}>
+              <Icon name="add-box" size={26} color="#10b981" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconBtn} onPress={handleSignOut}>
+              <Icon name="menu" size={26} color="#1f2937" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        // Other User's Profile: Show back button and username
+        <View style={styles.scrollableHeader}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => navigation.goBack()}
+          >
+            <Icon name="arrow-back" size={24} color="#1f2937" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn} onPress={handleSignOut}>
-            <Icon name="menu" size={26} color="#1f2937" />
+          <Text style={styles.scrollableHeaderTitle}>@{profile.username}</Text>
+          <TouchableOpacity 
+            style={styles.iconBtn} 
+            onPress={() => Alert.alert("Share Profile", "Share functionality to be implemented.")}
+          >
+            <Icon name="share" size={24} color="#1f2937" />
           </TouchableOpacity>
         </View>
-      </View>
+      )}
+      
       <AvatarRow profile={profile} postsCount={profile.videos?.length || 0} />
       <Bio 
         profile={profile} 
         onTierBadgePress={handleTierBadgePress}
         tierDisplay={usageData.tierDisplay}
-        showTierBadge={true}
+        showTierBadge={isOwnProfile} // Only show tier badge for own profile
       />
       
       <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.editButton} onPress={handleEditProfilePress}>
-          <Text style={styles.editButtonText}>Edit Profile</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.shareButton} onPress={() => Alert.alert("Share Profile", "Share functionality to be implemented.")}>
-          <Text style={styles.shareButtonText}>Share Profile</Text>
-        </TouchableOpacity>
+        {isOwnProfile ? (
+          <>
+            <TouchableOpacity style={styles.editButton} onPress={handleEditProfilePress}>
+              <Text style={styles.editButtonText}>Edit Profile</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.shareButton} onPress={() => Alert.alert("Share Profile", "Share functionality to be implemented.")}>
+              <Text style={styles.shareButtonText}>Share Profile</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <FollowButton 
+              targetUserId={profile.user_id || targetUserId || ''} 
+              style={styles.editButton} // Use existing editButton style for now
+            />
+            <TouchableOpacity style={styles.shareButton} onPress={() => Alert.alert("Share Profile", "Share functionality to be implemented.")}>
+              <Text style={styles.shareButtonText}>Share Profile</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </View>
   );
@@ -420,69 +553,106 @@ export const ProfileScreen: React.FC = () => {
       
       {/* Scrollable Content - includes Kitch Hub content above avatar */}
       <View style={styles.tabsContainer}>
-        <Tabs.Container
-          renderHeader={renderProfileInfo}
-          headerHeight={undefined} 
-          allowHeaderOverscroll={false}
-          renderTabBar={(props) => (
-            <MaterialTabBar
-              {...props}
-              activeColor={ACTIVE_COLOR}
-              inactiveColor="#525252"
-              labelStyle={styles.tabLabel}
-              indicatorStyle={styles.tabIndicator}
-              style={styles.materialTabBar}
-              getLabelText={(name: string) => name}
-              // @ts-ignore 
-              renderIcon={(iconProps) => { 
-                let iconName = 'video-library'; 
-                if (iconProps.route.name === 'My Recipes') iconName = 'video-library';
-                if (iconProps.route.name === 'Saved') iconName = 'bookmark';
-                if (iconProps.route.name === 'Planner') iconName = 'calendar-today'; // Changed from Planner V2
-                if (iconProps.route.name === 'Activity') iconName = 'notifications';
+        {isOwnProfile ? (
+          // Own Profile: Show all tabs
+          <Tabs.Container
+            renderHeader={renderProfileInfo}
+            headerHeight={undefined} 
+            allowHeaderOverscroll={false}
+            renderTabBar={(props) => (
+              <MaterialTabBar
+                {...props}
+                activeColor={ACTIVE_COLOR}
+                inactiveColor="#525252"
+                labelStyle={styles.tabLabel}
+                indicatorStyle={styles.tabIndicator}
+                style={styles.materialTabBar}
+                getLabelText={(name: string) => name}
+                // @ts-ignore 
+                renderIcon={(iconProps) => { 
+                  let iconName = 'video-library'; 
+                  if (iconProps.route.name === 'My Recipes') iconName = 'video-library';
+                  if (iconProps.route.name === 'Saved') iconName = 'bookmark';
+                  if (iconProps.route.name === 'Planner') iconName = 'calendar-today';
+                  if (iconProps.route.name === 'Activity') iconName = 'notifications';
 
-                return <Icon name={iconName} size={20} color={iconProps.focused ? ACTIVE_COLOR : '#525252'} style={{ marginRight: 0, paddingRight:0 }}/>;
-              }}
-            />
-          )}
-        >
-          <Tabs.Tab name="My Recipes" label="My Recipes">
-            <LazyTabContent 
-              data={profile.videos} 
-              context="myRecipes" 
-              emptyLabel="No recipes uploaded yet."
-              refreshControl={refreshControl}
-            />
-          </Tabs.Tab>
-          <Tabs.Tab name="Saved" label="Saved">
-            <LazyTabContent 
-              data={profile.saved_recipes} 
-              context="savedRecipes" 
-              emptyLabel="No saved recipes yet."
-              refreshControl={refreshControl}
-            />
-          </Tabs.Tab>
-          <Tabs.Tab name="Planner" label="Planner">
-            <Tabs.ScrollView 
-              style={styles.fullScreenTabContent}
-              refreshControl={refreshControl}
-            >
-              <MealPlannerV2Screen />
-            </Tabs.ScrollView>
-          </Tabs.Tab>
-          <Tabs.Tab name="Activity" label="Activity">
-            <Tabs.ScrollView 
-              style={styles.fullScreenTabContent}
-              refreshControl={refreshControl}
-            >
-              <ActivityFeed 
-                data={activityData}
-                isLoading={activityLoading}
-                error={activityError}
+                  return <Icon name={iconName} size={20} color={iconProps.focused ? ACTIVE_COLOR : '#525252'} style={{ marginRight: 0, paddingRight:0 }}/>;
+                }}
               />
-            </Tabs.ScrollView>
-          </Tabs.Tab>
-        </Tabs.Container>
+            )}
+          >
+            <Tabs.Tab name="My Recipes" label="My Recipes">
+              <LazyTabContent 
+                data={profile.videos} 
+                context="myRecipes" 
+                emptyLabel="No recipes uploaded yet."
+                refreshControl={refreshControl}
+              />
+            </Tabs.Tab>
+            <Tabs.Tab name="Saved" label="Saved">
+              <LazyTabContent 
+                data={profile.saved_recipes} 
+                context="savedRecipes" 
+                emptyLabel="No saved recipes yet."
+                refreshControl={refreshControl}
+              />
+            </Tabs.Tab>
+            <Tabs.Tab name="Planner" label="Planner">
+              <Tabs.ScrollView 
+                style={styles.fullScreenTabContent}
+                refreshControl={refreshControl}
+              >
+                <MealPlannerV2Screen />
+              </Tabs.ScrollView>
+            </Tabs.Tab>
+            <Tabs.Tab name="Activity" label="Activity">
+              <Tabs.ScrollView 
+                style={styles.fullScreenTabContent}
+                refreshControl={refreshControl}
+              >
+                <ActivityFeed 
+                  data={activityData}
+                  isLoading={activityLoading}
+                  error={activityError}
+                />
+              </Tabs.ScrollView>
+            </Tabs.Tab>
+          </Tabs.Container>
+        ) : (
+          // Other User's Profile: Show only public recipes
+          <Tabs.Container
+            renderHeader={renderProfileInfo}
+            headerHeight={undefined} 
+            allowHeaderOverscroll={false}
+            renderTabBar={(props) => (
+              <MaterialTabBar
+                {...props}
+                activeColor={ACTIVE_COLOR}
+                inactiveColor="#525252"
+                labelStyle={styles.tabLabel}
+                indicatorStyle={styles.tabIndicator}
+                style={styles.materialTabBar}
+                getLabelText={(name: string) => name}
+                // @ts-ignore 
+                renderIcon={(iconProps) => { 
+                  let iconName = 'video-library'; 
+                  if (iconProps.route.name === 'Recipes') iconName = 'video-library';
+
+                  return <Icon name={iconName} size={20} color={iconProps.focused ? ACTIVE_COLOR : '#525252'} style={{ marginRight: 0, paddingRight:0 }}/>;
+                }}
+              />
+            )}
+          >
+            <Tabs.Tab name="Recipes" label="Recipes">
+              <LazyTabContent 
+                data={profile.videos} 
+                context="otherUserRecipes" 
+                emptyLabel={`${profile.username} hasn't shared any recipes yet.`}
+                refreshControl={refreshControl}
+              />
+            </Tabs.Tab>
+          </Tabs.Container>
+        )}
       </View>
 
       {/* Tier Modal */}
@@ -698,7 +868,6 @@ const styles = StyleSheet.create({
   },
   bioName: {
     fontWeight: 'bold',
-    marginBottom: 6,
     fontSize: 16,
     color: '#262626',
   },
@@ -859,28 +1028,38 @@ const styles = StyleSheet.create({
   usernameRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 6,
   },
   tierBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-    marginLeft: 8,
-    height: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    marginLeft: 10,
+    minHeight: 24,
+    justifyContent: 'center',
   },
   tierBadgePremium: {
     backgroundColor: '#FFD700',
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 2,
   },
   tierBadgeFreemium: {
-    backgroundColor: '#E0E0E0',
+    backgroundColor: '#E8E8E8',
+    borderWidth: 1,
+    borderColor: '#D0D0D0',
   },
   tierBadgeIcon: {
-    marginRight: 4,
+    marginRight: 5,
   },
   tierBadgeText: {
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   tierBadgeTextPremium: {
     color: '#333',
@@ -972,6 +1151,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
 });
 

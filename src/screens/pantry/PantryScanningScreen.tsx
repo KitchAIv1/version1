@@ -30,6 +30,7 @@ import {
   ItemToUpsert,
 } from '../../utils/pantryScanning';
 import { supabase } from '../../services/supabase';
+import { refreshFeedPantryMatches } from '../../hooks/useFeed';
 
 export default function PantryScanningScreen() {
   // ---------- refs & state ----------
@@ -177,6 +178,9 @@ export default function PantryScanningScreen() {
         queryClient.invalidateQueries({ queryKey: ['stock'] });
         queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
         queryClient.invalidateQueries({ queryKey: ['feed'] });
+        
+        // Refresh feed pantry matches specifically
+        refreshFeedPantryMatches(queryClient);
         
         Alert.alert('Success', `${itemsToUpsert.length} items added to your pantry!`);
       }
