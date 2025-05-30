@@ -18,6 +18,10 @@ export const useCacheManager = () => {
   const pendingCommentRequests = useRef<Set<string>>(new Set());
   const commentCountTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
+  // Track pending like count requests to prevent duplicates
+  const pendingLikeRequests = useRef<Set<string>>(new Set());
+  const likeCountTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
   // Update all caches simultaneously to prevent inconsistencies
   const updateAllCaches = useCallback((params: CacheUpdateParams) => {
     const { recipeId, userId, likes, isLiked, isSaved, commentsCount } = params;
@@ -97,13 +101,13 @@ export const useCacheManager = () => {
     let currentLikes = 0;
     
     if (recipeData) {
-      currentLiked = recipeData.is_liked_by_user || false;
-      currentLikes = recipeData.likes || 0;
+      currentLiked = recipeData.is_liked_by_user ?? false;
+      currentLikes = recipeData.likes ?? 0;
     } else if (feedData) {
       const feedItem = feedData.find((item: any) => item.id === recipeId || item.recipe_id === recipeId);
       if (feedItem) {
-        currentLiked = feedItem.liked || false;
-        currentLikes = feedItem.likes || 0;
+        currentLiked = feedItem.liked ?? false;
+        currentLikes = feedItem.likes ?? 0;
       }
     }
     
@@ -244,10 +248,24 @@ export const useCacheManager = () => {
         
         if (error) {
           console.error(`[useCacheManager] Error fetching comments for recipe ${recipeId}:`, error);
-          return;
+          return 0;
         }
         
-        const actualCommentCount = (data || []).length;
+        // Handle different possible data structures from the RPC
+        let actualCommentCount = 0;
+        if (data) {
+          if (Array.isArray(data)) {
+            actualCommentCount = data.length;
+          } else if (typeof data === 'number') {
+            actualCommentCount = data;
+          } else if (data.length !== undefined) {
+            actualCommentCount = data.length;
+          } else {
+            console.warn(`[useCacheManager] Unexpected data structure for comments in recipe ${recipeId}:`, data);
+            actualCommentCount = 0;
+          }
+        }
+        
         console.log(`[useCacheManager] Fetched comment count for recipe ${recipeId}: ${actualCommentCount}`);
         
         // Update all caches with the correct comment count
@@ -258,7 +276,7 @@ export const useCacheManager = () => {
         });
         
         // Cache the comments data to prevent future requests
-        queryClient.setQueryData(['recipe-comments', recipeId], data || []);
+        queryClient.setQueryData(['recipe-comments', recipeId], Array.isArray(data) ? data : []);
         
         return actualCommentCount;
       } catch (error) {
@@ -275,6 +293,77 @@ export const useCacheManager = () => {
     commentCountTimeouts.current.set(recipeId, timeoutId);
   }, [updateAllCaches, queryClient]);
 
+  // RESTORED: Simple like count update since backend is now fixed
+  const updateLikeCount = useCallback(async (recipeId: string, userId?: string) => {
+    // Check if request is already pending for this recipe
+    if (pendingLikeRequests.current.has(recipeId)) {
+      console.log(`[useCacheManager] Like count request already pending for recipe ${recipeId}, skipping`);
+      return;
+    }
+
+    // Clear any existing timeout for this recipe
+    const existingTimeout = likeCountTimeouts.current.get(recipeId);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+    }
+
+    // Debounce the request
+    const timeoutId = setTimeout(async () => {
+      // Mark request as pending
+      pendingLikeRequests.current.add(recipeId);
+      
+      try {
+        // Fetch accurate like data from recipe details RPC (backend fixed)
+        const { data, error } = await supabase.rpc('get_recipe_details', {
+          p_user_id: userId,
+          p_recipe_id: recipeId
+        });
+
+        if (error) {
+          console.error(`[useCacheManager] Error fetching recipe details for like data ${recipeId}:`, error);
+          return;
+        }
+
+        if (!data) {
+          console.warn(`[useCacheManager] No recipe details data for recipe ${recipeId}`);
+          return;
+        }
+
+        // FIX: Use correct backend field names
+        const actualLikeCount = data.recipe_details_likes ?? data.likes ?? 0;  // Backend uses recipe_details_likes
+        const actualIsLiked = data.recipe_details_liked ?? data.is_liked_by_user ?? false;  // Backend uses recipe_details_liked
+        
+        console.log(`[useCacheManager] ✅ FIELD MAPPING FIXED - fetched like data for recipe ${recipeId}:`, {
+          raw_recipe_details_likes: data.recipe_details_likes,
+          raw_recipe_details_liked: data.recipe_details_liked,
+          processed_likes: actualLikeCount, 
+          processed_isLiked: actualIsLiked,
+          backend_team_was_right: "YES!"
+        });
+        
+        // Update all caches with the correct like count and state
+        updateAllCaches({
+          recipeId,
+          userId,
+          likes: actualLikeCount,
+          isLiked: actualIsLiked
+        });
+        
+        return { likes: actualLikeCount, isLiked: actualIsLiked };
+      } catch (error) {
+        console.error(`[useCacheManager] Exception fetching like data for recipe ${recipeId}:`, error);
+        return { likes: 0, isLiked: false };
+      } finally {
+        // Remove from pending requests
+        pendingLikeRequests.current.delete(recipeId);
+        likeCountTimeouts.current.delete(recipeId);
+      }
+    }, 300); // 300ms debounce
+
+    // Store the timeout
+    likeCountTimeouts.current.set(recipeId, timeoutId);
+  }, [updateAllCaches, queryClient]);
+
   return {
     updateAllCaches,
     optimisticLikeUpdate,
@@ -285,6 +374,7 @@ export const useCacheManager = () => {
     cancelQueries,
     invalidateQueries,
     updateCommentCount,
+    updateLikeCount,
     queryClient
   };
 }; 

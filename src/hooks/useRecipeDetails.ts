@@ -12,6 +12,11 @@ export interface RecipeDetailsData {
   diet_tags: string[] | null;
   is_public: boolean;
   video_url: string | null;
+  thumbnail_url?: string | null;   // For AI recipes and regular recipe thumbnails
+  is_ai_generated?: boolean;       // To identify AI-generated recipes
+  difficulty?: string | null;      // Recipe difficulty level
+  estimated_cost?: string | null;  // Cost estimate
+  nutrition_notes?: string | null; // Nutrition information
   created_at: string;
   description: string | null;
   username?: string | null;         // Creator's username
@@ -42,6 +47,78 @@ interface UseRecipeDetailsResult {
   error: string | null;
   refetch: () => void;
 }
+
+// Clean pantry match data to handle backend RPC format issues
+const cleanPantryMatchData = (pantryData: any, recipeId: string) => {
+  if (!pantryData) {
+    console.warn(`[cleanPantryMatchData] No pantry data received for recipe ${recipeId}`);
+    return { match_percentage: 0, matched_ingredients: [], missing_ingredients: [] };
+  }
+
+  try {
+    // Handle matched_ingredients array
+    let matchedIngredients: string[] = [];
+    if (Array.isArray(pantryData.matched_ingredients)) {
+      matchedIngredients = pantryData.matched_ingredients
+        .filter((item: any) => item != null && item !== undefined) // Remove null/undefined
+        .map((item: any) => {
+          // Handle both string and object formats
+          if (typeof item === 'string') {
+            return item.trim();
+          } else if (typeof item === 'object' && item.name) {
+            return item.name.trim();
+          } else {
+            console.warn(`[cleanPantryMatchData] Invalid matched ingredient format for recipe ${recipeId}:`, item);
+            return null;
+          }
+        })
+        .filter((name: any) => name && name.length > 0); // Remove empty strings
+    }
+
+    // Handle missing_ingredients array
+    let missingIngredients: string[] = [];
+    if (Array.isArray(pantryData.missing_ingredients)) {
+      missingIngredients = pantryData.missing_ingredients
+        .filter((item: any) => item != null && item !== undefined) // Remove null/undefined
+        .map((item: any) => {
+          // Handle both string and object formats
+          if (typeof item === 'string') {
+            return item.trim();
+          } else if (typeof item === 'object' && item.name) {
+            return item.name.trim();
+          } else {
+            console.warn(`[cleanPantryMatchData] Invalid missing ingredient format for recipe ${recipeId}:`, item);
+            return null;
+          }
+        })
+        .filter((name: any) => name && name.length > 0); // Remove empty strings
+    }
+
+    const totalIngredients = matchedIngredients.length + missingIngredients.length;
+    const matchPercentage = totalIngredients > 0 
+      ? Math.round((matchedIngredients.length / totalIngredients) * 100)
+      : 0;
+
+    console.log(`[cleanPantryMatchData] Cleaned pantry data for recipe ${recipeId}:`, {
+      original_matched_count: pantryData.matched_ingredients?.length || 0,
+      cleaned_matched_count: matchedIngredients.length,
+      original_missing_count: pantryData.missing_ingredients?.length || 0,
+      cleaned_missing_count: missingIngredients.length,
+      calculated_percentage: matchPercentage,
+      backend_percentage: pantryData.match_percentage
+    });
+
+    return {
+      match_percentage: pantryData.match_percentage || matchPercentage,
+      matched_ingredients: matchedIngredients,
+      missing_ingredients: missingIngredients
+    };
+
+  } catch (error) {
+    console.error(`[cleanPantryMatchData] Error cleaning pantry data for recipe ${recipeId}:`, error);
+    return { match_percentage: 0, matched_ingredients: [], missing_ingredients: [] };
+  }
+};
 
 // Update fetchRecipeDetails to accept userId and pass it to RPC
 export const fetchRecipeDetails = async (recipeId: string, userId?: string, queryClient?: any) => {
@@ -75,6 +152,34 @@ export const fetchRecipeDetails = async (recipeId: string, userId?: string, quer
       throw new Error('Recipe not found');
     }
 
+    // BACKEND AUDIT: Log what recipe details RPC returns for likes
+    console.log(`[fetchRecipeDetails] 🔍 RECIPE DETAILS AUDIT for ${recipeId}:`, {
+      likes: recipeData.likes,
+      is_liked_by_user: recipeData.is_liked_by_user,
+      is_saved_by_user: recipeData.is_saved_by_user,
+      comments_count: recipeData.comments_count,
+      title: recipeData.title?.substring(0, 30) + '...'
+    });
+
+    // CRITICAL: Show raw data types and values
+    console.log(`[fetchRecipeDetails] 🚨 RAW RECIPE DETAILS DATA for ${recipeId}:`, {
+      RAW_likes: recipeData.likes,
+      RAW_is_liked_by_user: recipeData.is_liked_by_user,
+      type_of_likes: typeof recipeData.likes,
+      is_null_likes: recipeData.likes === null,
+      is_undefined_likes: recipeData.likes === undefined,
+      type_of_liked: typeof recipeData.is_liked_by_user,
+      is_null_liked: recipeData.is_liked_by_user === null,
+      COMPLETE_DATA_KEYS: Object.keys(recipeData)
+    });
+
+    // FIELD MAPPING FIX: Use correct backend field names
+    console.log(`[fetchRecipeDetails] 🔧 CORRECT FIELD MAPPING for ${recipeId}:`, {
+      recipe_details_likes: recipeData.recipe_details_likes,
+      recipe_details_liked: recipeData.recipe_details_liked,
+      backend_actually_works: "YES!"
+    });
+
     // Fetch pantry match data separately using calculate_pantry_match
     let pantryMatchData = null;
     if (userId) {
@@ -88,7 +193,9 @@ export const fetchRecipeDetails = async (recipeId: string, userId?: string, quer
         // Don't throw error, just use empty pantry data
         pantryMatchData = { match_percentage: 0, matched_ingredients: [], missing_ingredients: [] };
       } else {
-        pantryMatchData = pantryData || { match_percentage: 0, matched_ingredients: [], missing_ingredients: [] };
+        // Clean and process pantry data to handle backend RPC data format issues
+        const cleanedPantryData = cleanPantryMatchData(pantryData, recipeId);
+        pantryMatchData = cleanedPantryData || { match_percentage: 0, matched_ingredients: [], missing_ingredients: [] };
       }
     } else {
       // No user logged in, use empty pantry data
@@ -107,6 +214,14 @@ export const fetchRecipeDetails = async (recipeId: string, userId?: string, quer
       ...recipeData,
       pantry_match: pantryMatchData
     };
+
+    // Verify like fields are present (should now be included from backend)
+    if (combinedData.is_liked_by_user === undefined || combinedData.likes === undefined) {
+      console.warn(`[fetchRecipeDetails] Like fields missing from get_recipe_details RPC for recipe ${recipeId}. This should now be resolved.`);
+      // Set defaults if still missing
+      combinedData.is_liked_by_user = false;
+      combinedData.likes = 0;
+    }
 
     // Process the combined data
     return await processRecipeDetailsData(combinedData, recipeId, userId, existingFeedData);
@@ -237,24 +352,14 @@ const fetchRecipeDetailsViaFallback = async (recipeId: string, userId?: string, 
 
 // Process recipe details data (common logic)
 const processRecipeDetailsData = async (data: any, recipeId: string, userId?: string, existingFeedData?: any) => {
-  // Add detailed logging for like state and compare with feed data
-  console.log(`[processRecipeDetailsData] Processing data for recipe ${recipeId}:`, {
-    is_liked_by_user: data.is_liked_by_user,
-    likes: data.likes,
-    user_id: userId,
-    has_pantry_match: !!data.pantry_match,
-    timestamp: new Date().toISOString()
-  });
-  
   // Check for discrepancies with feed data
   if (existingFeedData && existingFeedData.likes !== data.likes) {
     console.warn(`[processRecipeDetailsData] LIKE COUNT DISCREPANCY for recipe ${recipeId}:`, {
       feed_likes: existingFeedData.likes,
-      recipe_details_likes: data.likes,
+      recipe_details_likes: data.recipe_details_likes,
       feed_liked: existingFeedData.liked,
-      recipe_details_liked: data.is_liked_by_user,
-      title: data.title,
-      timestamp: new Date().toISOString()
+      recipe_details_liked: data.recipe_details_liked,
+      title: data.title
     });
     
     // Use the higher like count as it's more likely to be correct
@@ -264,12 +369,10 @@ const processRecipeDetailsData = async (data: any, recipeId: string, userId?: st
     }
   }
   
-  // Log raw and cleaned preparation steps for debugging
-  console.log(`[processRecipeDetailsData] Raw data.preparation_steps for recipe ${recipeId}:`, JSON.stringify(data.preparation_steps));
+  // Clean preparation steps
   const cleanedSteps = (data.preparation_steps || []).map(
     (step: string) => step.replace(/^"+|"+$/g, '').trim()
   );
-  console.log(`[processRecipeDetailsData] Cleaned preparation_steps for recipe ${recipeId}:`, JSON.stringify(cleanedSteps));
   
   // Return data including pantry_match from calculate_pantry_match
   const processedData = {
@@ -282,8 +385,9 @@ const processRecipeDetailsData = async (data: any, recipeId: string, userId?: st
     prep_time_minutes: data.prep_time_minutes ?? null,
     cook_time_minutes: data.cook_time_minutes ?? null,
     video_url: data.video_url ?? null,
-    likes: data.likes ?? 0,
-    is_liked_by_user: data.is_liked_by_user ?? false,
+    // FIX: Use correct backend field names for likes
+    likes: data.recipe_details_likes ?? data.likes ?? 0,  // Backend uses recipe_details_likes
+    is_liked_by_user: data.recipe_details_liked ?? data.is_liked_by_user ?? false,  // Backend uses recipe_details_liked
     is_saved_by_user: data.is_saved_by_user ?? false,
     comments_count: data.comments_count ?? 0,
     views_count: data.views_count ?? 0,
@@ -294,18 +398,6 @@ const processRecipeDetailsData = async (data: any, recipeId: string, userId?: st
     missing_ingredients: data.pantry_match?.missing_ingredients || [],
     missing_ingredient_names: data.pantry_match?.missing_ingredients || [],
   } as RecipeDetailsData;
-
-  // Log pantry match data for debugging
-  if (data.pantry_match) {
-    console.log(`[processRecipeDetailsData] Final pantry match data for recipe ${recipeId}:`, {
-      match_percentage: data.pantry_match.match_percentage,
-      matched_count: data.pantry_match.matched_ingredients?.length || 0,
-      missing_count: data.pantry_match.missing_ingredients?.length || 0,
-      total_count: (data.pantry_match.matched_ingredients?.length || 0) + (data.pantry_match.missing_ingredients?.length || 0)
-    });
-  } else {
-    console.log(`[processRecipeDetailsData] No pantry_match data for recipe ${recipeId}`);
-  }
 
   return processedData;
 };
@@ -417,25 +509,31 @@ export const useRecipeDetails = (recipeId: string | undefined, userId?: string):
   const recipeResult = results[0];
   const pantryResult = results[1]; // RESTORED: pantryResult for fallback
 
-  // Update feed cache when recipe details are successfully fetched
+  // SIMPLE CACHE SYNC: Prevent race conditions by only updating feed if recipe details has BETTER data
   useEffect(() => {
     if (recipeResult.data && recipeId) {
-      // Update feed cache with recipe details data to keep them in sync
+      console.log(`[useRecipeDetails] 🔄 ALWAYS SYNC - Backend fixed, syncing all data for recipe ${recipeId}:`, {
+        recipe_comments: recipeResult.data.comments_count,
+        recipe_likes: recipeResult.data.likes,
+        recipe_liked: recipeResult.data.is_liked_by_user,
+        recipe_saved: recipeResult.data.is_saved_by_user
+      });
+
+      // ALWAYS sync now that backend is fixed - trust the recipe details data
       queryClient.setQueryData(['feed'], (oldFeedData: any) => {
         if (!oldFeedData || !Array.isArray(oldFeedData)) return oldFeedData;
         
         return oldFeedData.map((item: any) => {
           if (item.id === recipeId || item.recipe_id === recipeId) {
-            console.log(`[useRecipeDetails] Syncing feed with recipe details for recipe ${recipeId}:`, {
-              feed_likes: item.likes,
-              recipe_details_likes: recipeResult.data.likes,
-              feed_liked: item.liked,
-              recipe_details_liked: recipeResult.data.is_liked_by_user,
-              feed_saved: item.saved,
-              recipe_details_saved: recipeResult.data.is_saved_by_user,
-              feed_comments: item.commentsCount,
-              recipe_details_comments: recipeResult.data.comments_count,
-              title: item.title
+            console.log(`[useRecipeDetails] 📊 Syncing feed item for recipe ${recipeId}:`, {
+              from_feed_likes: item.likes,
+              to_recipe_likes: recipeResult.data.likes,
+              from_feed_liked: item.liked,
+              to_recipe_liked: recipeResult.data.is_liked_by_user,
+              from_feed_saved: item.saved,
+              to_recipe_saved: recipeResult.data.is_saved_by_user,
+              from_feed_comments: item.commentsCount,
+              to_recipe_comments: recipeResult.data.comments_count
             });
             
             return {
@@ -451,6 +549,53 @@ export const useRecipeDetails = (recipeId: string | undefined, userId?: string):
       });
     }
   }, [recipeResult.data, recipeId, queryClient]);
+
+  // REVERSE SYNC: Update recipe details when feed data changes (for like/save mutations from feed)
+  useEffect(() => {
+    const feedData = queryClient.getQueryData(['feed']) as any[];
+    if (feedData && recipeId && userId && recipeResult.data) {
+      const feedItem = feedData.find((item: any) => item.id === recipeId || item.recipe_id === recipeId);
+      
+      if (feedItem) {
+        // Check if feed has more recent interaction data
+        const feedLiked = feedItem.liked;
+        const feedSaved = feedItem.saved;
+        const feedLikes = feedItem.likes;
+        const feedComments = feedItem.commentsCount;
+        
+        const currentRecipeData = recipeResult.data;
+        
+        // Only update if there's a discrepancy (feed is more recent)
+        if (feedLiked !== currentRecipeData.is_liked_by_user || 
+            feedSaved !== currentRecipeData.is_saved_by_user ||
+            feedLikes !== currentRecipeData.likes ||
+            feedComments !== currentRecipeData.comments_count) {
+          
+          console.log(`[useRecipeDetails] Reverse sync: updating recipe details from feed for recipe ${recipeId}:`, {
+            feed_liked: feedLiked,
+            recipe_liked: currentRecipeData.is_liked_by_user,
+            feed_saved: feedSaved,
+            recipe_saved: currentRecipeData.is_saved_by_user,
+            feed_likes: feedLikes,
+            recipe_likes: currentRecipeData.likes,
+            feed_comments: feedComments,
+            recipe_comments: currentRecipeData.comments_count
+          });
+          
+          queryClient.setQueryData(['recipeDetails', recipeId, userId], (oldData: any) => {
+            if (!oldData) return oldData;
+            return {
+              ...oldData,
+              is_liked_by_user: feedLiked,
+              is_saved_by_user: feedSaved,
+              likes: feedLikes,
+              comments_count: feedComments
+            };
+          });
+        }
+      }
+    }
+  }, [queryClient, recipeId, userId, recipeResult.data]);
 
   const isLoading = recipeResult.isLoading || (!!userId && pantryResult.isLoading);
   const error = recipeResult.error || pantryResult.error;

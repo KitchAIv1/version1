@@ -56,6 +56,14 @@ export const useFeed = () => {
   const cacheManager = useCacheManager();
   const refreshedRecipeIds = useRef<Set<string>>(new Set());
 
+  // NUCLEAR CACHE CLEAR: Remove all stale cached data with wrong field mappings
+  useEffect(() => {
+    if (user?.id) {
+      console.log('[useFeed] 🧹 NUCLEAR CACHE CLEAR - Removing stale cached data with wrong field mappings');
+      queryClient.clear(); // Clear ALL cached data to start fresh
+    }
+  }, [user?.id, queryClient]);
+
   const feedQuery = useQuery<FeedItem[]>({
     queryKey: ['feed'],
     queryFn: async () => {
@@ -73,6 +81,18 @@ export const useFeed = () => {
 
       if (error) {
         console.error('[useFeed] RPC Error:', error);
+        
+        // Check if this is the known backend issue with missing likes column
+        if (error.code === '42703' && error.message?.includes('column r.likes does not exist')) {
+          console.error('[useFeed] BACKEND ISSUE: The get_community_feed_pantry_match_v3 RPC is trying to access a "likes" column that does not exist in the recipes table.');
+          console.error('[useFeed] Backend team needs to fix this by either:');
+          console.error('[useFeed] 1. Adding likes column to recipes table, OR');
+          console.error('[useFeed] 2. Calculating likes from recipe_likes table using COUNT()');
+          
+          // Create a more user-friendly error message
+          throw new Error('Feed is temporarily unavailable due to a backend issue. Please try again later.');
+        }
+        
         throw error;
       }
 
@@ -82,6 +102,22 @@ export const useFeed = () => {
       }
 
       console.log(`[useFeed] Successfully fetched ${data.length} feed items`);
+      
+      // CRITICAL BACKEND AUDIT: Show EVERY piece of like data from the first few items
+      console.log('[useFeed] 🚨 CRITICAL BACKEND AUDIT - Raw RPC Response:');
+      data.slice(0, 3).forEach((item, index) => {
+        console.log(`[useFeed] 🔍 RAW ITEM ${index + 1}:`, {
+          recipe_id: item.output_id,
+          title: item.output_name?.substring(0, 25) + '...',
+          RAW_output_likes: item.output_likes,
+          RAW_output_is_liked: item.output_is_liked,
+          RAW_output_is_saved: item.output_is_saved,
+          RAW_output_comments_count: item.output_comments_count,
+          type_of_likes: typeof item.output_likes,
+          is_null_likes: item.output_likes === null,
+          is_undefined_likes: item.output_likes === undefined
+        });
+      });
       
       // Log pantry match statistics for debugging
       const pantryMatchStats = data.map(item => ({
@@ -98,7 +134,7 @@ export const useFeed = () => {
       }
       
       // Transform the data to match the expected FeedItem interface
-      const transformedData: FeedItem[] = data.map((item: RawFeedItem) => {
+      const transformedData: FeedItem[] = data.map((item, index) => {
         // Use new pantry_match structure
         const pantryMatchPct = item.pantry_match?.match_percentage || 0;
         const matchedCount = item.pantry_match?.matched_ingredients?.length || 0;
@@ -109,6 +145,28 @@ export const useFeed = () => {
           console.warn(`[useFeed] Pantry match discrepancy for ${item.output_name}: ${matchedCount}/${totalCount} ingredients matched but showing 0%`);
         }
 
+        // TRANSFORMATION AUDIT: Log for first few items to see what's happening
+        if (index < 2) {
+          console.log(`[useFeed] 🔄 TRANSFORMATION for recipe ${index + 1}:`, {
+            raw_output_likes: item.output_likes,
+            raw_output_is_liked: item.output_is_liked,
+            transformed_likes: item.output_likes ?? 0,
+            transformed_liked: item.output_is_liked ?? false,
+            title: item.output_name?.substring(0, 20) + '...'
+          });
+        }
+
+        // CHECK: Does feed RPC also use different field names?
+        if (index < 1) {
+          console.log(`[useFeed] 🔍 FEED RPC FIELD CHECK:`, {
+            all_keys: Object.keys(item),
+            has_recipe_details_likes: 'recipe_details_likes' in item,
+            has_recipe_details_liked: 'recipe_details_liked' in item,
+            output_likes_value: item.output_likes,
+            output_is_liked_value: item.output_is_liked
+          });
+        }
+
         return {
           id: item.output_id,
           recipe_id: item.output_id,
@@ -116,13 +174,13 @@ export const useFeed = () => {
           video: item.output_video_url,
           video_url: item.output_video_url,
           description: item.output_description,
-          likes: item.output_likes,
-          liked: item.output_is_liked,
-          saved: item.output_is_saved,
+          likes: item.output_likes ?? 0, // Use nullish coalescing - 0 is a valid value!
+          liked: item.output_is_liked ?? false, // Use nullish coalescing
+          saved: item.output_is_saved ?? false, // Use nullish coalescing
           saves: 0,
-          commentsCount: item.output_comments_count,
-          userName: item.user_name,
-          creatorAvatarUrl: item.out_creator_avatar_url,
+          commentsCount: item.output_comments_count ?? 0, // Use nullish coalescing
+          userName: item.user_name || 'Unknown User',
+          creatorAvatarUrl: item.out_creator_avatar_url || null,
           creator_user_id: item.output_user_id,
           created_at: item.output_created_at,
           pantryMatchPct: pantryMatchPct,

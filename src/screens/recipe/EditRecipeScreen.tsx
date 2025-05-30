@@ -24,6 +24,9 @@ import { useAuth } from '../../providers/AuthProvider'; // Import useAuth
 import * as FileSystem from 'expo-file-system'; // Import expo-file-system
 import { compressImageWithPreset, needsCompression } from '../../utils/imageCompression'; // Import compression utilities
 
+// ADD THE SAFE RECIPE EDIT HOOK IMPORT
+import { useSafeRecipeEdit } from '../../hooks/useSafeRecipeEdit';
+
 // Reusable CollapsibleCard (can be moved to a shared components folder)
 const CollapsibleCard: React.FC<{ title: string; children: React.ReactNode; defaultCollapsed?: boolean }> = ({ title, children, defaultCollapsed = false }) => {
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
@@ -52,6 +55,17 @@ const EditRecipeScreen: React.FC<EditRecipeScreenProps> = ({ route, navigation }
 
   const { data: initialRecipeData, isLoading: isLoadingDetails, isError: isErrorDetails, error: errorDetails } = useEditableRecipeDetails(recipeId);
 
+  // ADD SAFE RECIPE EDIT HOOK FOR PARSED INGREDIENTS
+  const { 
+    parsedIngredients, 
+    updateIngredients, 
+    addIngredient: addParsedIngredient, 
+    removeIngredient: removeParsedIngredient,
+    getIngredientsForSave,
+    clearCachesAfterSave,
+    isLoading: isLoadingParsedIngredients 
+  } = useSafeRecipeEdit(recipeId, user?.id);
+
   // Form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -74,7 +88,7 @@ const EditRecipeScreen: React.FC<EditRecipeScreenProps> = ({ route, navigation }
     if (initialRecipeData) {
       setTitle(initialRecipeData.title || '');
       setDescription(initialRecipeData.description || '');
-      setIngredients(initialRecipeData.ingredients.length > 0 ? initialRecipeData.ingredients : [{ name: '', quantity: '', unit: '' }]);
+      // REMOVE: setIngredients(initialRecipeData.ingredients.length > 0 ? initialRecipeData.ingredients : [{ name: '', quantity: '', unit: '' }]);
       setPreparationSteps(initialRecipeData.preparation_steps.length > 0 ? initialRecipeData.preparation_steps : ['']);
       setDietTags(initialRecipeData.diet_tags || []);
       setPrepTimeMinutes(initialRecipeData.prep_time_minutes?.toString() || '');
@@ -93,19 +107,46 @@ const EditRecipeScreen: React.FC<EditRecipeScreenProps> = ({ route, navigation }
     }
   }, [initialRecipeData, navigation]);
 
-  // --- Handlers for Ingredients (similar to VideoUploaderScreen) ---
+  // --- NEW: Effect to sync parsed ingredients to display format --- 
+  useEffect(() => {
+    if (parsedIngredients && parsedIngredients.length > 0) {
+      const displayIngredients = parsedIngredients.map(parsed => ({
+        name: parsed.ingredient || '',
+        quantity: parsed.quantity || '',
+        unit: parsed.unit || ''
+      }));
+      setIngredients(displayIngredients);
+    }
+  }, [parsedIngredients]);
+
+  // --- Updated Handlers for Ingredients to sync with parsing ---
   const handleIngredientChange = (index: number, field: keyof Ingredient, value: string) => {
     const newIngredients = [...ingredients];
     newIngredients[index] = { ...newIngredients[index], [field]: value };
     setIngredients(newIngredients);
+    
+    // Also update the parsed ingredients to keep them in sync
+    const newParsedIngredients = [...parsedIngredients];
+    if (newParsedIngredients[index]) {
+      if (field === 'name') newParsedIngredients[index].ingredient = value;
+      if (field === 'quantity') newParsedIngredients[index].quantity = value;
+      if (field === 'unit') newParsedIngredients[index].unit = value;
+      updateIngredients(newParsedIngredients);
+    }
   };
-  const handleAddIngredient = () => setIngredients([...ingredients, { name: '', quantity: '', unit: '' }]);
+  
+  const handleAddIngredient = () => {
+    setIngredients([...ingredients, { name: '', quantity: '', unit: '' }]);
+    addParsedIngredient(); // Also add to parsed ingredients
+  };
+  
   const handleRemoveIngredient = (indexToRemove: number) => {
     if (ingredients.length === 1) {
       setIngredients([{ name: '', quantity: '', unit: '' }]);
       return;
     }
     setIngredients(ingredients.filter((_, index) => index !== indexToRemove));
+    removeParsedIngredient(indexToRemove); // Also remove from parsed ingredients
   };
 
   // --- Handlers for Preparation Steps (similar to VideoUploaderScreen) ---
@@ -281,7 +322,7 @@ const EditRecipeScreen: React.FC<EditRecipeScreenProps> = ({ route, navigation }
         p_description: description.trim(),
         p_video_url: initialRecipeData.video_url, // Pass original video URL as it's not changed here
         p_thumbnail_url: finalThumbnailUrl,
-        p_ingredients: ingredients.filter(ing => ing.name.trim() !== ''), // Clean empty ingredients
+        p_ingredients: getIngredientsForSave(), // USE PROPERLY SERIALIZED INGREDIENTS
         p_diet_tags: dietTags,
         p_preparation_steps: preparationSteps.filter(step => step.trim() !== ''), // Clean empty steps
         p_prep_time_minutes: parseInt(prepTimeMinutes) || null,
@@ -299,7 +340,10 @@ const EditRecipeScreen: React.FC<EditRecipeScreenProps> = ({ route, navigation }
       setUploadProgress(1);
       Alert.alert('Success', 'Recipe updated successfully!');
       
-      // Invalidate queries to refresh data
+      // 4. Clear caches using enhanced cache clearing
+      await clearCachesAfterSave();
+      
+      // Also invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['editableRecipeDetails', recipeId] });
       queryClient.invalidateQueries({ queryKey: ['recipeDetails', recipeId] }); // For the detail view screen
       if (user) { // Invalidate profile query if user exists
@@ -354,7 +398,7 @@ const EditRecipeScreen: React.FC<EditRecipeScreenProps> = ({ route, navigation }
 
 
   // --- Render Loading/Error States --- 
-  if (isLoadingDetails) {
+  if (isLoadingDetails || isLoadingParsedIngredients) {
     return <View style={styles.centered}><ActivityIndicator size="large" /></View>;
   }
   if (isErrorDetails) {

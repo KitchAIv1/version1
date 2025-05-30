@@ -24,6 +24,7 @@ import RecipeCard from '../../components/RecipeCard';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../providers/AuthProvider';
 import { useCacheManager } from '../../hooks/useCacheManager';
+import { useNavigation } from '@react-navigation/native';
 
 // Import "What Can I Cook?" components
 import InsufficientItemsModal from '../../components/modals/InsufficientItemsModal';
@@ -39,6 +40,7 @@ export default function FeedScreen() {
   const prevFeedItemsRef = useRef<FeedItem[] | undefined>(undefined);
   const insets = useSafeAreaInsets();
   const windowDims = Dimensions.get('window');
+  const navigation = useNavigation();
 
   // Use optimized mutation hooks
   const likeMutation = useLikeMutation(user?.id);
@@ -71,135 +73,69 @@ export default function FeedScreen() {
     );
   }, [insets, windowDims]);
 
-  // Automatic comment count refresh when screen is focused and feed data is available
+  // Real-time comment count monitoring - KEEP THIS SIMPLE VERSION
+  useEffect(() => {
+    if (!feedData || !user?.id) return;
+
+    // Monitor comment queries for changes
+    const unsubscribe = queryClient.getQueryCache().subscribe(event => {
+      if (event.type === 'updated' && event.query.queryKey[0] === 'recipe-comments') {
+        const recipeId = event.query.queryKey[1] as string;
+        const comments = event.query.state.data as any[];
+        
+        if (comments && Array.isArray(comments)) {
+          const newCommentCount = comments.length;
+          
+          // Update feed cache immediately with new comment count
+          queryClient.setQueryData(['feed'], (oldFeedData: any) => {
+            if (!oldFeedData || !Array.isArray(oldFeedData)) return oldFeedData;
+            
+            return oldFeedData.map((item: any) => {
+              if (item.id === recipeId || item.recipe_id === recipeId) {
+                return {
+                  ...item,
+                  commentsCount: newCommentCount
+                };
+              }
+              return item;
+            });
+          });
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [queryClient, feedData, user?.id]);
+
+  // SIMPLE LIKE REFRESH: Update like counts when screen is focused (backend fixed)
   useEffect(() => {
     if (isFeedScreenFocused && feedData && feedData.length > 0 && user?.id) {
-      console.log(
-        '[FeedScreen] Screen focused, refreshing comment counts for all feed items',
-      );
-
-      // Refresh comment counts for ALL feed items, not just first 5
-      feedData.forEach((item: FeedItem, index: number) => {
-        // Add a small delay between requests to avoid overwhelming the server
-        setTimeout(() => {
-          cacheManager.updateCommentCount(item.id, user.id);
-        }, index * 50); // Reduced delay to 50ms for faster refresh
-      });
+      // DISABLED - using optimized sync instead
+      return;
     }
-  }, [isFeedScreenFocused, feedData, user?.id, cacheManager]);
+  }, [isFeedScreenFocused, currentIndex, feedData, user?.id, cacheManager]);
 
-  // Additional refresh when user scrolls to new items
+  // OPTIMIZED LIKE SYNC: Only sync items that have 0 likes (feed RPC compensation)
   useEffect(() => {
-    if (feedData && feedData.length > 0 && user?.id && currentIndex >= 0) {
-      const currentItem = feedData[currentIndex];
-      if (currentItem) {
-        // Refresh comment count for currently visible item and next few items
-        const itemsToRefresh = feedData.slice(currentIndex, currentIndex + 3);
-        itemsToRefresh.forEach((item: FeedItem, relativeIndex: number) => {
+    if (isFeedScreenFocused && feedData && feedData.length > 0 && user?.id) {
+      // Get currently visible items 
+      const startIndex = Math.max(0, currentIndex);
+      const endIndex = Math.min(feedData.length, startIndex + 2);
+      const visibleItems = feedData.slice(startIndex, endIndex);
+      
+      // Only sync items that have 0 likes (indicating feed RPC didn't provide like data)
+      const itemsNeedingSync = visibleItems.filter(item => (item.likes ?? 0) === 0);
+      
+      if (itemsNeedingSync.length > 0) {
+        console.log(`[FeedScreen] 🔧 Syncing ${itemsNeedingSync.length} items with missing like data`);
+        itemsNeedingSync.forEach((item: FeedItem, index: number) => {
           setTimeout(() => {
-            cacheManager.updateCommentCount(item.id, user.id);
-          }, relativeIndex * 100);
+            cacheManager.updateLikeCount(item.id, user.id);
+          }, index * 500);
         });
       }
     }
-  }, [currentIndex, feedData, user?.id, cacheManager]);
-
-  // Reset comment refresh tracking when feed data changes (removed the blocking mechanism)
-  useEffect(() => {
-    if (feedData) {
-      // Don't block refreshes anymore - allow multiple refreshes for accuracy
-      console.log(
-        '[FeedScreen] Feed data updated, comment counts will be refreshed',
-      );
-    }
-  }, [feedData]);
-
-  // Periodic refresh of comment counts for currently visible items
-  useEffect(() => {
-    if (!isFeedScreenFocused || !feedData || !user?.id) return;
-
-    const refreshInterval = setInterval(() => {
-      // Refresh comment counts for currently visible item and nearby items
-      const startIndex = Math.max(0, currentIndex - 1);
-      const endIndex = Math.min(feedData.length, currentIndex + 2);
-      const visibleItems = feedData.slice(startIndex, endIndex);
-
-      console.log(
-        `[FeedScreen] Periodic refresh of comment counts for ${visibleItems.length} visible items`,
-      );
-
-      visibleItems.forEach((item: FeedItem, index: number) => {
-        setTimeout(() => {
-          cacheManager.updateCommentCount(item.id, user.id);
-        }, index * 200); // Stagger the requests
-      });
-    }, 30000); // Refresh every 30 seconds
-
-    return () => clearInterval(refreshInterval);
-  }, [isFeedScreenFocused, currentIndex, feedData, user?.id, cacheManager]);
-
-  // Quick scroll to top function - TikTok style
-  const scrollToTopQuick = useCallback(() => {
-    if (flashListRef.current) {
-      console.log('[FeedScreen] Quick scroll to top initiated');
-      
-      // Immediate scroll to top - no animation for instant feedback
-      flashListRef.current.scrollToOffset({ 
-        offset: 0, 
-        animated: false 
-      });
-      
-      // Reset current index immediately
-      setCurrentIndex(0);
-      
-      // Force a quick re-render to ensure the first item is active
-      setTimeout(() => {
-        setCurrentIndex(0);
-      }, 10);
-    }
-  }, []);
-
-  // Track focus events for tab press detection
-  const focusCountRef = useRef(0);
-  
-  useFocusEffect(
-    useCallback(() => {
-      focusCountRef.current += 1;
-      
-      // If this is not the initial focus and we have data, scroll to top immediately
-      if (focusCountRef.current > 1 && feedData && feedData.length > 0) {
-        console.log('[FeedScreen] Tab press detected, triggering immediate scroll to top');
-        // No delay - immediate scroll for best UX
-        scrollToTopQuick();
-      }
-    }, [feedData, scrollToTopQuick])
-  );
-
-  // Listen for feed data changes to trigger scroll-to-top
-  useEffect(() => {
-    if (
-      isFeedScreenFocused &&
-      feedData &&
-      feedData.length > 0 &&
-      flashListRef.current &&
-      prevFeedItemsRef.current !== undefined &&
-      prevFeedItemsRef.current !== feedData &&
-      !likeMutation.isPending && // Prevent scroll during like mutations
-      !saveMutation.isPending // Prevent scroll during save mutations
-    ) {
-      console.log(
-        '[FeedScreen] Feed items updated (not from mutation), quick scroll to top.',
-      );
-      scrollToTopQuick();
-    }
-    prevFeedItemsRef.current = feedData;
-  }, [
-    feedData,
-    isFeedScreenFocused,
-    likeMutation.isPending,
-    saveMutation.isPending,
-    scrollToTopQuick,
-  ]);
+  }, [isFeedScreenFocused, feedData, currentIndex, user?.id, cacheManager]);
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: Array<ViewToken> }) => {

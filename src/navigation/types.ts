@@ -118,3 +118,8 @@ export type SearchResultsProps = NativeStackScreenProps<MainStackParamList, 'Sea
 export type RecipeDetailProps = NativeStackScreenProps<MainStackParamList, 'RecipeDetail'>;
 export type PantryScanProps = NativeStackScreenProps<MainStackParamList, 'PantryScan'>; // Add prop type for PantryScan
 export type UpgradeScreenProps = NativeStackScreenProps<MainStackParamList, 'UpgradeScreen'>; // Add prop type for UpgradeScreen 
+
+// "What Can I Cook?" feature screen prop types
+export type IngredientSelectionScreenProps = NativeStackScreenProps<MainStackParamList, 'IngredientSelection'>;
+export type RecipeResultsScreenProps = NativeStackScreenProps<MainStackParamList, 'RecipeResults'>;
+export type AIRecipeGenerationScreenProps = NativeStackScreenProps<MainStackParamList, 'AIRecipeGeneration'>; 

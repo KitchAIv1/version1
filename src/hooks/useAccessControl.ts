@@ -79,40 +79,133 @@ export const useAccessControl = () => {
       return null;
     }
 
-    if (!canGenerateAIRecipe()) {
-      Alert.alert(
-        'AI Recipe Limit Reached',
-        'FREEMIUM limit reached: 10 AI recipes per month. Upgrade to PREMIUM for unlimited access.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Upgrade Now', onPress: () => {/* Navigate to upgrade screen */} }
-        ]
-      );
-      return null;
-    }
-
     setIsProcessing(true);
     try {
-      const { data, error } = await supabase.rpc('generate_ai_recipe', {
-        p_user_id: user.id,
-        p_recipe_data: recipeData,
+      console.log('[useAccessControl] Calling Edge Function directly with data:', recipeData);
+
+      // Call the Edge Function directly as instructed by backend team
+      const supabaseUrl = 'https://btpmaqffdmxhugvybgfn.supabase.co';
+      const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON;
+      
+      const response = await fetch(`${supabaseUrl}/functions/v1/generate-recipe`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({
+          user_id: user.id,
+          ingredients: recipeData.selected_ingredients || [],
+          dietary_preferences: recipeData.dietary_restrictions || {},
+          cuisine_style: recipeData.user_preferences?.cuisine_style,
+          difficulty: recipeData.user_preferences?.difficulty || 'Medium',
+          prep_time: recipeData.user_preferences?.max_prep_time || 45,
+          servings: recipeData.user_preferences?.servings || 4,
+        })
       });
 
-      if (error) {
-        Alert.alert('Error', error.message);
+      const rawResponse = await response.text();
+      console.log('[useAccessControl] Raw Edge Function response:', rawResponse);
+      
+      let data;
+      try {
+        data = JSON.parse(rawResponse);
+      } catch (parseError) {
+        // If direct JSON parsing fails, try to extract JSON from markdown
+        if (rawResponse.includes('```json')) {
+          const jsonMatch = rawResponse.match(/```json\s*([\s\S]*?)\s*```/);
+          if (jsonMatch && jsonMatch[1]) {
+            try {
+              data = JSON.parse(jsonMatch[1]);
+              console.log('[useAccessControl] Parsed JSON from markdown in response:', data);
+            } catch (innerParseError) {
+              console.error('[useAccessControl] Failed to parse JSON from markdown:', innerParseError);
+              Alert.alert('Error', 'Invalid response format from AI service');
+              return null;
+            }
+          } else {
+            console.error('[useAccessControl] No valid JSON found in markdown response');
+            Alert.alert('Error', 'Invalid response format from AI service');
+            return null;
+          }
+        } else {
+          console.error('[useAccessControl] Failed to parse response as JSON:', parseError);
+          Alert.alert('Error', 'Invalid response from AI service');
+          return null;
+        }
+      }
+      
+      if (!response.ok) {
+        console.error('[useAccessControl] Edge Function error:', data);
+        
+        // Special handling: If the error contains JSON parsing issues with markdown,
+        // try to extract the JSON from the error message itself
+        if (data.error && typeof data.error === 'string' && data.error.includes('```json')) {
+          console.log('[useAccessControl] Attempting to extract JSON from error message...');
+          try {
+            // The error message contains the actual JSON we need
+            const jsonMatch = data.error.match(/```json\s*([\s\S]*?)(?:\s*```|$)/);
+            if (jsonMatch && jsonMatch[1]) {
+              const extractedJson = JSON.parse(jsonMatch[1]);
+              console.log('[useAccessControl] Successfully extracted JSON from error message:', extractedJson);
+              
+              // Refresh usage limits after successful generation
+              await refreshUsageLimits(user.id);
+              
+              return extractedJson; // Return the extracted recipes
+            }
+          } catch (extractError) {
+            console.error('[useAccessControl] Failed to extract JSON from error message:', extractError);
+          }
+        }
+        
+        // Handle specific error cases
+        if (data.error?.includes('limit reached') || data.error?.includes('LIMIT_EXCEEDED')) {
+          Alert.alert(
+            'AI Recipe Limit Reached',
+            'FREEMIUM limit reached: 10 AI recipes per month. Upgrade to PREMIUM for unlimited access.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Upgrade Now', onPress: () => {/* Navigate to upgrade screen */} }
+            ]
+          );
+        } else {
+          Alert.alert('Error', data.error || 'Failed to generate AI recipe');
+        }
         return null;
+      }
+
+      console.log('[useAccessControl] Edge Function returned recipes:', data);
+
+      // Handle case where AI returns JSON wrapped in markdown code blocks in the data field
+      let parsedData = data;
+      if (typeof data === 'string' && data.includes('```json')) {
+        try {
+          // Extract JSON from markdown code blocks
+          const jsonMatch = data.match(/```json\s*([\s\S]*?)\s*```/);
+          if (jsonMatch && jsonMatch[1]) {
+            parsedData = JSON.parse(jsonMatch[1]);
+            console.log('[useAccessControl] Parsed JSON from markdown:', parsedData);
+          }
+        } catch (parseError) {
+          console.error('[useAccessControl] Failed to parse JSON from markdown:', parseError);
+          Alert.alert('Error', 'Invalid response format from AI service');
+          return null;
+        }
       }
 
       // Refresh usage limits after successful generation
       await refreshUsageLimits(user.id);
-      return data;
+      
+      return parsedData; // Should be array of 3 recipes with recipe_id
     } catch (error: any) {
+      console.error('[useAccessControl] AI recipe generation error:', error);
       Alert.alert('Error', error.message || 'Failed to generate AI recipe');
       return null;
     } finally {
       setIsProcessing(false);
     }
-  }, [user, canGenerateAIRecipe, refreshUsageLimits]);
+  }, [user, refreshUsageLimits]);
 
   // Get usage display data
   const getUsageDisplay = useCallback(() => {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   FlatList,
   SafeAreaView,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -74,6 +73,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
   },
+  itemCountWarning: {
+    color: '#ef4444',
+  },
   itemsList: {
     flex: 1,
   },
@@ -88,6 +90,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
+  selectedItemCard: {
+    backgroundColor: '#f3f4f6',
+  },
+  unselectedItemCard: {
+    backgroundColor: '#f9fafb',
+  },
   itemInfo: {
     flex: 1,
   },
@@ -97,8 +105,20 @@ const styles = StyleSheet.create({
     color: '#1f2937',
     marginBottom: 4,
   },
+  selectedItemName: {
+    color: '#10b981',
+  },
+  unselectedItemName: {
+    color: '#6b7280',
+  },
   itemQuantity: {
     fontSize: 14,
+    color: '#6b7280',
+  },
+  selectedItemQuantity: {
+    color: '#10b981',
+  },
+  unselectedItemQuantity: {
     color: '#6b7280',
   },
   footer: {
@@ -145,44 +165,79 @@ export default function IngredientSelectionScreen() {
 
   const { pantryItems } = route.params;
 
+  // State for selected ingredients (start with all selected)
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(
+    new Set(pantryItems.map(item => item.id))
+  );
+
   const handleGoBack = () => {
     navigation.goBack();
   };
 
-  const handleContinue = () => {
-    // Phase 1 Demo: Show what would happen in Phase 2
-    const selectedIngredients = pantryItems
-      .map(item => item.item_name)
-      .slice(0, 5); // Show first 5 for demo
+  const handleToggleItem = (itemId: string) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
+  };
 
-    Alert.alert(
-      '🎉 Phase 1 Working!',
-      `Great! You've selected ${pantryItems.length} ingredients:\n\n${selectedIngredients.join(', ')}${pantryItems.length > 5 ? '...' : ''}\n\nPhase 2 will:\n• Call the backend API\n• Show recipe matches\n• Offer AI recipe generation\n\nBackend is ready and waiting!`,
-      [
-        {
-          text: 'Back to Pantry',
-          onPress: () => navigation.navigate('MainTabs', { screen: 'Pantry' }),
-          style: 'cancel',
-        },
-        {
-          text: 'Got it!',
-          onPress: () => navigation.goBack(),
-        },
-      ],
+  const handleContinue = () => {
+    // Get selected ingredients
+    const selectedIngredients = pantryItems
+      .filter(item => selectedItems.has(item.id))
+      .map(item => item.item_name);
+
+    console.log('[IngredientSelection] Navigating to RecipeResults with ingredients:', selectedIngredients);
+    console.log('[IngredientSelection] Total selected items:', selectedIngredients.length);
+    console.log('[IngredientSelection] Selected ingredients:', selectedIngredients.slice(0, 10));
+
+    navigation.navigate('RecipeResults', {
+      selectedIngredients,
+    });
+  };
+
+  const renderPantryItem = ({ item }: { item: PantryItem }) => {
+    const isSelected = selectedItems.has(item.id);
+    
+    return (
+      <TouchableOpacity 
+        style={[
+          styles.itemCard,
+          isSelected ? styles.selectedItemCard : styles.unselectedItemCard
+        ]}
+        onPress={() => handleToggleItem(item.id)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.itemInfo}>
+          <Text style={[
+            styles.itemName,
+            isSelected ? styles.selectedItemName : styles.unselectedItemName
+          ]}>
+            {item.item_name}
+          </Text>
+          <Text style={[
+            styles.itemQuantity,
+            isSelected ? styles.selectedItemQuantity : styles.unselectedItemQuantity
+          ]}>
+            {item.quantity} {item.unit}
+          </Text>
+        </View>
+        <Ionicons 
+          name={isSelected ? "checkmark-circle" : "ellipse-outline"} 
+          size={24} 
+          color={isSelected ? "#10b981" : "#9ca3af"} 
+        />
+      </TouchableOpacity>
     );
   };
 
-  const renderPantryItem = ({ item }: { item: PantryItem }) => (
-    <View style={styles.itemCard}>
-      <View style={styles.itemInfo}>
-        <Text style={styles.itemName}>{item.item_name}</Text>
-        <Text style={styles.itemQuantity}>
-          {item.quantity} {item.unit}
-        </Text>
-      </View>
-      <Ionicons name="checkmark-circle" size={24} color="#10b981" />
-    </View>
-  );
+  const selectedCount = selectedItems.size;
+  const canContinue = selectedCount >= 3;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -198,11 +253,14 @@ export default function IngredientSelectionScreen() {
       {/* Content */}
       <View style={styles.content}>
         <Text style={styles.subtitle}>
-          Your pantry items are pre-selected. Tap to deselect or add more.
+          Tap ingredients to select or deselect them for recipe matching.
         </Text>
 
-        <Text style={styles.itemCount}>
-          {pantryItems.length} ingredients selected
+        <Text style={[
+          styles.itemCount,
+          !canContinue && styles.itemCountWarning
+        ]}>
+          {selectedCount} ingredients selected
         </Text>
 
         <FlatList
@@ -219,20 +277,20 @@ export default function IngredientSelectionScreen() {
         <TouchableOpacity
           style={[
             styles.continueButton,
-            pantryItems.length < 3 && styles.disabledButton,
+            !canContinue && styles.disabledButton,
           ]}
           onPress={handleContinue}
-          disabled={pantryItems.length < 3}>
+          disabled={!canContinue}>
           <Text
             style={[
               styles.continueButtonText,
-              pantryItems.length < 3 && styles.disabledButtonText,
+              !canContinue && styles.disabledButtonText,
             ]}>
             Find Recipes
           </Text>
         </TouchableOpacity>
 
-        {pantryItems.length < 3 && (
+        {!canContinue && (
           <Text style={styles.requirementText}>
             Select at least 3 ingredients to continue
           </Text>

@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   Alert,
   TouchableOpacity,
-  TextInput,
   ScrollView,
   RefreshControl,
   Animated,
@@ -26,11 +25,13 @@ import { format } from 'date-fns';
 import { getShortRelativeTime } from '../../utils/dateUtils';
 import ManualAddSheet from '../../components/ManualAddSheet';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Import optimized hooks and components
 import { usePantryData, useRefreshPantryData, usePantryMutations, PantryItem } from '../../hooks/usePantryData';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { PantryItemComponent } from '../../components/PantryItemComponent';
+import SearchInput from '../../components/SearchInput';
 
 // Import "What Can I Cook?" components
 import WhatCanICookButton from '../../components/WhatCanICookButton';
@@ -52,6 +53,7 @@ export default function PantryScreen() {
   const navigation = useNavigation<PantryNavigationProp>();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const { 
     performPantryScan, 
     canPerformScan, 
@@ -76,19 +78,67 @@ export default function PantryScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   
+  // Stable search handler to prevent re-renders
+  const handleSearchChange = useCallback((text: string) => {
+    console.log('[PantryScreen] Search input changed:', text);
+    setSearchQuery(text);
+  }, []);
+  
+  // Stable clear handler
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+  }, []);
+  
   // Debounced search for better performance
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
   
+  // Add debugging for pantry items count
+  useEffect(() => {
+    console.log('[PantryScreen] Pantry items loaded:', {
+      totalCount: pantryItems.length,
+      isLoading,
+      hasError: !!fetchError,
+      sampleItems: pantryItems.slice(0, 5).map(item => ({
+        id: item.id,
+        name: item.item_name,
+        quantity: item.quantity,
+        unit: item.unit
+      }))
+    });
+  }, [pantryItems, isLoading, fetchError]);
+  
   // Memoized filtered items for better performance
   const filteredItems = useMemo(() => {
+    console.log('[PantryScreen] Filtering items:', {
+      searchQuery,
+      debouncedSearchQuery,
+      totalItems: pantryItems.length,
+      sampleItems: pantryItems.slice(0, 3).map(item => item.item_name)
+    });
+    
     if (!debouncedSearchQuery.trim()) {
+      console.log('[PantryScreen] No search query, returning all items:', pantryItems.length);
       return pantryItems;
     }
     
-    const lowerQuery = debouncedSearchQuery.toLowerCase();
-    return pantryItems.filter(item =>
-      item.item_name.toLowerCase().includes(lowerQuery)
-    );
+    const lowerQuery = debouncedSearchQuery.toLowerCase().trim();
+    const filtered = pantryItems.filter(item => {
+      const itemName = item.item_name.toLowerCase();
+      const matches = itemName.includes(lowerQuery);
+      if (matches) {
+        console.log('[PantryScreen] Item matches search:', item.item_name);
+      }
+      return matches;
+    });
+    
+    console.log('[PantryScreen] Filtered results:', {
+      query: lowerQuery,
+      totalItems: pantryItems.length,
+      filteredCount: filtered.length,
+      filteredItems: filtered.map(item => item.item_name)
+    });
+    
+    return filtered;
   }, [debouncedSearchQuery, pantryItems]);
   
   // Manual Add Sheet state
@@ -272,41 +322,21 @@ export default function PantryScreen() {
     setEditingItem(null);
   };
 
-  // Header component
-  const renderPantryHeader = () => (
-    <View style={styles.pantryHeaderContainer}>
-      {/* Scrollable Header with pantry title and item count badge */}
-      <View style={styles.scrollableHeader}>
-        <View style={styles.headerSpacer} />
-        <Text style={styles.scrollableHeaderTitle}>My Pantry</Text>
-        <View style={styles.headerActions}>
-          <View style={styles.itemCountBadge}>
-            <Text style={styles.itemCountText}>
-              {pantryItems.length}
-            </Text>
-          </View>
-        </View>
-      </View>
-      
-      {/* Search Bar Section */}
-      <View style={styles.searchSection}>
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#9ca3af" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search your pantry..."
-            placeholderTextColor="#9ca3af"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={20} color="#9ca3af" />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
+  // Convert error to string for display
+  const error = fetchError ? (fetchError as any).message || 'Failed to load pantry data' : null;
 
+  // "What Can I Cook?" feature hook - moved before memoized components
+  const {
+    pantryItemCount,
+    showInsufficientModal,
+    handleWhatCanICookPress,
+    handleCloseModal,
+    handleNavigateToPantry,
+  } = useWhatCanICook();
+
+  // Header component
+  const renderPantryHeader = useCallback(() => (
+    <View style={styles.pantryHeaderContainer}>
       {/* Action Buttons Section - Award-Winning Design */}
       <View style={styles.actionButtonsSection}>
         {/* Primary Action - What Can I Cook? (Hero Button) */}
@@ -398,7 +428,7 @@ export default function PantryScreen() {
         </View>
       </View>
     </View>
-  );
+  ), [pantryItemCount, handleWhatCanICookPress, isProcessing, canPerformScan, usageData, handleScanPress, scanButtonScale, handleManualAddPress, addButtonScale]);
 
   // Optimized render function using memoized component
   const renderPantryItem = useCallback(({ item }: { item: PantryItem }) => {
@@ -425,18 +455,6 @@ export default function PantryScreen() {
     </View>
   );
 
-  // Convert error to string for display
-  const error = fetchError ? (fetchError as any).message || 'Failed to load pantry data' : null;
-
-  // "What Can I Cook?" feature hook
-  const {
-    pantryItemCount,
-    showInsufficientModal,
-    handleWhatCanICookPress,
-    handleCloseModal,
-    handleNavigateToPantry,
-  } = useWhatCanICook();
-
   return (
     <View style={styles.container}>
       {/* Fixed Green Header - covers status bar area and stays fixed */}
@@ -444,55 +462,80 @@ export default function PantryScreen() {
         <SafeAreaView edges={['top']} />
       </View>
       
-      {/* Main Content - Now using optimized FlatList instead of nested ScrollView */}
-      <View style={styles.mainContent}>
-        <FlatList
-          data={filteredItems}
-          renderItem={renderPantryItem}
-          keyExtractor={keyExtractor}
-          ListHeaderComponent={renderPantryHeader}
-          ListEmptyComponent={
-            isLoading && pantryItems.length === 0 ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={ACTIVE_COLOR} />
-                <Text style={styles.loadingText}>Loading your pantry...</Text>
-              </View>
-            ) : error ? (
-              <View style={styles.errorContainer}>
-                <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
-                <Text style={styles.errorTitle}>Something went wrong</Text>
-                <Text style={styles.errorText}>{error}</Text>
-                <TouchableOpacity style={styles.retryButton} onPress={fetchPantryData}>
-                  <Text style={styles.retryButtonText}>Try Again</Text>
-                </TouchableOpacity>
-              </View>
-            ) : searchQuery ? (
-              <View style={styles.emptyStateContainer}>
-                <Ionicons name="search-outline" size={48} color="#cbd5e1" />
-                <Text style={styles.emptyStateTitle}>No items found</Text>
-                <Text style={styles.emptyStateText}>
-                  Try a different search term or add new items to your pantry
-                </Text>
-              </View>
-            ) : (
-              renderEmptyState()
-            )
-          }
-          refreshControl={
-            <RefreshControl 
-              refreshing={refreshing} 
-              onRefresh={onRefresh} 
-              colors={[ACTIVE_COLOR]}
-              tintColor={ACTIVE_COLOR}
-            />
-          }
-          showsVerticalScrollIndicator={false}
-          removeClippedSubviews={true}
-          maxToRenderPerBatch={10}
-          windowSize={10}
-          initialNumToRender={8}
-          contentContainerStyle={styles.listContentContainer}
-        />
+      {/* Content below green header */}
+      <View style={[styles.contentBelowHeader, { marginTop: insets.top }]}>
+        {/* Fixed Search Bar - completely isolated from list */}
+        <View style={styles.fixedSearchContainer}>
+          <View style={styles.headerRow}>
+            <Text style={styles.pantryTitle}>My Pantry</Text>
+            <View style={styles.itemCountBadge}>
+              <Text style={styles.itemCountText}>{pantryItems.length}</Text>
+            </View>
+          </View>
+          
+          <SearchInput
+            placeholder="Search your pantry..."
+            onSearchChange={handleSearchChange}
+            onClear={handleClearSearch}
+          />
+        </View>
+        
+        {/* Main Content - Now using optimized FlatList */}
+        <View style={styles.mainContent}>
+          <FlatList
+            data={filteredItems}
+            renderItem={renderPantryItem}
+            keyExtractor={keyExtractor}
+            ListHeaderComponent={renderPantryHeader}
+            ListHeaderComponentStyle={styles.listHeader}
+            ListEmptyComponent={
+              isLoading && pantryItems.length === 0 ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={ACTIVE_COLOR} />
+                  <Text style={styles.loadingText}>Loading your pantry...</Text>
+                </View>
+              ) : error ? (
+                <View style={styles.errorContainer}>
+                  <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
+                  <Text style={styles.errorTitle}>Something went wrong</Text>
+                  <Text style={styles.errorText}>{error}</Text>
+                  <TouchableOpacity style={styles.retryButton} onPress={fetchPantryData}>
+                    <Text style={styles.retryButtonText}>Try Again</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : searchQuery ? (
+                <View style={styles.emptyStateContainer}>
+                  <Ionicons name="search-outline" size={48} color="#cbd5e1" />
+                  <Text style={styles.emptyStateTitle}>No items found</Text>
+                  <Text style={styles.emptyStateText}>
+                    Try a different search term or add new items to your pantry
+                  </Text>
+                </View>
+              ) : (
+                renderEmptyState()
+              )
+            }
+            refreshControl={
+              <RefreshControl 
+                refreshing={refreshing} 
+                onRefresh={onRefresh} 
+                colors={[ACTIVE_COLOR]}
+                tintColor={ACTIVE_COLOR}
+              />
+            }
+            showsVerticalScrollIndicator={false}
+            removeClippedSubviews={false}
+            maxToRenderPerBatch={20}
+            windowSize={21}
+            initialNumToRender={15}
+            updateCellsBatchingPeriod={50}
+            getItemLayout={undefined}
+            contentContainerStyle={styles.listContentContainer}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="none"
+            scrollEventThrottle={16}
+          />
+        </View>
       </View>
 
       {/* Manual Add/Edit Sheet */}
@@ -574,9 +617,12 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 1000,
   },
+  contentBelowHeader: {
+    flex: 1,
+  },
   mainContent: {
     flex: 1,
-    paddingTop: 50, // Account for fixed green header
+    paddingTop: 0, // No padding needed since search is now above
   },
   scrollContainer: {
     flex: 1,
@@ -944,5 +990,31 @@ const styles = StyleSheet.create({
   },
   addButtonIconContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  listHeader: {
+    paddingHorizontal: 16,
+  },
+  fixedSearchContainer: {
+    backgroundColor: '#fff',
+    paddingTop: 20, // Add space below green header
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    flexDirection: 'column',
+    gap: 12,
+  },
+  pantryTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1f2937',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  safeAreaContent: {
+    flex: 1,
   },
 }); 

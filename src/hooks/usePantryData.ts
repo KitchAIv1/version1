@@ -20,19 +20,25 @@ export const usePantryData = (userId?: string) => {
       
       console.log('[usePantryData] Fetching pantry data for user:', userId);
       
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from('stock')
-        .select('id, item_name, quantity, unit, description, created_at, updated_at, user_id')
+        .select('id, item_name, quantity, unit, description, created_at, updated_at, user_id', { count: 'exact' })
         .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(100); // Reasonable limit for performance
+        .order('created_at', { ascending: false });
       
       if (error) {
         console.error('[usePantryData] Error fetching pantry data:', error);
         throw error;
       }
       
-      console.log(`[usePantryData] Successfully fetched ${data?.length || 0} pantry items`);
+      console.log(`[usePantryData] Successfully fetched ${data?.length || 0} pantry items (total count: ${count})`);
+      console.log('[usePantryData] Sample items:', data?.slice(0, 3).map(item => ({
+        id: item.id,
+        name: item.item_name,
+        quantity: item.quantity,
+        unit: item.unit
+      })));
+      
       return data || [];
     },
     enabled: !!userId,

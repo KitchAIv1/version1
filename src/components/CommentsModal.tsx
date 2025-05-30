@@ -188,10 +188,25 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
       const currentDetails = queryClient.getQueryData<RecipeDetailsData>(['recipeDetails', recipeId, user?.id]);
       
       if (currentDetails && currentDetails.comments_count !== comments.length) {
-        // Only update recipe details cache - defer feed cache updates
+        // Update recipe details cache
         queryClient.setQueryData<RecipeDetailsData>(['recipeDetails', recipeId, user?.id], {
           ...currentDetails,
           comments_count: comments.length
+        });
+        
+        // Also update feed cache to keep counts in sync
+        queryClient.setQueryData(['feed'], (oldFeedData: any) => {
+          if (!oldFeedData || !Array.isArray(oldFeedData)) return oldFeedData;
+          
+          return oldFeedData.map((item: any) => {
+            if (item.id === recipeId || item.recipe_id === recipeId) {
+              return {
+                ...item,
+                commentsCount: comments.length
+              };
+            }
+            return item;
+          });
         });
       }
     }, 100); // Small delay to ensure smooth animations
@@ -239,28 +254,37 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
     onSuccess: () => {
       setCommentText('');
       
-      // Invalidate only essential queries immediately
+      // Invalidate comment queries immediately for fresh data
       queryClient.invalidateQueries({ queryKey: ['recipe-comments', recipeId] });
       
-      // Defer other cache invalidations to avoid blocking UI
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['recipeDetails', recipeId, user?.id] });
+      // Immediately update both caches with optimistic comment count
+      const currentCommentCount = (comments?.length || 0) + 1;
+      
+      // Update recipe details cache immediately
+      queryClient.setQueryData(['recipeDetails', recipeId, user?.id], (oldData: any) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          comments_count: currentCommentCount
+        };
+      });
+      
+      // Update feed cache immediately
+      queryClient.setQueryData(['feed'], (oldFeedData: any) => {
+        if (!oldFeedData || !Array.isArray(oldFeedData)) return oldFeedData;
         
-        // Update feed cache with new comment count
-        queryClient.setQueryData(['feed'], (oldFeedData: any) => {
-          if (!oldFeedData || !Array.isArray(oldFeedData)) return oldFeedData;
-          
-          return oldFeedData.map((item: any) => {
-            if (item.id === recipeId || item.recipe_id === recipeId) {
-              return {
-                ...item,
-                commentsCount: (item.commentsCount || 0) + 1
-              };
-            }
-            return item;
-          });
+        return oldFeedData.map((item: any) => {
+          if (item.id === recipeId || item.recipe_id === recipeId) {
+            return {
+              ...item,
+              commentsCount: currentCommentCount
+            };
+          }
+          return item;
         });
-      }, 200);
+      });
+      
+      console.log(`[CommentsModal] Comment posted, updated count to ${currentCommentCount} in all caches`);
     },
     onError: (error, variables, context) => {
       // Simple rollback

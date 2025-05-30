@@ -16,10 +16,10 @@ export const useLikeMutation = (userId?: string) => {
       
       console.log('[useLikeMutation] Attempting to toggle like for recipe:', recipeId, 'by user:', userId);
       
-      // Use the existing toggle_like_recipe RPC function
-      const { data: rpcData, error } = await supabase.rpc('toggle_like_recipe', { 
-        p_user_id: userId,
-        p_recipe_id: recipeId
+      // Use the toggle_recipe_like RPC function (confirmed working by backend team)
+      const { data: rpcData, error } = await supabase.rpc('toggle_recipe_like', {
+        user_id_param: userId,
+        recipe_id_param: recipeId
       });
       
       if (error) {

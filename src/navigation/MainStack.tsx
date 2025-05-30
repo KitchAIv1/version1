@@ -18,6 +18,8 @@ import OnboardingFinalScreen from '../screens/onboarding/OnboardingFinalScreen';
 
 // Import "What Can I Cook?" Screens
 import IngredientSelectionScreen from '../screens/recipe-generation/IngredientSelectionScreen';
+import RecipeResultsScreen from '../screens/recipe-generation/RecipeResultsScreen';
+import AIRecipeGenerationScreen from '../screens/recipe-generation/AIRecipeGenerationScreen';
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -90,6 +92,22 @@ const MainStack: React.FC<MainStackProps> = ({ userOnboarded }) => {
       <Stack.Screen 
         name="IngredientSelection" 
         component={IngredientSelectionScreen} 
+        options={{ 
+          headerShown: false, // Screen has its own header
+          presentation: 'card', // Standard card presentation
+        }} 
+      />
+      <Stack.Screen 
+        name="RecipeResults" 
+        component={RecipeResultsScreen} 
+        options={{ 
+          headerShown: false, // Screen has its own header
+          presentation: 'card', // Standard card presentation
+        }} 
+      />
+      <Stack.Screen 
+        name="AIRecipeGeneration" 
+        component={AIRecipeGenerationScreen} 
         options={{ 
           headerShown: false, // Screen has its own header
           presentation: 'card', // Standard card presentation

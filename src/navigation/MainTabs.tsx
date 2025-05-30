@@ -52,19 +52,34 @@ const MainTabs = () => {
             e.preventDefault();
 
             const state = navigation.getState();
-            if (state.routes[state.index].name === 'Feed') {
-              console.log(
-                'Feed tab pressed while it is the current tab. Master refresh initiated.'
-              );
+            const currentRoute = state.routes[state.index];
+            
+            // Check if we're actually on the Feed tab already
+            if (currentRoute.name === 'Feed') {
+              // Only do master refresh if this is a deliberate tab press
+              // Check if we're coming from a nested screen (like RecipeDetail)
+              const currentTabRoute = currentRoute.state?.routes && currentRoute.state.index !== undefined 
+                ? currentRoute.state.routes[currentRoute.state.index] 
+                : null;
               
-              // Master refresh - invalidate all relevant caches
-              queryClient.invalidateQueries({ queryKey: ['feed'] });
-              queryClient.invalidateQueries({ queryKey: ['pantryData'] });
-              queryClient.invalidateQueries({ queryKey: ['recipeDetails'] });
-              queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
-              queryClient.invalidateQueries({ queryKey: ['groceryList'] });
-              
-              console.log('Master refresh completed - all caches invalidated');
+              // If we're on the Feed tab but not on the main Feed screen, don't refresh
+              if (currentTabRoute && currentTabRoute.name !== 'Feed') {
+                console.log('Returning to Feed from nested screen - preserving state');
+              } else {
+                console.log('Feed tab pressed while it is the current tab. Master refresh - TEMPORARILY DISABLED');
+                
+                // TEMPORARILY DISABLED FOR DEBUGGING
+                /*
+                // Master refresh - invalidate all relevant caches
+                queryClient.invalidateQueries({ queryKey: ['feed'] });
+                queryClient.invalidateQueries({ queryKey: ['pantryData'] });
+                queryClient.invalidateQueries({ queryKey: ['recipeDetails'] });
+                queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
+                queryClient.invalidateQueries({ queryKey: ['groceryList'] });
+                
+                console.log('Master refresh completed - all caches invalidated');
+                */
+              }
             }
 
             navigation.jumpTo('Feed');

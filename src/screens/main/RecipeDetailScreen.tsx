@@ -576,6 +576,27 @@ export default function RecipeDetailScreen() {
               </View>
             );
           }
+          
+          // Check if this is an AI-generated recipe
+          if (recipeDetails?.is_ai_generated) {
+            return (
+              <View style={styles.aiRecipeImageContainer}>
+                <Image
+                  source={{ 
+                    uri: recipeDetails.thumbnail_url || 
+                         'https://btpmaqffdmxhugvybgfn.supabase.co/storage/v1/object/public/app-assets/kitch-ai-recipe-default.jpg'
+                  }}
+                  style={styles.aiRecipeImage}
+                  resizeMode="cover"
+                />
+                <View style={styles.aiRecipeBadge}>
+                  <Ionicons name="sparkles" size={16} color="#10b981" />
+                  <Text style={styles.aiRecipeBadgeText}>AI Generated</Text>
+                </View>
+              </View>
+            );
+          }
+          
           if (recipeDetails?.video_url) {
             console.log("RecipeDetailScreen: Attempting to play video_url:", recipeDetails.video_url); 
             return (
@@ -669,9 +690,17 @@ export default function RecipeDetailScreen() {
           </Text>
 
           {/* Author Info Row */}
-          {recipeDetails?.username && (
-            <TouchableOpacity style={styles.authorInfoRow} onPress={handleNavigateToAuthorProfile}>
-              {recipeDetails.avatar_url ? (
+          {(recipeDetails?.username || recipeDetails?.is_ai_generated) && (
+            <TouchableOpacity 
+              style={styles.authorInfoRow} 
+              onPress={recipeDetails?.is_ai_generated ? undefined : handleNavigateToAuthorProfile}
+              disabled={recipeDetails?.is_ai_generated}
+            >
+              {recipeDetails?.is_ai_generated ? (
+                <View style={styles.authorAvatarPlaceholder}>
+                  <Ionicons name="sparkles" size={18} color="#10b981" />
+                </View>
+              ) : recipeDetails.avatar_url ? (
                 <Image 
                   source={{ uri: recipeDetails.avatar_url }} 
                   style={styles.authorAvatarImage}
@@ -682,7 +711,7 @@ export default function RecipeDetailScreen() {
                 </View>
               )}
               <Text style={styles.authorNameText}>
-                {recipeDetails.username || 'Unknown Author'}
+                {recipeDetails?.is_ai_generated ? 'Kitch AI' : (recipeDetails.username || 'Unknown Author')}
               </Text>
             </TouchableOpacity>
           )}
@@ -1109,5 +1138,32 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'white',
     fontWeight: '600',
+  },
+  aiRecipeImageContainer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  aiRecipeImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 10,
+  },
+  aiRecipeBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 5,
+    borderRadius: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  aiRecipeBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginLeft: 4,
   },
 }); 

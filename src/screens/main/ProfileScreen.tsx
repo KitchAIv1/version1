@@ -32,6 +32,9 @@ import { useUserActivityFeed } from '../../hooks/useUserActivityFeed'; // Import
 import { useAccessControl } from '../../hooks/useAccessControl'; // Import access control hook
 import { TierDisplay } from '../../components/TierDisplay'; // Added TierDisplay import
 import { FollowButton } from '../../components/FollowButton'; // Import FollowButton
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
+// import { useCacheDebug } from '../../hooks/useCacheDebug'; // REMOVED - no longer needed
 
 // Define types for profile and post data
 interface VideoPostData { 
@@ -68,14 +71,6 @@ const useProfile = (targetUserId?: string) => {
   const { user } = useAuth(); 
   const userId = targetUserId || user?.id; // Use targetUserId if provided, otherwise current user
 
-  // Debug logging for useProfile
-  console.log('[useProfile] Hook called with:', {
-    targetUserId: targetUserId,
-    currentUserId: user?.id,
-    resolvedUserId: userId,
-    timestamp: new Date().toISOString()
-  });
-
   return useQuery<ProfileData, Error, ProfileData, QueryKey>({
     queryKey: ['profile', userId], 
     queryFn: async () => {
@@ -93,26 +88,12 @@ const useProfile = (targetUserId?: string) => {
         throw new Error('Profile data not found.'); 
       }
       
-      console.log('[useProfile] rawData from RPC:', JSON.stringify(rawData, null, 2)); // Log the raw data
       const profileDataBackend = rawData as any;
-      
-      // Enhanced debug logging for recipes
-      console.log('[useProfile] Enhanced Debug Info:', {
-        userId: userId,
-        recipesType: typeof profileDataBackend.recipes,
-        recipesIsArray: Array.isArray(profileDataBackend.recipes),
-        recipesLength: profileDataBackend.recipes?.length,
-        firstRecipe: profileDataBackend.recipes?.[0],
-        allKeys: Object.keys(profileDataBackend),
-        timestamp: new Date().toISOString()
-      });
       
       // Map uploaded recipes with robust field mapping and fallbacks
       let processedUploadedVideos: VideoPostData[] = [];
       if (Array.isArray(profileDataBackend.recipes)) {
         processedUploadedVideos = profileDataBackend.recipes.map((recipe: any, index: number) => {
-          console.log(`[useProfile] Processing recipe ${index}:`, recipe);
-          
           const mappedRecipe = {
             recipe_id: recipe.recipe_id || recipe.id || `recipe_${index}`,
             recipe_name: recipe.title || recipe.recipe_name || recipe.name || 'Untitled Recipe',
@@ -122,7 +103,6 @@ const useProfile = (targetUserId?: string) => {
             creator_user_id: recipe.creator_user_id || recipe.creatorUserId || recipe.user_id || userId,
           };
           
-          console.log(`[useProfile] Mapped recipe ${index}:`, mappedRecipe);
           return mappedRecipe;
         });
         
@@ -136,12 +116,10 @@ const useProfile = (targetUserId?: string) => {
         });
         
         processedUploadedVideos = validRecipes;
-        console.log(`[useProfile] Successfully processed ${processedUploadedVideos.length} valid recipes out of ${profileDataBackend.recipes.length} total`);
       } else {
         console.warn('[useProfile] profileDataBackend.recipes is not an array or is missing:', {
           type: typeof profileDataBackend.recipes,
           value: profileDataBackend.recipes,
-          allKeys: Object.keys(profileDataBackend),
           userId: userId
         });
       }
@@ -150,8 +128,6 @@ const useProfile = (targetUserId?: string) => {
       let processedSavedRecipes: VideoPostData[] = [];
       if (Array.isArray(profileDataBackend.saved_recipes)) {
         processedSavedRecipes = profileDataBackend.saved_recipes.map((recipe: any, index: number) => {
-          console.log(`[useProfile] Processing saved recipe ${index}:`, recipe);
-          
           const mappedRecipe = {
             recipe_id: recipe.recipe_id || recipe.id || `saved_recipe_${index}`,
             recipe_name: recipe.title || recipe.recipe_name || recipe.name || 'Untitled Recipe',
@@ -161,7 +137,6 @@ const useProfile = (targetUserId?: string) => {
             creator_user_id: recipe.creator_user_id || recipe.creatorUserId || recipe.user_id || userId,
           };
           
-          console.log(`[useProfile] Mapped saved recipe ${index}:`, mappedRecipe);
           return mappedRecipe;
         });
         
@@ -175,12 +150,10 @@ const useProfile = (targetUserId?: string) => {
         });
         
         processedSavedRecipes = validSavedRecipes;
-        console.log(`[useProfile] Successfully processed ${processedSavedRecipes.length} valid saved recipes out of ${profileDataBackend.saved_recipes.length} total`);
       } else {
         console.warn('[useProfile] profileDataBackend.saved_recipes is not an array or is missing:', {
           type: typeof profileDataBackend.saved_recipes,
           value: profileDataBackend.saved_recipes,
-          allKeys: Object.keys(profileDataBackend),
           userId: userId
         });
       }
@@ -197,7 +170,6 @@ const useProfile = (targetUserId?: string) => {
         user_id: userId // Add user_id for follow functionality
       };
       
-      console.log(`[useProfile] Processed ${processedUploadedVideos.length} uploaded, ${processedSavedRecipes.length} saved recipes.`);
       return processedFrontendData;
     },
     enabled: !!userId,
@@ -213,7 +185,6 @@ const useProfile = (targetUserId?: string) => {
 // Components
 // -----------------------------------------------------------------------------
 const AvatarRow: React.FC<{ profile: ProfileData; postsCount: number }> = React.memo(({ profile, postsCount }) => {
-  console.log(`[AvatarRow] Rendering. Avatar URL: ${profile.avatar_url}, Timestamp: ${Date.now()}`);
   return (
     <View style={styles.avatarRow}>
       {profile.avatar_url ? (
@@ -339,16 +310,6 @@ export const ProfileScreen: React.FC = () => {
   const routeParams = route.params as ProfileScreenParams | undefined;
   const targetUserId = routeParams?.userId;
   const isOwnProfile = !targetUserId || targetUserId === user?.id;
-  
-  // Debug logging to identify the issue
-  console.log('[ProfileScreen] Debug info:', {
-    routeName: route.name,
-    routeParams: routeParams,
-    targetUserId: targetUserId,
-    currentUserId: user?.id,
-    isOwnProfile: isOwnProfile,
-    timestamp: new Date().toISOString()
-  });
   
   // Use the profile hook with targetUserId
   const { data: profile, isLoading: profileLoading, isError, error: profileFetchError, refetch: refetchProfile } = useProfile(targetUserId);
