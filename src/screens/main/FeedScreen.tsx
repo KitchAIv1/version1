@@ -25,6 +25,7 @@ import { supabase } from '../../services/supabase';
 import { useAuth } from '../../providers/AuthProvider';
 import { useCacheManager } from '../../hooks/useCacheManager';
 import { useNavigation } from '@react-navigation/native';
+import { useCommentCountSync } from '../../hooks/useCommentCountSync';
 
 // Import "What Can I Cook?" components
 import InsufficientItemsModal from '../../components/modals/InsufficientItemsModal';
@@ -34,6 +35,7 @@ export default function FeedScreen() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const cacheManager = useCacheManager();
+  const { smartSync, syncSingleRecipe } = useCommentCountSync();
   const { data: feedData, isLoading, error: feedError } = useFeed();
   const isFeedScreenFocused = useIsFocused();
   const flashListRef = useRef<FlashList<FeedItem>>(null);
@@ -73,39 +75,40 @@ export default function FeedScreen() {
     );
   }, [insets, windowDims]);
 
-  // Real-time comment count monitoring - KEEP THIS SIMPLE VERSION
+  // EFFICIENT Real-time comment count monitoring
   useEffect(() => {
     if (!feedData || !user?.id) return;
+
+    console.log('[FeedScreen] 🎧 Setting up efficient real-time comment monitoring');
 
     // Monitor comment queries for changes
     const unsubscribe = queryClient.getQueryCache().subscribe(event => {
       if (event.type === 'updated' && event.query.queryKey[0] === 'recipe-comments') {
         const recipeId = event.query.queryKey[1] as string;
-        const comments = event.query.state.data as any[];
+        const commentsData = event.query.state.data;
         
-        if (comments && Array.isArray(comments)) {
+        // Handle both old array format and new {comments: [...]} format
+        let comments: any[] = [];
+        if (Array.isArray(commentsData)) {
+          comments = commentsData;
+        } else if (commentsData?.comments && Array.isArray(commentsData.comments)) {
+          comments = commentsData.comments;
+        }
+        
+        if (comments.length >= 0) {
           const newCommentCount = comments.length;
           
-          // Update feed cache immediately with new comment count
-          queryClient.setQueryData(['feed'], (oldFeedData: any) => {
-            if (!oldFeedData || !Array.isArray(oldFeedData)) return oldFeedData;
-            
-            return oldFeedData.map((item: any) => {
-              if (item.id === recipeId || item.recipe_id === recipeId) {
-                return {
-                  ...item,
-                  commentsCount: newCommentCount
-                };
-              }
-              return item;
-            });
-          });
+          // Use efficient direct cache update instead of invalidation
+          syncSingleRecipe(recipeId, user.id);
         }
       }
     });
 
-    return unsubscribe;
-  }, [queryClient, feedData, user?.id]);
+    return () => {
+      console.log('[FeedScreen] 🎧 Cleaning up real-time comment monitoring');
+      unsubscribe();
+    };
+  }, [queryClient, feedData, user?.id, syncSingleRecipe]);
 
   // SIMPLE LIKE REFRESH: Update like counts when screen is focused (backend fixed)
   useEffect(() => {
@@ -136,6 +139,23 @@ export default function FeedScreen() {
       }
     }
   }, [isFeedScreenFocused, feedData, currentIndex, user?.id, cacheManager]);
+
+  // EFFICIENT COMMENT COUNT SYNC: Smart sync when returning from recipe details
+  useFocusEffect(
+    useCallback(() => {
+      if (feedData && feedData.length > 0 && user?.id) {
+        console.log('[FeedScreen] 🧠 Screen focused - running smart comment count sync');
+        
+        // Get visible recipes for smart sync
+        const startIndex = Math.max(0, currentIndex);
+        const endIndex = Math.min(feedData.length, startIndex + 3);
+        const visibleRecipeIds = feedData.slice(startIndex, endIndex).map(item => item.id);
+        
+        // Use smart sync to only update what needs updating
+        smartSync(visibleRecipeIds, user.id);
+      }
+    }, [feedData, currentIndex, user?.id, smartSync])
+  );
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: Array<ViewToken> }) => {

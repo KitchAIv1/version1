@@ -44,6 +44,7 @@ import { useDailyMealPlan, MealSlot } from '../../hooks/useDailyMealPlan';
 import AddToMealPlannerModal from '../../components/modals/AddToMealPlannerModal';
 import CommentsModal from '../../components/CommentsModal';
 import { useLikeMutation, useSaveMutation } from '../../hooks/useRecipeMutations';
+import { useCommentCountSync } from '../../hooks/useCommentCountSync';
 
 // Define route prop type
 type RecipeDetailScreenRouteProp = RouteProp<
@@ -137,6 +138,7 @@ export default function RecipeDetailScreen() {
   const route = useRoute<RecipeDetailScreenRouteProp>();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { syncSingleRecipe } = useCommentCountSync();
   const id = route.params?.id;
   const initialSeekTime = route.params?.initialSeekTime ?? 0;
   const initialTabFromParams = route.params?.initialTab; // Read the initialTab param
@@ -243,10 +245,17 @@ export default function RecipeDetailScreen() {
         is_liked_by_user: recipeDetails?.is_liked_by_user,
         likes: recipeDetails?.likes,
         is_saved_by_user: recipeDetails?.is_saved_by_user,
+        comments_count: recipeDetails?.comments_count,
         timestamp: new Date().toISOString()
       });
+      
+      // EFFICIENT COMMENT COUNT SYNC: Update comment count when screen becomes focused
+      if (id && user?.id) {
+        console.log(`[RecipeDetailScreen] 🎯 Efficient sync comment count for recipe ${id}`);
+        syncSingleRecipe(id, user.id);
+      }
     }
-  }, [isScreenFocused, recipeDetails?.is_liked_by_user, recipeDetails?.likes, recipeDetails?.is_saved_by_user, id, isAnyModalOpen]);
+  }, [isScreenFocused, recipeDetails?.is_liked_by_user, recipeDetails?.likes, recipeDetails?.is_saved_by_user, recipeDetails?.comments_count, id, isAnyModalOpen, syncSingleRecipe, user?.id]);
 
   // Effect to reset video error when video_url changes
   useEffect(() => {

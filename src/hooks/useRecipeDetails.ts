@@ -519,12 +519,16 @@ export const useRecipeDetails = (recipeId: string | undefined, userId?: string):
         recipe_saved: recipeResult.data.is_saved_by_user
       });
 
-      // ALWAYS sync now that backend is fixed - trust the recipe details data
+      // SMART SYNC: Only update feed if recipe details data is fresher
       queryClient.setQueryData(['feed'], (oldFeedData: any) => {
         if (!oldFeedData || !Array.isArray(oldFeedData)) return oldFeedData;
         
         return oldFeedData.map((item: any) => {
           if (item.id === recipeId || item.recipe_id === recipeId) {
+            // SMART COMMENT SYNC: Don't overwrite higher comment counts (indicates fresh data)
+            const shouldSyncComments = (recipeResult.data.comments_count >= (item.commentsCount || 0));
+            const finalCommentCount = shouldSyncComments ? recipeResult.data.comments_count : item.commentsCount;
+            
             console.log(`[useRecipeDetails] 📊 Syncing feed item for recipe ${recipeId}:`, {
               from_feed_likes: item.likes,
               to_recipe_likes: recipeResult.data.likes,
@@ -533,7 +537,9 @@ export const useRecipeDetails = (recipeId: string | undefined, userId?: string):
               from_feed_saved: item.saved,
               to_recipe_saved: recipeResult.data.is_saved_by_user,
               from_feed_comments: item.commentsCount,
-              to_recipe_comments: recipeResult.data.comments_count
+              to_recipe_comments: recipeResult.data.comments_count,
+              final_comment_count: finalCommentCount,
+              comments_sync_decision: shouldSyncComments ? 'SYNC' : 'KEEP_FEED'
             });
             
             return {
@@ -541,7 +547,7 @@ export const useRecipeDetails = (recipeId: string | undefined, userId?: string):
               likes: recipeResult.data.likes,
               liked: recipeResult.data.is_liked_by_user,
               saved: recipeResult.data.is_saved_by_user,
-              commentsCount: recipeResult.data.comments_count
+              commentsCount: finalCommentCount  // Smart comment sync
             };
           }
           return item;

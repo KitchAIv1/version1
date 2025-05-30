@@ -1,7 +1,10 @@
+-- Add comments_count column to recipe_uploads if it doesn't exist
+ALTER TABLE recipe_uploads ADD COLUMN IF NOT EXISTS comments_count INTEGER DEFAULT 0;
+
 -- Create recipe_comments table if it doesn't exist
 CREATE TABLE IF NOT EXISTS recipe_comments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  recipe_id UUID NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+  recipe_id UUID NOT NULL REFERENCES recipe_uploads(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   comment_text TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now(),
@@ -66,10 +69,10 @@ CREATE OR REPLACE FUNCTION update_recipe_comments_count()
 RETURNS TRIGGER AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
-    UPDATE recipes SET comments_count = comments_count + 1 WHERE id = NEW.recipe_id;
+    UPDATE recipe_uploads SET comments_count = COALESCE(comments_count, 0) + 1 WHERE id = NEW.recipe_id;
     RETURN NEW;
   ELSIF TG_OP = 'DELETE' THEN
-    UPDATE recipes SET comments_count = comments_count - 1 WHERE id = OLD.recipe_id;
+    UPDATE recipe_uploads SET comments_count = COALESCE(comments_count, 1) - 1 WHERE id = OLD.recipe_id;
     RETURN OLD;
   END IF;
   RETURN NULL;

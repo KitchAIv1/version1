@@ -141,7 +141,7 @@ export default function RecipeResultsScreen({ navigation, route }: RecipeResults
                     { backgroundColor: getMatchColor(recipe.match_percentage) }
                   ]}>
                     <Text style={styles.matchBadgeText}>
-                      {recipe.match_percentage}%
+                      {Math.round(recipe.match_percentage)}%
                     </Text>
                   </View>
                 </View>

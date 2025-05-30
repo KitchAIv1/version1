@@ -165,69 +165,132 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
     queryFn: async () => {
       if (!recipeId) return [];
       
+      console.log('[CommentsModal] 🔍 FETCHING COMMENTS for recipe:', recipeId);
+      
       const { data, error } = await supabase
         .rpc('get_recipe_comments', {
           p_recipe_id: recipeId
         });
       
-      if (error) throw error;
-      return data || [];
+      if (error) {
+        console.error('[CommentsModal] 🚨 RPC ERROR fetching comments:', {
+          error_message: error.message,
+          error_code: error.code,
+          error_details: error.details,
+          recipe_id: recipeId,
+          full_error: error
+        });
+        throw error;
+      }
+      
+      console.log('[CommentsModal] ✅ COMMENTS FETCHED:', {
+        recipe_id: recipeId,
+        raw_data: data,
+        data_type: typeof data,
+        data_structure: data && typeof data === 'object' ? Object.keys(data) : 'not_object',
+        comments_array: data?.comments ? Array.isArray(data.comments) : false,
+        comments_length: data?.comments ? data.comments.length : 0,
+        sample_comment: data?.comments && Array.isArray(data.comments) && data.comments.length > 0 ? data.comments[0] : null
+      });
+      
+      // Handle the new RPC response structure: { comments: [...] }
+      let result = [];
+      if (data && data.comments && Array.isArray(data.comments)) {
+        result = data.comments;
+      } else if (Array.isArray(data)) {
+        result = data; // Fallback for direct array response
+      }
+      
+      console.log('[CommentsModal] 📋 PROCESSED COMMENTS:', {
+        recipe_id: recipeId,
+        final_result_length: result.length,
+        final_result_type: Array.isArray(result) ? 'array' : typeof result
+      });
+      
+      return result;
     },
     enabled: !!recipeId && visible,
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 0, // Always fetch fresh data as per backend team recommendation
+    gcTime: 30 * 1000, // Keep in cache for 30 seconds only
   });
 
-  // Lightweight cache sync - only update comment count when comments actually change
-  // Defer this operation to avoid blocking modal animations
+  // ENHANCED REAL-TIME COMMENT COUNT SYNC - Immediate updates across the app
   React.useEffect(() => {
-    if (!visible || !hasOpenedRef.current || !comments || !Array.isArray(comments)) return;
+    if (!visible || !comments || !Array.isArray(comments)) return;
     
-    // Use setTimeout to defer cache updates until after animation completes
-    const timeoutId = setTimeout(() => {
-      const currentDetails = queryClient.getQueryData<RecipeDetailsData>(['recipeDetails', recipeId, user?.id]);
+    const currentCount = comments.length;
+    console.log(`[CommentsModal] 🔄 REAL-TIME SYNC: Updating comment count to ${currentCount} for recipe ${recipeId}`);
+    
+    // Immediate sync (no delay for better UX)
+    const currentDetails = queryClient.getQueryData<RecipeDetailsData>(['recipeDetails', recipeId, user?.id]);
+    
+    if (currentDetails && currentDetails.comments_count !== currentCount) {
+      console.log(`[CommentsModal] 📊 Recipe details count: ${currentDetails.comments_count} → ${currentCount}`);
       
-      if (currentDetails && currentDetails.comments_count !== comments.length) {
-        // Update recipe details cache
-        queryClient.setQueryData<RecipeDetailsData>(['recipeDetails', recipeId, user?.id], {
-          ...currentDetails,
-          comments_count: comments.length
-        });
+      // Update recipe details cache immediately
+      queryClient.setQueryData<RecipeDetailsData>(['recipeDetails', recipeId, user?.id], {
+        ...currentDetails,
+        comments_count: currentCount
+      });
+      
+      // Also update feed cache to keep counts in sync immediately
+      queryClient.setQueryData(['feed'], (oldFeedData: any) => {
+        if (!oldFeedData || !Array.isArray(oldFeedData)) return oldFeedData;
         
-        // Also update feed cache to keep counts in sync
-        queryClient.setQueryData(['feed'], (oldFeedData: any) => {
-          if (!oldFeedData || !Array.isArray(oldFeedData)) return oldFeedData;
-          
-          return oldFeedData.map((item: any) => {
-            if (item.id === recipeId || item.recipe_id === recipeId) {
-              return {
-                ...item,
-                commentsCount: comments.length
-              };
-            }
-            return item;
-          });
+        return oldFeedData.map((item: any) => {
+          if (item.id === recipeId || item.recipe_id === recipeId) {
+            console.log(`[CommentsModal] 📰 Feed count: ${item.commentsCount || 0} → ${currentCount}`);
+            return {
+              ...item,
+              commentsCount: currentCount
+            };
+          }
+          return item;
         });
-      }
-    }, 100); // Small delay to ensure smooth animations
-    
-    return () => clearTimeout(timeoutId);
+      });
+      
+      console.log(`[CommentsModal] ✅ Real-time sync complete - all counts updated to ${currentCount}`);
+    }
   }, [comments?.length, visible, recipeId, queryClient, user?.id]);
 
-  // Optimized comment posting with reduced cache operations
+  // Optimized comment posting with enhanced error handling
   const postCommentMutation = useMutation({
     mutationFn: async (text: string) => {
       if (!user?.id || !recipeId) throw new Error('User or recipe ID missing');
       
-      const { error } = await supabase
+      console.log('[CommentsModal] 🔧 POSTING COMMENT:', {
+        recipe_id: recipeId,
+        user_id: user.id,
+        comment_text: text,
+        text_length: text.length
+      });
+      
+      const { data, error } = await supabase
         .from('recipe_comments')
         .insert({
           recipe_id: recipeId,
           user_id: user.id,
           comment_text: text
-        });
+        })
+        .select(); // Add .select() to get the inserted data back
       
-      if (error) throw error;
+      if (error) {
+        console.error('[CommentsModal] 🚨 SUPABASE INSERT ERROR:', {
+          error_message: error.message,
+          error_code: error.code,
+          error_details: error.details,
+          error_hint: error.hint,
+          full_error: error
+        });
+        throw error;
+      }
+      
+      console.log('[CommentsModal] ✅ INSERT SUCCESSFUL:', {
+        inserted_data: data,
+        data_length: data?.length
+      });
+      
+      return data;
     },
     onMutate: async (text: string) => {
       // Cancel only essential queries to avoid blocking UI
@@ -245,8 +308,10 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
       };
       
       // Only update comments list optimistically - defer other cache updates
-      queryClient.setQueryData(['recipe-comments', recipeId], (oldComments: Comment[] = []) => {
-        return [optimisticComment, ...oldComments];
+      queryClient.setQueryData(['recipe-comments', recipeId], (oldComments: Comment[] | undefined) => {
+        // Safely handle undefined/null/non-array values
+        const safeOldComments = Array.isArray(oldComments) ? oldComments : [];
+        return [optimisticComment, ...safeOldComments];
       });
       
       return { previousComments };
@@ -254,51 +319,61 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
     onSuccess: () => {
       setCommentText('');
       
-      // Invalidate comment queries immediately for fresh data
+      console.log(`[CommentsModal] ✅ Comment posted successfully - triggering immediate cache refresh`);
+      
+      // More targeted cache strategy: invalidate to get fresh data but keep real-time sync working
       queryClient.invalidateQueries({ queryKey: ['recipe-comments', recipeId] });
+      queryClient.invalidateQueries({ queryKey: ['recipeDetails', recipeId, user?.id] });
       
-      // Immediately update both caches with optimistic comment count
-      const currentCommentCount = (comments?.length || 0) + 1;
+      // Gentle feed refresh (don't remove, just invalidate to let real-time sync work)
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
       
-      // Update recipe details cache immediately
-      queryClient.setQueryData(['recipeDetails', recipeId, user?.id], (oldData: any) => {
-        if (!oldData) return oldData;
-        return {
-          ...oldData,
-          comments_count: currentCommentCount
-        };
-      });
-      
-      // Update feed cache immediately
-      queryClient.setQueryData(['feed'], (oldFeedData: any) => {
-        if (!oldFeedData || !Array.isArray(oldFeedData)) return oldFeedData;
-        
-        return oldFeedData.map((item: any) => {
-          if (item.id === recipeId || item.recipe_id === recipeId) {
-            return {
-              ...item,
-              commentsCount: currentCommentCount
-            };
-          }
-          return item;
-        });
-      });
-      
-      console.log(`[CommentsModal] Comment posted, updated count to ${currentCommentCount} in all caches`);
+      console.log(`[CommentsModal] ✅ Cache invalidated - real-time sync will handle count updates`);
     },
     onError: (error, variables, context) => {
-      // Simple rollback
-      if (context?.previousComments) {
+      // Enhanced error logging
+      console.error('[CommentsModal] 🚨 COMMENT POST FAILED:', {
+        error_message: error.message,
+        error_type: typeof error,
+        error_name: error.name,
+        error_stack: error.stack,
+        comment_text: variables,
+        recipe_id: recipeId,
+        user_id: user?.id,
+        context_available: !!context
+      });
+      
+      // Simple rollback with safe type checking
+      if (context?.previousComments !== undefined) {
+        console.log('[CommentsModal] 🔄 Rolling back to previous comments');
         queryClient.setQueryData(['recipe-comments', recipeId], context.previousComments);
       }
-      console.error('Failed to post comment:', error);
+      
+      // Also rollback any optimistic recipe details updates
+      queryClient.invalidateQueries({ queryKey: ['recipeDetails', recipeId, user?.id] });
+      
+      // Show user-friendly error
+      console.error('Failed to post comment:', error.message || 'Unknown error');
     }
   });
 
   const handlePostComment = useCallback(() => {
     if (!commentText.trim()) return;
-    postCommentMutation.mutate(commentText.trim());
-  }, [commentText, postCommentMutation]);
+    
+    try {
+      console.log('[CommentsModal] Posting comment:', {
+        recipeId,
+        userId: user?.id,
+        commentText: commentText.trim(),
+        currentCommentsCount: Array.isArray(comments) ? comments.length : 'NOT_ARRAY',
+        commentsType: typeof comments
+      });
+      
+      postCommentMutation.mutate(commentText.trim());
+    } catch (error) {
+      console.error('[CommentsModal] Error in handlePostComment:', error);
+    }
+  }, [commentText, postCommentMutation, recipeId, user?.id, comments]);
 
   const handleClose = useCallback(() => {
     // Dismiss keyboard first
@@ -405,7 +480,7 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
               </View>
             ) : (
               <FlatList
-                data={comments}
+                data={Array.isArray(comments) ? comments : []}
                 renderItem={renderComment}
                 keyExtractor={keyExtractor}
                 contentContainerStyle={styles.commentsList}

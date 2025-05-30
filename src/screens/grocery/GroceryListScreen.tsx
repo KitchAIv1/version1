@@ -3,7 +3,7 @@ import { View, Text, ActivityIndicator, Button, Alert, StyleSheet, LayoutAnimati
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useGroceryManager, GroceryItem } from '../../hooks/useGroceryManager';
 import { COLORS, FONTS, SIZES } from '../../constants/theme';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Feather } from '@expo/vector-icons'; // Changed from Icon to Feather for consistency
 import { getIngredientsForMealPlanRange, AggregatedIngredient } from '../../hooks/useMealPlanAggregatedIngredients';
 import { useAuth } from '../../providers/AuthProvider';
 import { startOfWeek, endOfWeek, format, addDays } from 'date-fns';
@@ -22,86 +22,86 @@ if (Platform.OS === 'android') {
 // Navigation type
 type GroceryNavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
-// Constants
-const ACTIVE_COLOR = '#10b981'; // Same as ProfileScreen
+// Constants - Updated to match premium design
+const ACTIVE_COLOR = '#10b981'; // Primary brand green
 
 // --- Item Icon Mapping ---
 const itemIconMap: { [key: string]: string } = {
-  // Fruits
-  apple: 'nutrition-outline',
-  banana: 'nutrition-outline',
-  orange: 'nutrition-outline',
-  strawberry: 'nutrition-outline',
-  grapes: 'nutrition-outline',
-  blueberry: 'nutrition-outline',
-  raspberry: 'nutrition-outline',
-  avocado: 'leaf-outline', // Often used like a vegetable but botanically a fruit
+  // Fruits - using shopping-bag for general food items
+  apple: 'shopping-bag',
+  banana: 'shopping-bag', 
+  orange: 'shopping-bag',
+  strawberry: 'shopping-bag',
+  grapes: 'shopping-bag',
+  blueberry: 'shopping-bag',
+  raspberry: 'shopping-bag',
+  avocado: 'shopping-bag',
 
   // Vegetables
-  tomato: 'leaf-outline',
-  potato: 'leaf-outline',
-  onion: 'leaf-outline',
-  lettuce: 'leaf-outline',
-  carrot: 'leaf-outline',
-  broccoli: 'leaf-outline',
-  cucumber: 'leaf-outline',
-  bellpepper: 'leaf-outline', // bell pepper
-  garlic: 'leaf-outline',
-  spinach: 'leaf-outline',
+  tomato: 'shopping-bag',
+  potato: 'shopping-bag',
+  onion: 'shopping-bag',
+  lettuce: 'shopping-bag',
+  carrot: 'shopping-bag',
+  broccoli: 'shopping-bag',
+  cucumber: 'shopping-bag',
+  bellpepper: 'shopping-bag',
+  garlic: 'shopping-bag',
+  spinach: 'shopping-bag',
 
   // Dairy & Alternatives
-  milk: 'pint-outline',
-  cheese: 'cube-outline', // Generic, can be more specific
-  cheddar: 'cube-outline',
-  mozzarella: 'ellipse-outline', // Softer cheese
-  yogurt: 'ice-cream-outline', // Similar container shape
-  butter: 'layers-outline', // Block shape
-  "almond milk": 'pint-outline',
-  "soy milk": 'pint-outline',
+  milk: 'shopping-bag',
+  cheese: 'shopping-bag',
+  cheddar: 'shopping-bag',
+  mozzarella: 'shopping-bag',
+  yogurt: 'coffee',
+  butter: 'shopping-bag',
+  "almond milk": 'shopping-bag',
+  "soy milk": 'shopping-bag',
   
   // Bakery
-  bread: 'restaurant-outline', // Using a generic food icon as 'baguette-outline' might not exist or fit
-  "white bread": 'restaurant-outline',
-  "whole wheat bread": 'restaurant-outline',
-  bagel: 'ellipse-outline',
-  croissant: 'restaurant-outline',
+  bread: 'shopping-bag',
+  "white bread": 'shopping-bag',
+  "whole wheat bread": 'shopping-bag',
+  bagel: 'shopping-bag',
+  croissant: 'shopping-bag',
 
   // Proteins
-  eggs: 'egg-outline',
-  chicken: 'logo-twitter', // Placeholder, closest to a bird? Or use 'restaurant-outline'
-  "chicken breast": 'logo-twitter',
-  beef: 'restaurant-outline',
-  steak: 'restaurant-outline',
-  pork: 'restaurant-outline',
-  bacon: 'remove-outline', // Strips?
-  fish: 'fish-outline',
-  salmon: 'fish-outline',
-  shrimp: 'fish-outline',
-  tofu: 'square-outline',
+  eggs: 'shopping-bag',
+  chicken: 'shopping-bag',
+  "chicken breast": 'shopping-bag',
+  beef: 'shopping-bag',
+  steak: 'shopping-bag',
+  pork: 'shopping-bag',
+  bacon: 'shopping-bag',
+  fish: 'shopping-bag',
+  salmon: 'shopping-bag',
+  shrimp: 'shopping-bag',
+  tofu: 'shopping-bag',
 
   // Pantry Staples
-  pasta: 'restaurant-outline',
-  rice: 'ellipse-outline', // or grain-outline if available
-  flour: 'folder-outline', // Bag shape
-  sugar: 'cube-outline', // or folder-outline
-  salt: 'cube-outline',
-  pepper: 'ellipse-outline', // Peppercorn
-  "olive oil": 'water-outline', // Bottle
-  vinegar: 'water-outline',
-  cereal: 'apps-outline', // Box of items
-  oats: 'apps-outline',
-  coffee: 'cafe-outline',
-  tea: 'cafe-outline',
+  pasta: 'shopping-bag',
+  rice: 'shopping-bag',
+  flour: 'shopping-bag',
+  sugar: 'shopping-bag',
+  salt: 'shopping-bag',
+  pepper: 'shopping-bag',
+  "olive oil": 'shopping-bag',
+  vinegar: 'shopping-bag',
+  cereal: 'shopping-bag',
+  oats: 'shopping-bag',
+  coffee: 'coffee',
+  tea: 'coffee',
   
   // Drinks
-  juice: 'water-outline',
-  "apple juice": 'water-outline', // Could be more specific if icon exists
-  "orange juice": 'water-outline',
-  soda: 'beer-outline', // Can shape
-  water: 'water-outline',
+  juice: 'shopping-bag',
+  "apple juice": 'shopping-bag',
+  "orange juice": 'shopping-bag',
+  soda: 'shopping-bag',
+  water: 'shopping-bag',
 
   // Default
-  default: 'cube-outline',
+  default: 'shopping-bag',
 };
 
 const getIconForItem = (itemName: string): string => {
@@ -216,21 +216,21 @@ export default function GroceryListScreen() {
   };
 
   const renderItem = ({ item }: { item: GroceryItem }) => {
-    const itemIconName = getIconForItem(item.item_name);
+    const itemIconName = getIconForItem(item.item_name) as any; // Type assertion for Feather icons
     return (
       <TouchableOpacity onPress={() => handleToggleChecked(item)} activeOpacity={0.7} style={{ transform: [{ scale: item.is_checked ? 0.98 : 1 }] }}>
         <View style={[styles.itemContainer, item.is_checked && styles.itemChecked]}>
-          <View style={styles.itemIcon}><Icon name={itemIconName} size={SIZES.large} color={item.is_checked ? COLORS.gray : COLORS.primary} /></View>
+          <View style={styles.itemIcon}><Feather name={itemIconName} size={20} color={item.is_checked ? '#9ca3af' : ACTIVE_COLOR} /></View>
           <View style={styles.itemTextContainer}>
             <Text style={[styles.itemText, item.is_checked && styles.itemTextChecked]} numberOfLines={1} ellipsizeMode="tail">{item.item_name}</Text>
             {(item.recipe_name || item.created_at) && (
               <View style={styles.metaDataContainer}>
-                {item.recipe_name && <Text style={styles.metaText}><Icon name="restaurant-outline" size={SIZES.body5} /> {item.recipe_name}</Text>}
-                {item.created_at && <Text style={styles.metaText}><Icon name="time-outline" size={SIZES.body5} /> {getShortRelativeTime(item.created_at)}</Text>}
+                {item.recipe_name && <Text style={styles.metaText}><Feather name="package" size={12} color="#6b7280" /> {item.recipe_name}</Text>}
+                {item.created_at && <Text style={styles.metaText}><Feather name="clock" size={12} color="#6b7280" /> {getShortRelativeTime(item.created_at)}</Text>}
               </View>
             )}
           </View>
-          <TouchableOpacity onPress={() => handleDeleteItem(item.id, item.item_name)} style={styles.deleteButton}><Icon name="trash-bin-outline" size={SIZES.h3} color={COLORS.error} /></TouchableOpacity>
+          <TouchableOpacity onPress={() => handleDeleteItem(item.id, item.item_name)} style={styles.deleteButton}><Feather name="trash" size={18} color="#ef4444" /></TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -251,219 +251,403 @@ export default function GroceryListScreen() {
   );
   
   const ListHeader = () => (
-    <View style={styles.listHeaderButtonsContainer}>
-        <TouchableOpacity style={styles.listHeaderButton} onPress={clearCheckedItems}>
-            <Icon name="checkmark-done-outline" size={SIZES.h3} color={COLORS.primary} />
-            <Text style={styles.listHeaderButtonText}>Clear Checked</Text>
+    <View style={styles.actionButtonsSection}>
+        <TouchableOpacity style={styles.actionButton} onPress={clearCheckedItems}>
+            <View style={styles.actionButtonIcon}>
+              <Feather name="check-circle" size={20} color={ACTIVE_COLOR} />
+            </View>
+            <Text style={styles.actionButtonText}>Clear Checked</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.listHeaderButton} onPress={loadIngredientsFromCurrentWeek}>
-            <Icon name="calendar-outline" size={SIZES.h3} color={COLORS.primary} />
-            <Text style={styles.listHeaderButtonText}>Plan Ingredients</Text>
+        <TouchableOpacity style={styles.actionButton} onPress={loadIngredientsFromCurrentWeek}>
+            <View style={styles.actionButtonIcon}>
+              <Feather name="calendar" size={20} color={ACTIVE_COLOR} />
+            </View>
+            <Text style={styles.actionButtonText}>Plan Ingredients</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.listHeaderButton, styles.clearAllListButton]} onPress={handleClearAllItems}>
-            <Icon name="trash-outline" size={SIZES.h3} color={COLORS.error} />
-            <Text style={[styles.listHeaderButtonText, styles.clearAllListButtonText]}>Clear All</Text>
+        <TouchableOpacity style={[styles.actionButton, styles.dangerActionButton]} onPress={handleClearAllItems}>
+            <View style={styles.actionButtonIcon}>
+              <Feather name="trash" size={20} color="#ef4444" />
+            </View>
+            <Text style={[styles.actionButtonText, styles.dangerActionButtonText]}>Clear All</Text>
         </TouchableOpacity>
     </View>
   );
 
   return (
-    <View style={styles.container}>
-      {/* Fixed Green Header - covers status bar area and stays fixed */}
-      <View style={styles.fixedGreenHeader}>
-        <SafeAreaView edges={['top']} />
-      </View>
-      
-      {/* Content below green header */}
-      <View style={[styles.contentBelowHeader, { marginTop: insets.top }]}>
-        {/* Fixed Header Bar - completely isolated from list */}
-        <View style={styles.fixedHeaderContainer}>
-          <View style={styles.headerRow}>
-            <Text style={styles.groceryTitle}>My Grocery List</Text>
-            <View style={styles.itemCountBadge}>
-              <Text style={styles.itemCountText}>{groceryList.length}</Text>
-            </View>
-          </View>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Modern Header */}
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>My Grocery List</Text>
+          <Text style={styles.headerSubtitle}>
+            {groceryList.length} items • {groceryList.filter(item => item.is_checked).length} completed
+          </Text>
         </View>
+        <View style={styles.itemCountBadge}>
+          <Text style={styles.itemCountText}>{groceryList.length}</Text>
+        </View>
+      </View>
         
-        {/* Main Content */}
-        <View style={styles.mainContent}>
-          <ScrollView 
-            style={styles.scrollContainer}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[ACTIVE_COLOR]}/>}
-          >
-            <ListHeader /> 
+      {/* Main Content */}
+      <View style={styles.content}>
+        <ScrollView 
+          style={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[ACTIVE_COLOR]} tintColor={ACTIVE_COLOR} />}
+        >
+          <ListHeader /> 
 
-            {isGroceryManagerLoading && groceryList.length === 0 && <ActivityIndicator size="large" color={ACTIVE_COLOR} style={{ marginTop: 20}}/>}
-            {groceryManagerError && <Text style={styles.errorText}>Error loading grocery list: {groceryManagerError}</Text>}
-            
-            {groceryList.length === 0 && !isGroceryManagerLoading && (
-              <Text style={styles.emptyListText}>Your manually added grocery list is empty.</Text>
-            )}
-            {groceryList.length > 0 &&
-                <FlatList
-                    data={groceryList.sort((a,b) => Number(a.is_checked) - Number(b.is_checked) || new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())}
-                    renderItem={renderItem}
-                    keyExtractor={(item) => item.id}
-                    style={styles.flatListStyle}
-                    scrollEnabled={false}
-                />
-            }
+          {isGroceryManagerLoading && groceryList.length === 0 && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={ACTIVE_COLOR} />
+              <Text style={styles.loadingText}>Loading your grocery list...</Text>
+            </View>
+          )}
+          
+          {groceryManagerError && (
+            <View style={styles.errorContainer}>
+              <Feather name="alert-circle" size={48} color="#ef4444" />
+              <Text style={styles.errorTitle}>Something went wrong</Text>
+              <Text style={styles.errorText}>Error loading grocery list: {groceryManagerError}</Text>
+            </View>
+          )}
+          
+          {groceryList.length === 0 && !isGroceryManagerLoading && (
+            <View style={styles.emptyContainer}>
+              <Feather name="shopping-bag" size={64} color="#d1d5db" />
+              <Text style={styles.emptyTitle}>Your grocery list is empty</Text>
+              <Text style={styles.emptyText}>Add items from your meal plan or manually to get started.</Text>
+            </View>
+          )}
+          
+          {groceryList.length > 0 && (
+            <View style={styles.itemsSection}>
+              <FlatList
+                data={groceryList.sort((a,b) => Number(a.is_checked) - Number(b.is_checked) || new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())}
+                renderItem={renderItem}
+                keyExtractor={(item) => item.id}
+                scrollEnabled={false}
+              />
+            </View>
+          )}
 
-            {isLoadingMealPlanIngredients && <ActivityIndicator size="large" color={ACTIVE_COLOR} style={{ marginVertical: 20}} />}
-            {mealPlanIngredientsError && <Text style={styles.errorText}>Error: {mealPlanIngredientsError}</Text>}
-            
-            {mealPlanIngredients.length > 0 && (
-              <View style={styles.mpiSectionContainer}>
-                <Text style={styles.mpiSectionTitle}>From Your Meal Plan (This Week)</Text>
-                <FlatList
-                    data={mealPlanIngredients}
-                    renderItem={renderAggregatedIngredient}
-                    keyExtractor={(item, index) => `${item.name}-${index}`}
-                    style={styles.flatListStyle}
-                    scrollEnabled={false}
-                />
-              </View>
-            )}
-            {mealPlanIngredients.length === 0 && !isLoadingMealPlanIngredients && !mealPlanIngredientsError && mealPlanIngredients !== null && (
-                <View style={styles.mpiSectionContainer}>
-                    <Text style={styles.emptyListText}>No ingredients loaded from this week's meal plan. Tap "Plan Ingredients" to load.</Text>
-                </View>
-            )}
-          </ScrollView>
-        </View>
+          {isLoadingMealPlanIngredients && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={ACTIVE_COLOR} />
+              <Text style={styles.loadingText}>Loading meal plan ingredients...</Text>
+            </View>
+          )}
+          
+          {mealPlanIngredientsError && (
+            <View style={styles.errorContainer}>
+              <Feather name="alert-circle" size={48} color="#ef4444" />
+              <Text style={styles.errorTitle}>Something went wrong</Text>
+              <Text style={styles.errorText}>Error: {mealPlanIngredientsError}</Text>
+            </View>
+          )}
+          
+          {mealPlanIngredients.length > 0 && (
+            <View style={styles.mealPlanSection}>
+              <Text style={styles.sectionTitle}>From Your Meal Plan (This Week)</Text>
+              <FlatList
+                data={mealPlanIngredients}
+                renderItem={renderAggregatedIngredient}
+                keyExtractor={(item, index) => `${item.name}-${index}`}
+                scrollEnabled={false}
+              />
+            </View>
+          )}
+          
+          {mealPlanIngredients.length === 0 && !isLoadingMealPlanIngredients && !mealPlanIngredientsError && mealPlanIngredients !== null && (
+            <View style={styles.infoContainer}>
+              <Feather name="info" size={24} color="#6b7280" />
+              <Text style={styles.infoText}>No ingredients loaded from this week's meal plan. Tap "Plan Ingredients" to load.</Text>
+            </View>
+          )}
+        </ScrollView>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
+    backgroundColor: '#f8fafc',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     backgroundColor: '#fff',
-  },
-  listHeaderButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: SIZES.medium,
-    paddingHorizontal: SIZES.small,
-    backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    marginBottom: SIZES.small,
-  },
-  listHeaderButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: SIZES.small,
-    paddingHorizontal: SIZES.base,
-    backgroundColor: COLORS.background, // Changed from lightGray
-    borderRadius: SIZES.small,
-  },
-  listHeaderButtonText: { fontSize: SIZES.body4, color: COLORS.primary, marginLeft: SIZES.base },
-  clearAllListButton: { backgroundColor: '#fee2e2' }, // Light red background for clear all
-  clearAllListButtonText: { color: COLORS.error }, 
-  flatListStyle: { paddingHorizontal: SIZES.small },
-  itemContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: SIZES.small, 
-    paddingHorizontal: SIZES.small,
-    marginBottom: SIZES.small / 2,
-    backgroundColor: COLORS.surface,
-    borderRadius: SIZES.small,
-    elevation: 1,
-    shadowColor: COLORS.black,
+    borderBottomColor: '#f1f5f9',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 1,
-  },
-  itemChecked: { backgroundColor: COLORS.primaryLight, opacity: 0.7, elevation: 0 }, // Use primaryLight and opacity
-  itemIcon: { marginRight: SIZES.medium },
-  itemTextContainer: { flex: 1 }, 
-  itemText: { fontSize: SIZES.body2, color: COLORS.text }, // Use SIZES.body2
-  itemTextChecked: { textDecorationLine: 'line-through', color: COLORS.textSecondary }, // Use textSecondary
-  metaDataContainer: { flexDirection: 'row', marginTop: SIZES.base / 2 },
-  metaText: { fontSize: SIZES.body5, color: COLORS.textSecondary, marginRight: SIZES.base },
-  deleteButton: { padding: SIZES.base },
-  emptyListText: { fontSize: SIZES.body3, color: COLORS.textSecondary, textAlign: 'center', marginVertical: SIZES.large, paddingHorizontal: SIZES.medium },
-  errorText: { fontSize: SIZES.body3, color: COLORS.error, textAlign: 'center', margin: SIZES.medium },
-  mpiSectionContainer: {
-    marginTop: SIZES.medium,
-    marginHorizontal: SIZES.small,
-    backgroundColor: COLORS.surface,
-    borderRadius: SIZES.small,
-    padding: SIZES.small,
-    elevation: 1,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
-  },
-  mpiSectionTitle: { fontSize: SIZES.h3, fontWeight: 'bold', color: COLORS.primaryDark, marginBottom: SIZES.small }, // Use primaryDark
-  mpiContainer: {
-    paddingVertical: SIZES.base,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border, // Use border color
-  },
-  mpiName: { fontSize: SIZES.body3, fontWeight: 'bold', color: COLORS.text, marginBottom: SIZES.base / 2 },
-  mpiAppearance: { flexDirection: 'row', marginLeft: SIZES.medium, alignItems: 'center' },
-  mpiQuantityUnit: { fontSize: SIZES.body4, color: COLORS.text },
-  mpiRecipeName: { fontSize: SIZES.body5, color: COLORS.textSecondary }, // Use textSecondary
-  itemCountBadge: {
-    backgroundColor: ACTIVE_COLOR,
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    minWidth: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: ACTIVE_COLOR,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
     shadowRadius: 2,
     elevation: 2,
   },
+  headerContent: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  itemCountBadge: {
+    backgroundColor: ACTIVE_COLOR,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    minWidth: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: ACTIVE_COLOR,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
   itemCountText: {
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '700',
     color: '#fff',
     textAlign: 'center',
   },
-  fixedGreenHeader: {
-    backgroundColor: ACTIVE_COLOR,
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-  },
-  mainContent: {
+  content: {
     flex: 1,
-    paddingTop: 0, // No padding needed since header is now above
+    paddingHorizontal: 20,
   },
   scrollContainer: {
     flex: 1,
   },
-  fixedHeaderContainer: {
-    backgroundColor: '#fff',
-    paddingTop: 20, // Add space below green header (matching PantryScreen)
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  headerRow: {
+  actionButtonsSection: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginVertical: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  actionButton: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    minWidth: 90,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  actionButtonIcon: { 
+    marginBottom: 6,
+  },
+  actionButtonText: { 
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#374151',
+    textAlign: 'center',
+  },
+  dangerActionButton: { 
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  dangerActionButtonText: { 
+    color: '#dc2626',
+  },
+  itemContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  itemChecked: { 
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    opacity: 0.8,
+  },
+  itemIcon: { 
+    marginRight: 16,
+    width: 24,
     alignItems: 'center',
   },
-  groceryTitle: {
-    fontSize: 20, // Match PantryScreen exactly
-    fontWeight: 'bold',
-    color: '#1f2937',
-  },
-  contentBelowHeader: {
+  itemTextContainer: { 
     flex: 1,
+  }, 
+  itemText: { 
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  itemTextChecked: { 
+    textDecorationLine: 'line-through',
+    color: '#6b7280',
+  },
+  metaDataContainer: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  metaText: { 
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  deleteButton: { 
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#fef2f2',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 80,
+    paddingHorizontal: 32,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 80,
+    paddingHorizontal: 32,
+  },
+  errorTitle: {
+    marginTop: 16,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    textAlign: 'center',
+  },
+  errorText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 80,
+    paddingHorizontal: 32,
+  },
+  emptyTitle: {
+    marginTop: 20,
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#111827',
+    textAlign: 'center',
+  },
+  emptyText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 20,
+    maxWidth: 280,
+  },
+  itemsSection: {
+    marginBottom: 32,
+  },
+  mealPlanSection: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  sectionTitle: { 
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 16,
+  },
+  mpiContainer: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  mpiName: { 
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 6,
+  },
+  mpiAppearance: { 
+    flexDirection: 'row',
+    marginLeft: 16,
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  mpiQuantityUnit: { 
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  mpiRecipeName: { 
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  infoContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  infoText: { 
+    fontSize: 14,
+    color: '#6b7280',
+    marginLeft: 12,
+    flex: 1,
+    lineHeight: 20,
   },
 }); 

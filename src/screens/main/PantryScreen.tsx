@@ -28,10 +28,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Import optimized hooks and components
-import { usePantryData, useRefreshPantryData, usePantryMutations, PantryItem } from '../../hooks/usePantryData';
+import { usePantryData, useRefreshPantryData, usePantryMutations, PantryItem, groupItemsByStorageLocation, StorageLocation } from '../../hooks/usePantryData';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { PantryItemComponent } from '../../components/PantryItemComponent';
 import SearchInput from '../../components/SearchInput';
+import { StorageLocationTabs } from '../../components/StorageLocationTabs';
+import { useStorageLocationPreference } from '../../hooks/useStorageLocationPreference';
 
 // Import "What Can I Cook?" components
 import WhatCanICookButton from '../../components/WhatCanICookButton';
@@ -74,9 +76,13 @@ export default function PantryScreen() {
   const refreshPantryData = useRefreshPantryData();
   const { invalidatePantryCache } = usePantryMutations(user?.id);
   
+  // Storage location preference hook
+  const { lastUsedLocation } = useStorageLocationPreference();
+  
   // State
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [activeStorageLocation, setActiveStorageLocation] = useState<StorageLocation>(lastUsedLocation);
   
   // Stable search handler to prevent re-renders
   const handleSearchChange = useCallback((text: string) => {
@@ -107,39 +113,77 @@ export default function PantryScreen() {
     });
   }, [pantryItems, isLoading, fetchError]);
   
-  // Memoized filtered items for better performance
+  // Memoized grouped items by storage location for better performance
+  const groupedItems = useMemo(() => {
+    console.log('[PantryScreen] Grouping items by storage location:', {
+      totalItems: pantryItems.length,
+      sampleItems: pantryItems.slice(0, 3).map(item => ({
+        name: item.item_name,
+        location: item.storage_location || 'cupboard'
+      }))
+    });
+    
+    return groupItemsByStorageLocation(pantryItems);
+  }, [pantryItems]);
+
+  // Memoized item counts for tabs
+  const itemCounts = useMemo(() => {
+    const counts = {
+      refrigerator: groupedItems.refrigerator.length,
+      freezer: groupedItems.freezer.length,
+      cupboard: groupedItems.cupboard.length,
+      condiments: groupedItems.condiments.length,
+    };
+    
+    console.log('[PantryScreen] Item counts by location:', counts);
+    return counts;
+  }, [groupedItems]);
+  
+  // Memoized filtered items for better performance (now supports both storage location and search)
   const filteredItems = useMemo(() => {
     console.log('[PantryScreen] Filtering items:', {
       searchQuery,
       debouncedSearchQuery,
-      totalItems: pantryItems.length,
-      sampleItems: pantryItems.slice(0, 3).map(item => item.item_name)
+      activeStorageLocation,
+      totalItems: pantryItems.length
     });
     
+    // Start with items from the active storage location
+    const locationItems = groupedItems[activeStorageLocation] || [];
+    
+    // If no search query, return all items from active location
     if (!debouncedSearchQuery.trim()) {
-      console.log('[PantryScreen] No search query, returning all items:', pantryItems.length);
-      return pantryItems;
+      console.log('[PantryScreen] No search query, returning location items:', {
+        location: activeStorageLocation,
+        itemCount: locationItems.length
+      });
+      return locationItems;
     }
     
+    // Apply search filter to location items
     const lowerQuery = debouncedSearchQuery.toLowerCase().trim();
-    const filtered = pantryItems.filter(item => {
+    const filtered = locationItems.filter(item => {
       const itemName = item.item_name.toLowerCase();
       const matches = itemName.includes(lowerQuery);
       if (matches) {
-        console.log('[PantryScreen] Item matches search:', item.item_name);
+        console.log('[PantryScreen] Item matches search in location:', {
+          item: item.item_name,
+          location: activeStorageLocation
+        });
       }
       return matches;
     });
     
     console.log('[PantryScreen] Filtered results:', {
       query: lowerQuery,
-      totalItems: pantryItems.length,
+      location: activeStorageLocation,
+      locationItems: locationItems.length,
       filteredCount: filtered.length,
       filteredItems: filtered.map(item => item.item_name)
     });
     
     return filtered;
-  }, [debouncedSearchQuery, pantryItems]);
+  }, [debouncedSearchQuery, groupedItems, activeStorageLocation]);
   
   // Manual Add Sheet state
   const [isManualAddSheetVisible, setIsManualAddSheetVisible] = useState(false);
@@ -258,14 +302,15 @@ export default function PantryScreen() {
       let result;
       
       if (submittedItem.original_item_name) {
-        // Edit mode
+        // Edit mode - include storage_location in update
         const { error: updateError } = await supabase
           .from('stock')
           .update({ 
             item_name: submittedItem.item_name, 
             quantity: submittedItem.quantity, 
             unit: submittedItem.unit,
-            description: submittedItem.description
+            description: submittedItem.description,
+            storage_location: submittedItem.storage_location || 'cupboard'
           })
           .eq('user_id', user.id)
           .eq('item_name', submittedItem.original_item_name);
@@ -273,7 +318,7 @@ export default function PantryScreen() {
         if (updateError) throw updateError;
         result = 'updated';
       } else {
-        // Add mode
+        // Add mode - include storage_location in insert
         const { error: insertError } = await supabase
           .from('stock')
           .insert({
@@ -281,7 +326,8 @@ export default function PantryScreen() {
             item_name: submittedItem.item_name,
             quantity: submittedItem.quantity,
             unit: submittedItem.unit,
-            description: submittedItem.description
+            description: submittedItem.description,
+            storage_location: submittedItem.storage_location || 'cupboard'
           });
         
         if (insertError) throw insertError;
@@ -479,6 +525,13 @@ export default function PantryScreen() {
             onClear={handleClearSearch}
           />
         </View>
+        
+        {/* NEW: Storage Location Tabs */}
+        <StorageLocationTabs
+          activeLocation={activeStorageLocation}
+          onLocationChange={setActiveStorageLocation}
+          itemCounts={itemCounts}
+        />
         
         {/* Main Content - Now using optimized FlatList */}
         <View style={styles.mainContent}>

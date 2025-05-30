@@ -15,6 +15,9 @@ import {
 import RNPickerSelect from 'react-native-picker-select';
 import { Ionicons } from '@expo/vector-icons';
 import { formatDetailedTimestamp } from '../utils/dateUtils';
+import { StorageLocationPicker } from './StorageLocationPicker';
+import { StorageLocation } from '../hooks/usePantryData';
+import { useStorageLocationPreference } from '../hooks/useStorageLocationPreference';
 
 interface PantryItem {
   id: string;
@@ -25,6 +28,7 @@ interface PantryItem {
   description?: string;
   created_at: string;
   updated_at?: string;
+  storage_location?: StorageLocation;
 }
 
 interface UnitOption {
@@ -49,10 +53,13 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
   initialItemData,
   unitOptions,
 }) => {
+  const { getDefaultLocation, savePreference } = useStorageLocationPreference();
+  
   const [itemName, setItemName] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [unit, setUnit] = useState(unitOptions[0]?.value || 'units');
   const [description, setDescription] = useState('');
+  const [storageLocation, setStorageLocation] = useState<StorageLocation>(getDefaultLocation());
   const [isSaving, setIsSaving] = useState(false);
 
   const isEditMode = mode === 'edit';
@@ -63,14 +70,16 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
       setQuantity(initialItemData.quantity.toString());
       setUnit(initialItemData.unit || unitOptions[0]?.value || 'units');
       setDescription(initialItemData.description || '');
+      setStorageLocation(initialItemData.storage_location || getDefaultLocation());
     } else if (!isVisible || !isEditMode) {
       // Reset form when modal is closed or in add mode
       setItemName('');
       setQuantity('1');
       setUnit(unitOptions[0]?.value || 'units');
       setDescription('');
+      setStorageLocation(getDefaultLocation());
     }
-  }, [initialItemData, isVisible, isEditMode, unitOptions]);
+  }, [initialItemData, isVisible, isEditMode, unitOptions, getDefaultLocation]);
 
   const handleSubmit = async () => {
     if (!itemName.trim()) {
@@ -90,8 +99,13 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
         quantity: numQuantity,
         unit: unit,
         description: description.trim() || null,
+        storage_location: storageLocation,
         original_item_name: isEditMode ? initialItemData?.item_name : undefined,
       };
+      
+      if (!isEditMode) {
+        await savePreference(storageLocation);
+      }
       
       await onSubmit(itemToSubmit);
     } catch (error) {
@@ -184,6 +198,13 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
                   />
                 </View>
               </View>
+
+              {/* NEW: Storage Location Picker */}
+              <StorageLocationPicker
+                selectedLocation={storageLocation}
+                onLocationChange={setStorageLocation}
+                required={true}
+              />
 
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Description (Optional)</Text>

@@ -1,6 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 
+// Storage location type for type safety
+export type StorageLocation = 'refrigerator' | 'freezer' | 'cupboard' | 'condiments';
+
+// Extended interface with backward compatibility
 export interface PantryItem {
   id: string;
   user_id: string;
@@ -10,7 +14,41 @@ export interface PantryItem {
   description?: string;
   created_at: string;
   updated_at?: string;
+  storage_location?: StorageLocation; // NEW: Optional field for backward compatibility
 }
+
+// Storage location constants for reuse
+export const STORAGE_LOCATIONS: Record<StorageLocation, string> = {
+  refrigerator: 'Refrigerator',
+  freezer: 'Freezer', 
+  cupboard: 'Cupboard',
+  condiments: 'Condiments'
+} as const;
+
+export const STORAGE_LOCATION_OPTIONS = Object.entries(STORAGE_LOCATIONS).map(([value, label]) => ({
+  value: value as StorageLocation,
+  label
+}));
+
+// Helper function to group items by storage location
+export const groupItemsByStorageLocation = (items: PantryItem[]) => {
+  const grouped = items.reduce((acc, item) => {
+    const location = item.storage_location || 'cupboard'; // Default to cupboard for legacy items
+    if (!acc[location]) {
+      acc[location] = [];
+    }
+    acc[location].push(item);
+    return acc;
+  }, {} as Record<StorageLocation, PantryItem[]>);
+
+  // Ensure all locations exist even if empty
+  return {
+    refrigerator: grouped.refrigerator || [],
+    freezer: grouped.freezer || [],
+    cupboard: grouped.cupboard || [],
+    condiments: grouped.condiments || [],
+  };
+};
 
 export const usePantryData = (userId?: string) => {
   return useQuery({
@@ -20,9 +58,10 @@ export const usePantryData = (userId?: string) => {
       
       console.log('[usePantryData] Fetching pantry data for user:', userId);
       
+      // UPDATED: Include storage_location in select query with backward compatibility
       const { data, error, count } = await supabase
         .from('stock')
-        .select('id, item_name, quantity, unit, description, created_at, updated_at, user_id', { count: 'exact' })
+        .select('id, item_name, quantity, unit, description, created_at, updated_at, user_id, storage_location', { count: 'exact' })
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
       
@@ -36,7 +75,8 @@ export const usePantryData = (userId?: string) => {
         id: item.id,
         name: item.item_name,
         quantity: item.quantity,
-        unit: item.unit
+        unit: item.unit,
+        storage_location: item.storage_location || 'cupboard' // Log storage location with default
       })));
       
       return data || [];
