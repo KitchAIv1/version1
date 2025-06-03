@@ -1,11 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import {
-  SafeAreaView,
-  StatusBar,
-  StyleSheet,
-  View,
-  Alert,
-} from 'react-native';
+import { SafeAreaView, StatusBar, StyleSheet, View, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useStockManager, StockItem } from '../../hooks/useStockManager';
 import { StockHeader } from '../../components/stock/StockHeader';
@@ -15,33 +9,34 @@ import { COLORS as ThemeColors } from '../../constants/theme';
 
 export default function MyStockScreen() {
   const navigation = useNavigation();
-  
+
   const {
     stockData,
     isLoading,
     error,
     isSaving,
     isManualModalVisible,
-    openManualModal, 
+    openManualModal,
     closeManualModal,
-    editingItem,      
-    prepareEditItem,  
-    handleSaveItem,   
-    deleteStockItem,  
-    fetchStock,       
+    editingItem,
+    prepareEditItem,
+    handleSaveItem,
+    deleteStockItem,
+    fetchStock,
     unitOptions,
-  } = useStockManager(); 
+  } = useStockManager();
 
-  const [searchQuery, setSearchQuery] = useState(''); 
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Enhanced filtered data with better performance
   const filteredStockData = useMemo(() => {
     if (!searchQuery.trim()) return stockData;
-    
+
     const query = searchQuery.toLowerCase();
-    return stockData.filter((item: StockItem) => 
-      item.item_name.toLowerCase().includes(query) ||
-      item.description?.toLowerCase().includes(query)
+    return stockData.filter(
+      (item: StockItem) =>
+        item.item_name.toLowerCase().includes(query) ||
+        item.description?.toLowerCase().includes(query),
     );
   }, [stockData, searchQuery]);
 
@@ -51,30 +46,33 @@ export default function MyStockScreen() {
 
   const handleDeleteWithConfirmation = (item: StockItem) => {
     Alert.alert(
-      "Confirm Delete",
+      'Confirm Delete',
       `Are you sure you want to delete "${item.item_name}"? This action cannot be undone.`,
       [
         {
-          text: "Cancel",
-          style: "cancel"
+          text: 'Cancel',
+          style: 'cancel',
         },
         {
-          text: "Delete",
+          text: 'Delete',
           onPress: () => deleteStockItem(item),
-          style: "destructive"
-        }
-      ]
+          style: 'destructive',
+        },
+      ],
     );
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={ThemeColors.background || '#FFF'} /> 
-      
-      <StockHeader 
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={ThemeColors.background || '#FFF'}
+      />
+
+      <StockHeader
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
-        onScanPress={handleNavigateToScanner} 
+        onScanPress={handleNavigateToScanner}
         onManualPress={() => openManualModal()}
         isScanning={false}
         isAddingManually={isSaving}
@@ -82,13 +80,13 @@ export default function MyStockScreen() {
 
       <View style={styles.listContainer}>
         <StockList
-          data={filteredStockData} 
+          data={filteredStockData}
           isLoading={isLoading}
           error={error}
-          onEdit={prepareEditItem} 
-          onDelete={handleDeleteWithConfirmation} 
-          onRefresh={fetchStock} 
-          isRefreshing={isLoading} 
+          onEdit={prepareEditItem}
+          onDelete={handleDeleteWithConfirmation}
+          onRefresh={fetchStock}
+          isRefreshing={isLoading}
         />
       </View>
 
@@ -96,7 +94,7 @@ export default function MyStockScreen() {
         visible={isManualModalVisible}
         onClose={closeManualModal}
         onSubmit={handleSaveItem}
-        initialItem={editingItem} 
+        initialItem={editingItem}
         isSaving={isSaving}
         unitOptions={unitOptions}
       />
@@ -112,4 +110,4 @@ const styles = StyleSheet.create({
   listContainer: {
     flex: 1,
   },
-}); 
+});

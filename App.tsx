@@ -23,8 +23,8 @@ const queryClient = new QueryClient({
       refetchOnMount: true,
       // Don't refetch on window focus by default (reduces unnecessary network calls)
       refetchOnWindowFocus: false,
-    }
-  }
+    },
+  },
 });
 
 export default function App() {

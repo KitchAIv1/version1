@@ -1,5 +1,11 @@
 // RecipeDetailScreen placeholder
-import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+} from 'react';
 import {
   View,
   Text,
@@ -18,18 +24,26 @@ import {
   KeyboardEvent,
   Platform,
 } from 'react-native';
-import { useRoute, RouteProp, useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/native';
+import {
+  useRoute,
+  RouteProp,
+  useNavigation,
+  useFocusEffect,
+  useIsFocused,
+  NavigationState,
+} from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { NavigationState } from '@react-navigation/native';
 import { format } from 'date-fns';
 
 import { MainStackParamList } from '../../navigation/types';
-import useRecipeDetails, { RecipeDetailsData } from '../../hooks/useRecipeDetails';
+import useRecipeDetails, {
+  RecipeDetailsData,
+} from '../../hooks/useRecipeDetails';
 import { RecipeItem } from '../../types';
 import { useAuth } from '../../providers/AuthProvider';
 import ActionOverlay from '../../components/ActionOverlay';
@@ -43,7 +57,10 @@ import FloatingTabBar from '../../components/FloatingTabBar';
 import { useDailyMealPlan, MealSlot } from '../../hooks/useDailyMealPlan';
 import AddToMealPlannerModal from '../../components/modals/AddToMealPlannerModal';
 import CommentsModal from '../../components/CommentsModal';
-import { useLikeMutation, useSaveMutation } from '../../hooks/useRecipeMutations';
+import {
+  useLikeMutation,
+  useSaveMutation,
+} from '../../hooks/useRecipeMutations';
 import { useCommentCountSync } from '../../hooks/useCommentCountSync';
 
 // Define route prop type
@@ -63,73 +80,80 @@ const TAB_ROUTES = {
 };
 
 // Create custom Tab Navigator to handle scroll issues
-const CustomTabNavigator = ({ 
-  activeTab, 
-  setActiveTab, 
-  tabs, 
+function CustomTabNavigator({
+  activeTab,
+  setActiveTab,
+  tabs,
   tabContent,
-  onTabChange
-}: { 
-  activeTab: string; 
+  onTabChange,
+}: {
+  activeTab: string;
   setActiveTab: (tab: string) => void;
   tabs: string[];
   tabContent: React.ReactNode;
   onTabChange?: (tab: string) => void;
-}) => {
+}) {
   const animatedValue = useRef(new Animated.Value(0)).current;
-  
+
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     if (onTabChange) onTabChange(tab);
-    
+
     // Animate the tab transition
     Animated.spring(animatedValue, {
       toValue: 1,
       useNativeDriver: true,
       tension: 50,
-      friction: 7
+      friction: 7,
     }).start(() => {
       animatedValue.setValue(0);
     });
   };
-  
+
   return (
     <View style={styles.customTabContainer}>
       <View style={styles.tabBarContainer}>
         {tabs.map(tab => (
-          <TouchableOpacity 
+          <TouchableOpacity
             key={`tab-${tab}`}
-            style={[styles.tabButton, activeTab === tab && styles.activeTabButton]} 
-            onPress={() => handleTabChange(tab)}
-          >
-            <Text style={[styles.tabButtonText, activeTab === tab && styles.activeTabButtonText]}>
+            style={[
+              styles.tabButton,
+              activeTab === tab && styles.activeTabButton,
+            ]}
+            onPress={() => handleTabChange(tab)}>
+            <Text
+              style={[
+                styles.tabButtonText,
+                activeTab === tab && styles.activeTabButtonText,
+              ]}>
               {tab}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
-      <Animated.View 
+      <Animated.View
         style={[
           styles.tabContentContainer,
           {
             opacity: animatedValue.interpolate({
               inputRange: [0, 0.5, 1],
-              outputRange: [1, 0.8, 1]
+              outputRange: [1, 0.8, 1],
             }),
-            transform: [{
-              scale: animatedValue.interpolate({
-                inputRange: [0, 0.5, 1],
-                outputRange: [1, 0.98, 1]
-              })
-            }]
-          }
-        ]}
-      >
+            transform: [
+              {
+                scale: animatedValue.interpolate({
+                  inputRange: [0, 0.5, 1],
+                  outputRange: [1, 0.98, 1],
+                }),
+              },
+            ],
+          },
+        ]}>
         {tabContent}
       </Animated.View>
     </View>
   );
-};
+}
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const HEADER_HEIGHT = screenHeight * 0.4; // 40% of screen height
@@ -143,46 +167,56 @@ export default function RecipeDetailScreen() {
   const initialSeekTime = route.params?.initialSeekTime ?? 0;
   const initialTabFromParams = route.params?.initialTab; // Read the initialTab param
   const videoRef = useRef<Video>(null);
-  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { groceryList, fetchGroceryList } = useGroceryManager();
   const scrollViewRef = useRef<ScrollView>(null);
   const isScreenFocused = useIsFocused(); // Added
-  
+
   // Track modal states to prevent unnecessary operations when returning from modals
   const [isAnyModalOpen, setIsAnyModalOpen] = useState(false);
   const lastFocusTimeRef = useRef(Date.now());
-  
+
   // Meal Planner integration (V2)
-  const { addRecipeToSlot } = useDailyMealPlan(format(new Date(), 'yyyy-MM-dd')); // Pass default date
+  const { addRecipeToSlot } = useDailyMealPlan(
+    format(new Date(), 'yyyy-MM-dd'),
+  ); // Pass default date
   const [isPlannerModalVisible, setIsPlannerModalVisible] = useState(false);
-  
+
   // Comments Modal state
   const [isCommentsModalVisible, setIsCommentsModalVisible] = useState(false);
-  
+
   // Track original tab bar measurements
   // const tabBarRef = useRef<View>(null);
   // const [tabBarPosition, setTabBarPosition] = useState(0);
   // const [tabBarHeight, setTabBarHeight] = useState(0);
-  
+
   // State for floating tab bar control with debouncing
   const [shouldShowFloatingBar, setShouldShowFloatingBar] = useState(false);
   const floatingTabBarVisible = useRef(new Animated.Value(0)).current;
   const floatingBarAnimating = useRef(false);
-  
+
   // Track tab content heights
-  const [tabContentHeights, setTabContentHeights] = useState<Record<string, number>>({
+  const [tabContentHeights, setTabContentHeights] = useState<
+    Record<string, number>
+  >({
     [TAB_ROUTES.INGREDIENTS]: 0,
     [TAB_ROUTES.STEPS]: 0,
     [TAB_ROUTES.MACROS]: 0,
   });
-  
+
   const [currentScrollPosition, setCurrentScrollPosition] = useState(0);
 
   const [isMuted, setIsMuted] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   // Set initial activeTab based on route param or default to Ingredients
   const [activeTab, setActiveTab] = useState(() => {
-    if (initialTabFromParams && Object.values(TAB_ROUTES).includes(initialTabFromParams as (typeof TAB_ROUTES)[keyof typeof TAB_ROUTES])) {
+    if (
+      initialTabFromParams &&
+      Object.values(TAB_ROUTES).includes(
+        initialTabFromParams as (typeof TAB_ROUTES)[keyof typeof TAB_ROUTES],
+      )
+    ) {
       return initialTabFromParams as (typeof TAB_ROUTES)[keyof typeof TAB_ROUTES];
     }
     return TAB_ROUTES.INGREDIENTS;
@@ -196,21 +230,24 @@ export default function RecipeDetailScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!user?.id) return;
-      
+
       const now = Date.now();
       const timeSinceLastFocus = now - lastFocusTimeRef.current;
-      
+
       // Only fetch if:
       // 1. More than 5 seconds since last focus (not just returning from modal)
       // 2. No modals are currently open
       // 3. This is the initial focus (timeSinceLastFocus > 30000)
-      if (!isAnyModalOpen && (timeSinceLastFocus > 5000 || timeSinceLastFocus > 30000)) {
+      if (
+        !isAnyModalOpen &&
+        (timeSinceLastFocus > 5000 || timeSinceLastFocus > 30000)
+      ) {
         console.log('RecipeDetailScreen focused, fetching grocery list...');
         fetchGroceryList(user.id);
       }
-      
+
       lastFocusTimeRef.current = now;
-    }, [user?.id, fetchGroceryList, isAnyModalOpen])
+    }, [user?.id, fetchGroceryList, isAnyModalOpen]),
   );
 
   // Track modal state changes
@@ -224,7 +261,7 @@ export default function RecipeDetailScreen() {
     isLoading,
     error,
   } = useRecipeDetails(id, user?.id);
-  
+
   // Log when recipe details change, especially like state
   useEffect(() => {
     if (recipeDetails) {
@@ -233,29 +270,49 @@ export default function RecipeDetailScreen() {
         likes: recipeDetails.likes,
         is_saved_by_user: recipeDetails.is_saved_by_user,
         title: recipeDetails.title,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
-  }, [recipeDetails?.is_liked_by_user, recipeDetails?.likes, recipeDetails?.is_saved_by_user, id]);
+  }, [
+    recipeDetails?.is_liked_by_user,
+    recipeDetails?.likes,
+    recipeDetails?.is_saved_by_user,
+    id,
+  ]);
 
   // Optimized focus logging - reduce noise
   useEffect(() => {
     if (isScreenFocused && !isAnyModalOpen) {
-      console.log(`[RecipeDetailScreen] Screen focused for recipe ${id}, current state:`, {
-        is_liked_by_user: recipeDetails?.is_liked_by_user,
-        likes: recipeDetails?.likes,
-        is_saved_by_user: recipeDetails?.is_saved_by_user,
-        comments_count: recipeDetails?.comments_count,
-        timestamp: new Date().toISOString()
-      });
-      
+      console.log(
+        `[RecipeDetailScreen] Screen focused for recipe ${id}, current state:`,
+        {
+          is_liked_by_user: recipeDetails?.is_liked_by_user,
+          likes: recipeDetails?.likes,
+          is_saved_by_user: recipeDetails?.is_saved_by_user,
+          comments_count: recipeDetails?.comments_count,
+          timestamp: new Date().toISOString(),
+        },
+      );
+
       // EFFICIENT COMMENT COUNT SYNC: Update comment count when screen becomes focused
       if (id && user?.id) {
-        console.log(`[RecipeDetailScreen] 🎯 Efficient sync comment count for recipe ${id}`);
+        console.log(
+          `[RecipeDetailScreen] 🎯 Efficient sync comment count for recipe ${id}`,
+        );
         syncSingleRecipe(id, user.id);
       }
     }
-  }, [isScreenFocused, recipeDetails?.is_liked_by_user, recipeDetails?.likes, recipeDetails?.is_saved_by_user, recipeDetails?.comments_count, id, isAnyModalOpen, syncSingleRecipe, user?.id]);
+  }, [
+    isScreenFocused,
+    recipeDetails?.is_liked_by_user,
+    recipeDetails?.likes,
+    recipeDetails?.is_saved_by_user,
+    recipeDetails?.comments_count,
+    id,
+    isAnyModalOpen,
+    syncSingleRecipe,
+    user?.id,
+  ]);
 
   // Effect to reset video error when video_url changes
   useEffect(() => {
@@ -266,50 +323,74 @@ export default function RecipeDetailScreen() {
   // --- Video Player Logic ---
   useEffect(() => {
     const videoElement = videoRef.current;
-    if (videoElement && isLoaded) { // Ensure video is loaded
+    if (videoElement && isLoaded) {
+      // Ensure video is loaded
       if (isScreenFocused) {
-        console.log(`RecipeDetailScreen: Screen focused and video loaded, playing video for ID: ${id}`);
-        videoElement.playAsync().catch(e => console.error(`RecipeDetailScreen ${id}: Focus play error:`, e));
+        console.log(
+          `RecipeDetailScreen: Screen focused and video loaded, playing video for ID: ${id}`,
+        );
+        videoElement
+          .playAsync()
+          .catch(e =>
+            console.error(`RecipeDetailScreen ${id}: Focus play error:`, e),
+          );
       } else {
-        console.log(`RecipeDetailScreen: Screen NOT focused, pausing video for ID: ${id}`);
-        videoElement.pauseAsync().catch(e => console.error(`RecipeDetailScreen ${id}: Focus pause error:`, e));
+        console.log(
+          `RecipeDetailScreen: Screen NOT focused, pausing video for ID: ${id}`,
+        );
+        videoElement
+          .pauseAsync()
+          .catch(e =>
+            console.error(`RecipeDetailScreen ${id}: Focus pause error:`, e),
+          );
       }
     }
   }, [isLoaded, isScreenFocused, id, videoRef]); // Dependencies for focus-aware playback
 
   const handleLoad = async (status: AVPlaybackStatus) => {
     if (status.isLoaded) {
-      console.log(`RecipeDetailScreen ${id}: Video loaded. Initial seek: ${initialSeekTime}ms. IsMuted: ${isMuted}`);
+      console.log(
+        `RecipeDetailScreen ${id}: Video loaded. Initial seek: ${initialSeekTime}ms. IsMuted: ${isMuted}`,
+      );
       if (videoRef.current) {
         if (initialSeekTime > 0) {
           // Set position but don't auto-play here; useEffect will handle it based on focus.
-          await videoRef.current.setPositionAsync(initialSeekTime, { toleranceMillisBefore: 100, toleranceMillisAfter: 100 });
+          await videoRef.current.setPositionAsync(initialSeekTime, {
+            toleranceMillisBefore: 100,
+            toleranceMillisAfter: 100,
+          });
         }
         // Ensure video respects the current isMuted state upon loading
         await videoRef.current.setIsMutedAsync(isMuted);
       }
       setIsLoaded(true); // This will trigger the focus-aware useEffect to potentially play the video
-    } else if (status.error) { 
-      console.error('Detail screen video load error from handleLoad:', status.error); 
+    } else if (status.error) {
+      console.error(
+        'Detail screen video load error from handleLoad:',
+        status.error,
+      );
       // Consider calling handleError if status.error is a string message, or adapt handleError
       // For now, just logging as original code did.
-    } 
+    }
   };
-  
-  const toggleMute = () => { 
+
+  const toggleMute = () => {
     if (!videoRef.current) {
       console.error('toggleMute: videoRef.current is null or undefined');
       return; // Exit if no video ref
     }
-    videoRef.current.setIsMutedAsync(!isMuted)
+    videoRef.current
+      .setIsMutedAsync(!isMuted)
       .catch(e => console.error('setIsMutedAsync error:', e));
     setIsMuted(prevMuted => !prevMuted);
   };
-  
-  const handleError = (error: string) => { 
-    console.error(`RecipeDetailScreen ${id}: Video onError event:`, error); 
-    setVideoPlayerError("Video playback failed. Please check your connection or try again later."); // Set user-friendly error
-    setIsLoaded(false); 
+
+  const handleError = (error: string) => {
+    console.error(`RecipeDetailScreen ${id}: Video onError event:`, error);
+    setVideoPlayerError(
+      'Video playback failed. Please check your connection or try again later.',
+    ); // Set user-friendly error
+    setIsLoaded(false);
   };
   // --- End Video Player ---
 
@@ -331,13 +412,13 @@ export default function RecipeDetailScreen() {
   //         });
   //       }
   //     };
-  //     
+  //
   //     // Measure after a delay to ensure layout is complete
   //     const initialTimer = setTimeout(measureTabBar, 300);
-  //     
+  //
   //     // Measure again after a longer delay as a backup
   //     const backupTimer = setTimeout(measureTabBar, 1000);
-  //     
+  //
   //     return () => {
   //       clearTimeout(initialTimer);
   //       clearTimeout(backupTimer);
@@ -345,25 +426,25 @@ export default function RecipeDetailScreen() {
   //   }
   // }, [isLoading, recipeDetails]);
 
-  // --- Optimistic updates for like/save --- 
+  // --- Optimistic updates for like/save ---
   // Removed old mutation logic - now using optimized hooks
 
   // --- Share Functionality ---
-  const handleShare = async () => { 
-    const shareUrl = recipeDetails?.video_url || 'https://yourapp.com'; 
-    try { 
-      const available = await Sharing.isAvailableAsync(); 
-      if (available) { 
-        await Sharing.shareAsync(shareUrl, { 
-          dialogTitle: `Check out this recipe: ${recipeDetails?.title || 'Recipe'}`, 
-        }); 
-      } else { 
-        Alert.alert('Sharing not available on this device'); 
-      } 
-    } catch (shareError: any) { 
-      console.error('Error sharing:', shareError); 
-      Alert.alert('Error', 'Could not share recipe.'); 
-    } 
+  const handleShare = async () => {
+    const shareUrl = recipeDetails?.video_url || 'https://yourapp.com';
+    try {
+      const available = await Sharing.isAvailableAsync();
+      if (available) {
+        await Sharing.shareAsync(shareUrl, {
+          dialogTitle: `Check out this recipe: ${recipeDetails?.title || 'Recipe'}`,
+        });
+      } else {
+        Alert.alert('Sharing not available on this device');
+      }
+    } catch (shareError: any) {
+      console.error('Error sharing:', shareError);
+      Alert.alert('Error', 'Could not share recipe.');
+    }
   };
   // --- End Share ---
 
@@ -378,15 +459,25 @@ export default function RecipeDetailScreen() {
       return recipeDetails.ingredients;
     }
   }, [recipeDetails]);
-  
-  const matchedSet = React.useMemo(() => 
-    new Set((recipeDetails?.matched_ingredients || []).map(name => name.trim().toLowerCase())), 
-    [recipeDetails]);
-    
-  const matchedCount = React.useMemo(() => 
-    ingredients.filter((ing: any) => matchedSet.has(ing.name?.trim().toLowerCase())).length, 
-    [ingredients, matchedSet]);
-    
+
+  const matchedSet = React.useMemo(
+    () =>
+      new Set(
+        (recipeDetails?.matched_ingredients || []).map(name =>
+          name.trim().toLowerCase(),
+        ),
+      ),
+    [recipeDetails],
+  );
+
+  const matchedCount = React.useMemo(
+    () =>
+      ingredients.filter((ing: any) =>
+        matchedSet.has(ing.name?.trim().toLowerCase()),
+      ).length,
+    [ingredients, matchedSet],
+  );
+
   const totalCount = ingredients.length;
 
   // Prepare time information
@@ -398,95 +489,108 @@ export default function RecipeDetailScreen() {
   const handleCommentPress = () => {
     setIsCommentsModalVisible(true);
   };
-  
+
   // Handle tab content layout changes to measure their heights
-  const handleTabContentLayout = useCallback((tab: string, event: LayoutChangeEvent) => {
-    const { height } = event.nativeEvent.layout;
-    setTabContentHeights(prev => ({
-      ...prev,
-      [tab]: height
-    }));
-  }, []);
+  const handleTabContentLayout = useCallback(
+    (tab: string, event: LayoutChangeEvent) => {
+      const { height } = event.nativeEvent.layout;
+      setTabContentHeights(prev => ({
+        ...prev,
+        [tab]: height,
+      }));
+    },
+    [],
+  );
 
   // Handle tab change to ensure proper scrolling (reverted to HEADER_HEIGHT)
-  const handleTabChange = useCallback((tab: string) => {
-    if (currentScrollPosition > HEADER_HEIGHT) { 
-      scrollViewRef.current?.scrollTo({ 
-        y: HEADER_HEIGHT, 
-        animated: true 
-      });
-    }
-  }, [currentScrollPosition, HEADER_HEIGHT]); // Reverted to HEADER_HEIGHT dependency
-  
+  const handleTabChange = useCallback(
+    (tab: string) => {
+      if (currentScrollPosition > HEADER_HEIGHT) {
+        scrollViewRef.current?.scrollTo({
+          y: HEADER_HEIGHT,
+          animated: true,
+        });
+      }
+    },
+    [currentScrollPosition, HEADER_HEIGHT],
+  ); // Reverted to HEADER_HEIGHT dependency
+
   // Handle scroll event to show/hide floating tab bar (reverted to HEADER_HEIGHT logic)
-  const handleScroll = useCallback((event: any) => {
-    const scrollY = event.nativeEvent.contentOffset.y;
-    setCurrentScrollPosition(scrollY);
-    
-    // No longer need to check markerPosition_Y === 0
+  const handleScroll = useCallback(
+    (event: any) => {
+      const scrollY = event.nativeEvent.contentOffset.y;
+      setCurrentScrollPosition(scrollY);
 
-    if (Math.floor(scrollY) % 200 === 0) {
-      console.log(`[RDP HandleScroll] scrollY=${scrollY.toFixed(0)}, HEADER_HEIGHT=${HEADER_HEIGHT.toFixed(0)}`);
-    }
-    
-    const tabBarExitPoint = HEADER_HEIGHT; // Reverted to HEADER_HEIGHT
+      // No longer need to check markerPosition_Y === 0
 
-    const deepContentHideOffset = screenHeight * 0.8; 
-    const contentDeepPoint = HEADER_HEIGHT + deepContentHideOffset; // Relative to HEADER_HEIGHT
+      if (Math.floor(scrollY) % 200 === 0) {
+        console.log(
+          `[RDP HandleScroll] scrollY=${scrollY.toFixed(0)}, HEADER_HEIGHT=${HEADER_HEIGHT.toFixed(0)}`,
+        );
+      }
 
-    let shouldShow = scrollY > tabBarExitPoint && scrollY < contentDeepPoint;
+      const tabBarExitPoint = HEADER_HEIGHT; // Reverted to HEADER_HEIGHT
 
-    if (shouldShow !== shouldShowFloatingBar && !floatingBarAnimating.current) {
-      floatingBarAnimating.current = true;
-      logVisibilityChange.current++;
-      console.log(`[RDP HandleScroll #${logVisibilityChange.current}] Visibility change: shouldShow=${shouldShow}, scrollY=${scrollY.toFixed(0)}, tabBarExitPoint=${tabBarExitPoint.toFixed(0)}, contentDeepPoint=${contentDeepPoint.toFixed(0)}`);
-      setShouldShowFloatingBar(shouldShow);
-      Animated.timing(floatingTabBarVisible, {
-        toValue: shouldShow ? 1 : 0,
-        duration: 250, 
-        useNativeDriver: true,
-      }).start(() => {
-        floatingBarAnimating.current = false;
-      });
-    }
-  }, [activeTab, shouldShowFloatingBar, floatingTabBarVisible, HEADER_HEIGHT]); // REVERTED dependencies
+      const deepContentHideOffset = screenHeight * 0.8;
+      const contentDeepPoint = HEADER_HEIGHT + deepContentHideOffset; // Relative to HEADER_HEIGHT
+
+      const shouldShow =
+        scrollY > tabBarExitPoint && scrollY < contentDeepPoint;
+
+      if (
+        shouldShow !== shouldShowFloatingBar &&
+        !floatingBarAnimating.current
+      ) {
+        floatingBarAnimating.current = true;
+        logVisibilityChange.current++;
+        console.log(
+          `[RDP HandleScroll #${logVisibilityChange.current}] Visibility change: shouldShow=${shouldShow}, scrollY=${scrollY.toFixed(0)}, tabBarExitPoint=${tabBarExitPoint.toFixed(0)}, contentDeepPoint=${contentDeepPoint.toFixed(0)}`,
+        );
+        setShouldShowFloatingBar(shouldShow);
+        Animated.timing(floatingTabBarVisible, {
+          toValue: shouldShow ? 1 : 0,
+          duration: 250,
+          useNativeDriver: true,
+        }).start(() => {
+          floatingBarAnimating.current = false;
+        });
+      }
+    },
+    [activeTab, shouldShowFloatingBar, floatingTabBarVisible, HEADER_HEIGHT],
+  ); // REVERTED dependencies
 
   // Render the active tab content
   const renderTabContent = () => {
-    switch(activeTab) {
+    switch (activeTab) {
       case TAB_ROUTES.INGREDIENTS:
         return (
-          <View 
+          <View
             key="ingredients-tab"
-            onLayout={(e) => handleTabContentLayout(TAB_ROUTES.INGREDIENTS, e)}
-          >
+            onLayout={e => handleTabContentLayout(TAB_ROUTES.INGREDIENTS, e)}>
             <IngredientsTab />
           </View>
         );
       case TAB_ROUTES.STEPS:
         return (
-          <View 
+          <View
             key="steps-tab"
-            onLayout={(e) => handleTabContentLayout(TAB_ROUTES.STEPS, e)}
-          >
+            onLayout={e => handleTabContentLayout(TAB_ROUTES.STEPS, e)}>
             <StepsTab steps={recipeDetails?.preparation_steps} />
           </View>
         );
       case TAB_ROUTES.MACROS:
         return (
-          <View 
+          <View
             key="macros-tab"
-            onLayout={(e) => handleTabContentLayout(TAB_ROUTES.MACROS, e)}
-          >
+            onLayout={e => handleTabContentLayout(TAB_ROUTES.MACROS, e)}>
             <MacrosTab />
           </View>
         );
       default:
         return (
-          <View 
+          <View
             key="ingredients-tab-default"
-            onLayout={(e) => handleTabContentLayout(TAB_ROUTES.INGREDIENTS, e)}
-          >
+            onLayout={e => handleTabContentLayout(TAB_ROUTES.INGREDIENTS, e)}>
             <IngredientsTab />
           </View>
         );
@@ -495,7 +599,7 @@ export default function RecipeDetailScreen() {
 
   const handleOpenPlannerModal = () => {
     if (!recipeDetails) {
-      Alert.alert("Error", "Recipe details not loaded yet.");
+      Alert.alert('Error', 'Recipe details not loaded yet.');
       return;
     }
     setIsPlannerModalVisible(true);
@@ -507,26 +611,36 @@ export default function RecipeDetailScreen() {
 
   const handleAddToMealPlan = async (date: Date, slot: MealSlot) => {
     if (!recipeDetails) {
-      Alert.alert("Error", "Cannot add to plan, recipe details are missing.");
+      Alert.alert('Error', 'Cannot add to plan, recipe details are missing.');
       return;
     }
     const dateString = format(date, 'yyyy-MM-dd'); // Date for the plan entry
-    console.log(`RecipeDetailScreen: Adding ${recipeDetails.title} (ID: ${recipeDetails.recipe_id}) to meal plan on ${dateString} [${slot}] using V2 hook`);
+    console.log(
+      `RecipeDetailScreen: Adding ${recipeDetails.title} (ID: ${recipeDetails.recipe_id}) to meal plan on ${dateString} [${slot}] using V2 hook`,
+    );
     try {
       // V2 addRecipeToSlot expects an object
       await addRecipeToSlot({
         planDate: dateString, // Pass the formatted date for the plan
-        slot: slot, 
+        slot,
         recipeId: recipeDetails.recipe_id, // Corrected: Use recipe_id
         recipeTitle: recipeDetails.title,
         recipeThumbnailUrl: recipeDetails.video_url || undefined, // Corrected: Use video_url as thumbnail_url is not directly on RecipeDetailsData
       });
-      Alert.alert("Success", `Added ${recipeDetails.title} to your meal plan for ${format(date, 'MMM d, yyyy')} (${slot}).`);
+      Alert.alert(
+        'Success',
+        `Added ${recipeDetails.title} to your meal plan for ${format(date, 'MMM d, yyyy')} (${slot}).`,
+      );
       // Invalidate queries for the meal planner screen to refresh
-      queryClient.invalidateQueries({ queryKey: ['dailyMealPlan', dateString] });
+      queryClient.invalidateQueries({
+        queryKey: ['dailyMealPlan', dateString],
+      });
     } catch (e: any) {
-      Alert.alert("Error", e.message || "An unexpected error occurred while adding to meal plan.");
-      console.error("Error adding to meal plan (V2):", e);
+      Alert.alert(
+        'Error',
+        e.message || 'An unexpected error occurred while adding to meal plan.',
+      );
+      console.error('Error adding to meal plan (V2):', e);
     }
     setIsPlannerModalVisible(false); // Close modal on success or failure
     // Modal closes itself - original comment, keeping it but also explicitly closing
@@ -539,13 +653,17 @@ export default function RecipeDetailScreen() {
   // Handle navigation to author's profile
   const handleNavigateToAuthorProfile = () => {
     if (recipeDetails?.user_id) {
-      console.log(`[RecipeDetailScreen] Navigating to profile for user: ${recipeDetails.user_id}`);
-      navigation.navigate('MainTabs', { 
-        screen: 'Profile', 
-        params: { userId: recipeDetails.user_id } 
+      console.log(
+        `[RecipeDetailScreen] Navigating to profile for user: ${recipeDetails.user_id}`,
+      );
+      navigation.navigate('MainTabs', {
+        screen: 'Profile',
+        params: { userId: recipeDetails.user_id },
       });
     } else {
-      console.warn('[RecipeDetailScreen] No user_id available for profile navigation');
+      console.warn(
+        '[RecipeDetailScreen] No user_id available for profile navigation',
+      );
     }
   };
 
@@ -564,7 +682,7 @@ export default function RecipeDetailScreen() {
       <View style={styles.centeredContainer}>
         <StatusBar barStyle="dark-content" />
         <Text style={styles.errorText}>
-          {error ? error : 'Could not load recipe details.'}
+          {error || 'Could not load recipe details.'}
         </Text>
       </View>
     );
@@ -572,28 +690,38 @@ export default function RecipeDetailScreen() {
 
   return (
     <View style={styles.screenContainer}>
-      <StatusBar translucent backgroundColor="transparent" barStyle={currentScrollPosition > 50 ? "dark-content" : "light-content"} />
-      
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={currentScrollPosition > 50 ? 'dark-content' : 'light-content'}
+      />
+
       {/* Fixed Video header */}
       <View style={styles.headerContainer}>
-        {(() => { // Immediately invoked function expression to allow logging & error display
+        {(() => {
+          // Immediately invoked function expression to allow logging & error display
           if (videoPlayerError) {
             return (
               <View style={[styles.video, styles.videoPlaceholder]}>
-                <Ionicons name="alert-circle-outline" size={48} color="#FF9800" />
+                <Ionicons
+                  name="alert-circle-outline"
+                  size={48}
+                  color="#FF9800"
+                />
                 <Text style={styles.videoErrorText}>{videoPlayerError}</Text>
               </View>
             );
           }
-          
+
           // Check if this is an AI-generated recipe
           if (recipeDetails?.is_ai_generated) {
             return (
               <View style={styles.aiRecipeImageContainer}>
                 <Image
-                  source={{ 
-                    uri: recipeDetails.thumbnail_url || 
-                         'https://btpmaqffdmxhugvybgfn.supabase.co/storage/v1/object/public/app-assets/kitch-ai-recipe-default.jpg'
+                  source={{
+                    uri:
+                      recipeDetails.thumbnail_url ||
+                      'https://btpmaqffdmxhugvybgfn.supabase.co/storage/v1/object/public/app-assets/kitch-ai-recipe-default.jpg',
                   }}
                   style={styles.aiRecipeImage}
                   resizeMode="cover"
@@ -605,9 +733,12 @@ export default function RecipeDetailScreen() {
               </View>
             );
           }
-          
+
           if (recipeDetails?.video_url) {
-            console.log("RecipeDetailScreen: Attempting to play video_url:", recipeDetails.video_url); 
+            console.log(
+              'RecipeDetailScreen: Attempting to play video_url:',
+              recipeDetails.video_url,
+            );
             return (
               <View style={styles.videoContainer}>
                 <Video
@@ -625,28 +756,36 @@ export default function RecipeDetailScreen() {
                 />
               </View>
             );
-          } else {
-            console.log("RecipeDetailScreen: video_url is not available."); 
-            return (
-              <View style={[styles.video, styles.videoPlaceholder]}>
-                <Ionicons name="videocam-off-outline" size={48} color="#ccc" />
-                <Text style={{ color: '#ccc' }}>Video not available</Text>
-              </View>
-            );
           }
+          console.log('RecipeDetailScreen: video_url is not available.');
+          return (
+            <View style={[styles.video, styles.videoPlaceholder]}>
+              <Ionicons name="videocam-off-outline" size={48} color="#ccc" />
+              <Text style={{ color: '#ccc' }}>Video not available</Text>
+            </View>
+          );
         })()}
 
         {/* Header Overlays (Mute button, Pantry Match, Actions) */}
         <TouchableOpacity style={styles.muteButton} onPress={toggleMute}>
-          <Ionicons name={isMuted ? 'volume-mute' : 'volume-high'} size={24} color="white" />
+          <Ionicons
+            name={isMuted ? 'volume-mute' : 'volume-high'}
+            size={24}
+            color="white"
+          />
         </TouchableOpacity>
 
         {/* Cart Icon with Badge - Uses groceryList.length */}
-        <TouchableOpacity 
-          style={styles.cartButtonContainer} 
-          onPress={() => navigation.navigate('MainTabs', { screen: 'GroceryList' })}
-        > 
-          <Ionicons name="cart-outline" size={28} color={COLORS.white || '#FFF'} />
+        <TouchableOpacity
+          style={styles.cartButtonContainer}
+          onPress={() =>
+            navigation.navigate('MainTabs', { screen: 'GroceryList' })
+          }>
+          <Ionicons
+            name="cart-outline"
+            size={28}
+            color={COLORS.white || '#FFF'}
+          />
           {groceryList.length > 0 && (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{groceryList.length}</Text>
@@ -658,11 +797,13 @@ export default function RecipeDetailScreen() {
         {recipeDetails && typeof recipeDetails.views_count === 'number' && (
           <View style={styles.videoViewCountContainer}>
             <Ionicons name="eye-outline" style={styles.videoViewCountIcon} />
-            <Text style={styles.videoViewCountText}>{recipeDetails.views_count} views</Text>
+            <Text style={styles.videoViewCountText}>
+              {recipeDetails.views_count} views
+            </Text>
           </View>
         )}
       </View>
-      
+
       {/* Floating Tab Bar - appears when scrolled past original tab bar */}
       <FloatingTabBar
         tabs={Object.values(TAB_ROUTES)}
@@ -678,9 +819,9 @@ export default function RecipeDetailScreen() {
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
-          { 
+          {
             paddingBottom: 80, // Standard padding for all tabs
-          }
+          },
         ]}
         showsVerticalScrollIndicator={false}
         stickyHeaderIndices={[]} // Remove sticky header behavior
@@ -689,45 +830,59 @@ export default function RecipeDetailScreen() {
         decelerationRate="fast"
         snapToOffsets={undefined} // Remove snap behavior that causes sticking
         snapToStart={false}
-        bounces={true}
-        overScrollMode="always"
-      >
+        bounces
+        overScrollMode="always">
         {/* Recipe Info Section */}
         <View style={styles.recipeInfoSection}>
-          <Text style={styles.recipeTitleText} numberOfLines={3} ellipsizeMode="tail">
+          <Text
+            style={styles.recipeTitleText}
+            numberOfLines={3}
+            ellipsizeMode="tail">
             {recipeDetails.title}
           </Text>
 
           {/* Author Info Row */}
           {(recipeDetails?.username || recipeDetails?.is_ai_generated) && (
-            <TouchableOpacity 
-              style={styles.authorInfoRow} 
-              onPress={recipeDetails?.is_ai_generated ? undefined : handleNavigateToAuthorProfile}
-              disabled={recipeDetails?.is_ai_generated}
-            >
+            <TouchableOpacity
+              style={styles.authorInfoRow}
+              onPress={
+                recipeDetails?.is_ai_generated
+                  ? undefined
+                  : handleNavigateToAuthorProfile
+              }
+              disabled={recipeDetails?.is_ai_generated}>
               {recipeDetails?.is_ai_generated ? (
                 <View style={styles.authorAvatarPlaceholder}>
                   <Ionicons name="sparkles" size={18} color="#10b981" />
                 </View>
               ) : recipeDetails.avatar_url ? (
-                <Image 
-                  source={{ uri: recipeDetails.avatar_url }} 
+                <Image
+                  source={{ uri: recipeDetails.avatar_url }}
                   style={styles.authorAvatarImage}
                 />
               ) : (
                 <View style={styles.authorAvatarPlaceholder}>
-                  <Ionicons name="person-outline" size={18} color={COLORS.primary || '#00796b'} />
+                  <Ionicons
+                    name="person-outline"
+                    size={18}
+                    color={COLORS.primary || '#00796b'}
+                  />
                 </View>
               )}
               <Text style={styles.authorNameText}>
-                {recipeDetails?.is_ai_generated ? 'Kitch AI' : (recipeDetails.username || 'Unknown Author')}
+                {recipeDetails?.is_ai_generated
+                  ? 'Kitch AI'
+                  : recipeDetails.username || 'Unknown Author'}
               </Text>
             </TouchableOpacity>
           )}
 
           {/* Pantry Badge Row */}
           <View style={styles.pantryBadgeRow}>
-            <Ionicons name="restaurant-outline" style={styles.pantryBadgeIcon} />
+            <Ionicons
+              name="restaurant-outline"
+              style={styles.pantryBadgeIcon}
+            />
             <Text style={styles.pantryBadgeInfoText}>
               {matchedCount}/{totalCount} Ingredients in pantry
             </Text>
@@ -735,77 +890,99 @@ export default function RecipeDetailScreen() {
 
           {/* Time Info Row */}
           <View style={styles.timeInfoRow}>
-            {prepTime !== null && <Text style={styles.timeDetailText}>Prep: {prepTime} min</Text>}
-            {cookTime !== null && <Text style={styles.timeDetailText}>Cook: {cookTime} min</Text>}
-            {totalTime > 0 && <Text style={styles.timeDetailText}>Total: {totalTime} min</Text>}
+            {prepTime !== null && (
+              <Text style={styles.timeDetailText}>Prep: {prepTime} min</Text>
+            )}
+            {cookTime !== null && (
+              <Text style={styles.timeDetailText}>Cook: {cookTime} min</Text>
+            )}
+            {totalTime > 0 && (
+              <Text style={styles.timeDetailText}>Total: {totalTime} min</Text>
+            )}
           </View>
 
           {/* Divider before action row */}
-          <View style={[styles.sectionDivider, { marginTop: 16, marginBottom: 10 }]} />
+          <View
+            style={[styles.sectionDivider, { marginTop: 16, marginBottom: 10 }]}
+          />
 
           {/* Action Row (Like, Save, Comment, Share) */}
           <View style={styles.actionRow}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
                 styles.actionButton,
-                (!user?.id || likeMutation.isPending) && styles.actionButtonDisabled
-              ]} 
+                (!user?.id || likeMutation.isPending) &&
+                  styles.actionButtonDisabled,
+              ]}
               onPress={() => {
                 if (!user?.id) {
-                  Alert.alert('Authentication Required', 'Please log in to like recipes.');
+                  Alert.alert(
+                    'Authentication Required',
+                    'Please log in to like recipes.',
+                  );
                   return;
                 }
                 likeMutation.mutate(id);
               }}
-              disabled={!user?.id || likeMutation.isPending}
-            >
+              disabled={!user?.id || likeMutation.isPending}>
               {likeMutation.isPending ? (
                 <ActivityIndicator size="small" color={COLORS.primary} />
               ) : (
-                <Ionicons 
-                  name={recipeDetails?.is_liked_by_user ? "heart" : "heart-outline"} 
-                  size={26} 
-                  color={recipeDetails?.is_liked_by_user ? COLORS.error : COLORS.primary} 
+                <Ionicons
+                  name={
+                    recipeDetails?.is_liked_by_user ? 'heart' : 'heart-outline'
+                  }
+                  size={26}
+                  color={
+                    recipeDetails?.is_liked_by_user
+                      ? COLORS.error
+                      : COLORS.primary
+                  }
                 />
               )}
               {recipeDetails?.likes !== undefined && (
                 <Text style={styles.actionCount}>{recipeDetails.likes}</Text>
               )}
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.actionButton}
               onPress={() => saveMutation.mutate(id)}
-              disabled={saveMutation.isPending}
-            >
-              <Ionicons 
-                name={recipeDetails?.is_saved_by_user ? "bookmark" : "bookmark-outline"}
-                size={26} 
-                color={recipeDetails?.is_saved_by_user ? COLORS.primary : COLORS.textSecondary}
+              disabled={saveMutation.isPending}>
+              <Ionicons
+                name={
+                  recipeDetails?.is_saved_by_user
+                    ? 'bookmark'
+                    : 'bookmark-outline'
+                }
+                size={26}
+                color={
+                  recipeDetails?.is_saved_by_user
+                    ? COLORS.primary
+                    : COLORS.textSecondary
+                }
               />
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.actionButton}
-              onPress={handleCommentPress}
-            >
-              <Ionicons 
-                name="chatbubble-outline" 
-                size={26} 
+              onPress={handleCommentPress}>
+              <Ionicons
+                name="chatbubble-outline"
+                size={26}
                 color={COLORS.primary}
               />
               {recipeDetails.comments_count !== undefined && (
-                <Text style={styles.actionCount}>{recipeDetails.comments_count}</Text>
+                <Text style={styles.actionCount}>
+                  {recipeDetails.comments_count}
+                </Text>
               )}
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={handleShare}
-            >
-              <Ionicons 
-                name="share-social-outline" 
-                size={26} 
+
+            <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
+              <Ionicons
+                name="share-social-outline"
+                size={26}
                 color={COLORS.primary}
               />
             </TouchableOpacity>
@@ -814,10 +991,10 @@ export default function RecipeDetailScreen() {
 
         {/* Original Tab Navigator - Not sticky anymore */}
         <View style={styles.tabNavigatorWrapper}>
-          <CustomTabNavigator 
-            activeTab={activeTab} 
-            setActiveTab={setActiveTab} 
-            tabs={Object.values(TAB_ROUTES)} 
+          <CustomTabNavigator
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            tabs={Object.values(TAB_ROUTES)}
             tabContent={renderTabContent()}
             onTabChange={handleTabChange}
           />
@@ -1129,8 +1306,8 @@ const styles = StyleSheet.create({
   },
   videoViewCountContainer: {
     position: 'absolute',
-    bottom: 12, 
-    right: 12,  
+    bottom: 12,
+    right: 12,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -1175,4 +1352,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 4,
   },
-}); 
+});

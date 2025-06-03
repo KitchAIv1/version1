@@ -5,4 +5,4 @@ export * from './imageProcessing';
 export * from './unitConversion';
 
 // Export all duplicate handling utilities
-export * from './duplicateHandling'; 
+export * from './duplicateHandling';

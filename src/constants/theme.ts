@@ -39,4 +39,4 @@ export const SIZES = {
   body3: 13,
   body4: 12,
   body5: 10,
-}; 
+};

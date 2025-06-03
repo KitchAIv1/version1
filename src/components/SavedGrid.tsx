@@ -34,7 +34,7 @@ export const SavedGrid: React.FC<SavedGridProps> = ({ data }) => {
     <FlatList
       data={data}
       renderItem={renderItem}
-      keyExtractor={(item) => item.id}
+      keyExtractor={item => item.id}
       numColumns={numColumns}
       contentContainerStyle={styles.listContainer}
     />
@@ -42,12 +42,12 @@ export const SavedGrid: React.FC<SavedGridProps> = ({ data }) => {
 };
 
 const styles = StyleSheet.create({
-  listContainer: { 
+  listContainer: {
     padding: itemMargin,
   },
   itemContainer: {
     flex: 1 / numColumns,
-    aspectRatio: 1, 
+    aspectRatio: 1,
     margin: itemMargin,
     backgroundColor: '#e0e0e0',
     justifyContent: 'center',
@@ -55,8 +55,13 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   itemText: { fontSize: 10, textAlign: 'center' },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
   emptyText: { color: '#666' },
 });
 
-export default SavedGrid; 
+export default SavedGrid;

@@ -10,7 +10,10 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { StockItem } from '../../hooks/useStockManager';
-import { formatStockTimestamp, getShortRelativeTime } from '../../utils/dateUtils';
+import {
+  formatStockTimestamp,
+  getShortRelativeTime,
+} from '../../utils/dateUtils';
 import { getIconForPantryItem } from '../../utils/iconMapping';
 
 interface StockListProps {
@@ -32,18 +35,16 @@ export const StockList: React.FC<StockListProps> = ({
   onRefresh,
   isRefreshing = false,
 }) => {
-
   const renderItem = ({ item }: { item: StockItem }) => {
     const lastUpdated = formatStockTimestamp(item.created_at);
     const shortTime = getShortRelativeTime(item.created_at);
     const iconName = getIconForPantryItem(item.item_name);
-    
+
     return (
-      <TouchableOpacity 
-        style={styles.itemContainer} 
+      <TouchableOpacity
+        style={styles.itemContainer}
         onPress={() => onEdit(item)}
-        activeOpacity={0.7}
-      >
+        activeOpacity={0.7}>
         <View style={styles.itemIconContainer}>
           <Icon name={iconName} size={20} color="#4CAF50" />
         </View>
@@ -52,9 +53,7 @@ export const StockList: React.FC<StockListProps> = ({
             <Text style={styles.itemName}>
               {item.item_name.charAt(0).toUpperCase() + item.item_name.slice(1)}
             </Text>
-            {shortTime && (
-              <Text style={styles.timeChip}>{shortTime}</Text>
-            )}
+            {shortTime && <Text style={styles.timeChip}>{shortTime}</Text>}
           </View>
           <View style={styles.itemDetailsRow}>
             <View style={styles.quantityChip}>
@@ -76,10 +75,14 @@ export const StockList: React.FC<StockListProps> = ({
           )}
         </View>
         <View style={styles.itemActions}>
-          <TouchableOpacity onPress={() => onEdit(item)} style={styles.actionButton}>
+          <TouchableOpacity
+            onPress={() => onEdit(item)}
+            style={styles.actionButton}>
             <Icon name="create-outline" size={22} color="#757575" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => onDelete(item)} style={styles.actionButton}>
+          <TouchableOpacity
+            onPress={() => onDelete(item)}
+            style={styles.actionButton}>
             <Icon name="trash-outline" size={24} color="#F44336" />
           </TouchableOpacity>
         </View>
@@ -127,7 +130,7 @@ export const StockList: React.FC<StockListProps> = ({
     <FlatList
       data={data}
       renderItem={renderItem}
-      keyExtractor={(item) => item.id?.toString() || item.item_name}
+      keyExtractor={item => item.id?.toString() || item.item_name}
       style={styles.list}
       contentContainerStyle={styles.listContentContainer}
       showsVerticalScrollIndicator={false}
@@ -136,12 +139,12 @@ export const StockList: React.FC<StockListProps> = ({
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={onRefresh}
-            colors={["#22c55e"]}
-            tintColor={"#22c55e"}
+            colors={['#22c55e']}
+            tintColor="#22c55e"
           />
         ) : undefined
       }
-      removeClippedSubviews={true}
+      removeClippedSubviews
       maxToRenderPerBatch={10}
       updateCellsBatchingPeriod={50}
       initialNumToRender={15}
@@ -157,7 +160,7 @@ const styles = StyleSheet.create({
   },
   listContentContainer: {
     paddingHorizontal: 10,
-    paddingBottom: 20, 
+    paddingBottom: 20,
   },
   itemContainer: {
     flexDirection: 'row',
@@ -206,7 +209,7 @@ const styles = StyleSheet.create({
   itemDetailsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 3, 
+    marginBottom: 3,
   },
   quantityChip: {
     backgroundColor: '#e0e0e0', // Neutral chip background
@@ -229,7 +232,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   actionButton: {
-    padding: 8, 
+    padding: 8,
     marginLeft: 8,
   },
   centeredMessageContainer: {

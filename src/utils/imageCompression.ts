@@ -78,24 +78,24 @@ const calculateOptimalDimensions = (
   originalWidth: number,
   originalHeight: number,
   maxWidth: number,
-  maxHeight: number
+  maxHeight: number,
 ): { width: number; height: number } => {
   const aspectRatio = originalWidth / originalHeight;
-  
+
   let newWidth = originalWidth;
   let newHeight = originalHeight;
-  
+
   // Scale down if exceeds max dimensions
   if (newWidth > maxWidth) {
     newWidth = maxWidth;
     newHeight = newWidth / aspectRatio;
   }
-  
+
   if (newHeight > maxHeight) {
     newHeight = maxHeight;
     newWidth = newHeight * aspectRatio;
   }
-  
+
   return {
     width: Math.round(newWidth),
     height: Math.round(newHeight),
@@ -110,7 +110,7 @@ const calculateOptimalDimensions = (
  */
 export const compressImage = async (
   uri: string,
-  options: CompressionOptions = {}
+  options: CompressionOptions = {},
 ): Promise<CompressionResult> => {
   const {
     maxWidth = 800,
@@ -132,12 +132,13 @@ export const compressImage = async (
     const originalSizeKB = originalSize / 1024;
 
     // Calculate optimal dimensions
-    const { width: targetWidth, height: targetHeight } = calculateOptimalDimensions(
-      originalInfo.width,
-      originalInfo.height,
-      maxWidth,
-      maxHeight
-    );
+    const { width: targetWidth, height: targetHeight } =
+      calculateOptimalDimensions(
+        originalInfo.width,
+        originalInfo.height,
+        maxWidth,
+        maxHeight,
+      );
 
     let currentQuality = quality;
     let currentWidth = targetWidth;
@@ -152,29 +153,44 @@ export const compressImage = async (
         [{ resize: { width: currentWidth, height: currentHeight } }],
         {
           compress: currentQuality,
-          format: format === 'jpeg' ? ImageManipulator.SaveFormat.JPEG : 
-                 format === 'png' ? ImageManipulator.SaveFormat.PNG :
-                 ImageManipulator.SaveFormat.WEBP,
+          format:
+            format === 'jpeg'
+              ? ImageManipulator.SaveFormat.JPEG
+              : format === 'png'
+                ? ImageManipulator.SaveFormat.PNG
+                : ImageManipulator.SaveFormat.WEBP,
           base64: true,
-        }
+        },
       );
     } else {
       // Iteratively compress to reach target size
       while (iteration < maxIterations) {
         const manipulateActions: ImageManipulator.Action[] = [];
-        
+
         // Add resize action if dimensions changed
-        if (currentWidth !== originalInfo.width || currentHeight !== originalInfo.height) {
-          manipulateActions.push({ resize: { width: currentWidth, height: currentHeight } });
+        if (
+          currentWidth !== originalInfo.width ||
+          currentHeight !== originalInfo.height
+        ) {
+          manipulateActions.push({
+            resize: { width: currentWidth, height: currentHeight },
+          });
         }
 
-        result = await ImageManipulator.manipulateAsync(uri, manipulateActions, {
-          compress: currentQuality,
-          format: format === 'jpeg' ? ImageManipulator.SaveFormat.JPEG : 
-                 format === 'png' ? ImageManipulator.SaveFormat.PNG :
-                 ImageManipulator.SaveFormat.WEBP,
-          base64: true,
-        });
+        result = await ImageManipulator.manipulateAsync(
+          uri,
+          manipulateActions,
+          {
+            compress: currentQuality,
+            format:
+              format === 'jpeg'
+                ? ImageManipulator.SaveFormat.JPEG
+                : format === 'png'
+                  ? ImageManipulator.SaveFormat.PNG
+                  : ImageManipulator.SaveFormat.WEBP,
+            base64: true,
+          },
+        );
 
         const currentSize = estimateFileSizeFromBase64(result.base64!);
         const currentSizeKB = currentSize / 1024;
@@ -200,14 +216,15 @@ export const compressImage = async (
           } else {
             currentQuality *= 0.8; // Moderate reduction
           }
-          
+
           currentQuality = Math.max(currentQuality, 0.1); // Minimum quality threshold
         }
       }
     }
 
     const finalSize = estimateFileSizeFromBase64(result.base64!);
-    const compressionRatio = originalSize > 0 ? (originalSize - finalSize) / originalSize : 0;
+    const compressionRatio =
+      originalSize > 0 ? (originalSize - finalSize) / originalSize : 0;
 
     return {
       uri: result.uri,
@@ -231,7 +248,7 @@ export const compressImage = async (
  */
 export const compressImageWithPreset = async (
   uri: string,
-  preset: keyof typeof COMPRESSION_PRESETS
+  preset: keyof typeof COMPRESSION_PRESETS,
 ): Promise<CompressionResult> => {
   return compressImage(uri, COMPRESSION_PRESETS[preset]);
 };
@@ -244,15 +261,15 @@ export const compressImageWithPreset = async (
  */
 export const createMultipleSizes = async (
   uri: string,
-  sizes: Array<{ name: string; options: CompressionOptions }>
+  sizes: Array<{ name: string; options: CompressionOptions }>,
 ): Promise<Array<{ name: string; result: CompressionResult }>> => {
   const results = await Promise.all(
     sizes.map(async ({ name, options }) => ({
       name,
       result: await compressImage(uri, options),
-    }))
+    })),
   );
-  
+
   return results;
 };
 
@@ -264,17 +281,17 @@ export const createMultipleSizes = async (
  */
 export const needsCompression = async (
   uri: string,
-  maxSizeKB: number
+  maxSizeKB: number,
 ): Promise<{ needsCompression: boolean; currentSizeKB: number }> => {
   try {
     const info = await ImageManipulator.manipulateAsync(uri, [], {
       base64: true,
       format: ImageManipulator.SaveFormat.JPEG,
     });
-    
+
     const currentSize = estimateFileSizeFromBase64(info.base64!);
     const currentSizeKB = currentSize / 1024;
-    
+
     return {
       needsCompression: currentSizeKB > maxSizeKB,
       currentSizeKB,
@@ -283,4 +300,4 @@ export const needsCompression = async (
     console.error('[imageCompression] Error checking image size:', error);
     return { needsCompression: true, currentSizeKB: 0 };
   }
-}; 
+};

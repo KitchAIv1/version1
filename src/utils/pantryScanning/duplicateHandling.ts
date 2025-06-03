@@ -38,18 +38,20 @@ export interface DuplicateAction {
  * @param userId - User ID to fetch stock for
  * @returns Array of existing stock items
  */
-export const fetchCurrentStock = async (userId: string): Promise<ExistingStockItem[]> => {
+export const fetchCurrentStock = async (
+  userId: string,
+): Promise<ExistingStockItem[]> => {
   try {
     const { data, error } = await supabase
       .from('stock')
       .select('item_name, quantity, unit')
       .eq('user_id', userId);
-      
+
     if (error) {
       console.error('[duplicateHandling] Error fetching stock:', error);
       throw error;
     }
-    
+
     return data || [];
   } catch (error) {
     console.error('[duplicateHandling] Exception fetching stock:', error);
@@ -62,7 +64,9 @@ export const fetchCurrentStock = async (userId: string): Promise<ExistingStockIt
  * @param stockItems - Array of existing stock items
  * @returns Map with item names as keys
  */
-export const createStockMap = (stockItems: ExistingStockItem[]): Map<string, ExistingStockItem> => {
+export const createStockMap = (
+  stockItems: ExistingStockItem[],
+): Map<string, ExistingStockItem> => {
   return new Map(stockItems.map(item => [item.item_name.toLowerCase(), item]));
 };
 
@@ -74,32 +78,30 @@ export const createStockMap = (stockItems: ExistingStockItem[]): Map<string, Exi
  */
 export const processItemsForDuplicates = async (
   processedItems: ProcessedItem[],
-  userId: string
+  userId: string,
 ): Promise<{
   itemsToUpsert: ItemToUpsert[];
   duplicateActions: DuplicateAction[];
 }> => {
   const currentStock = await fetchCurrentStock(userId);
   const stockMap = createStockMap(currentStock);
-  
+
   const itemsToUpsert: ItemToUpsert[] = [];
   const duplicateActions: DuplicateAction[] = [];
-  
+
   for (const item of processedItems) {
     const itemNameLower = item.currentName.toLowerCase();
     const existingItem = stockMap.get(itemNameLower);
-    const { quantity: convertedQuantity, unit: backendUnit } = convertToBackendUnit(
-      item.currentQuantity,
-      item.currentUnit
-    );
-    
+    const { quantity: convertedQuantity, unit: backendUnit } =
+      convertToBackendUnit(item.currentQuantity, item.currentUnit);
+
     if (existingItem) {
       // Item exists - add to duplicate actions for user decision
       duplicateActions.push({
         item,
         existingDetails: existingItem,
         convertedQuantity,
-        backendUnit
+        backendUnit,
       });
     } else {
       // New item - add directly to upsert list
@@ -110,11 +112,11 @@ export const processItemsForDuplicates = async (
         quantity: convertedQuantity,
         unit: backendUnit,
         description: null,
-        created_at: now
+        created_at: now,
       });
     }
   }
-  
+
   return { itemsToUpsert, duplicateActions };
 };
 
@@ -126,21 +128,23 @@ export const processItemsForDuplicates = async (
  */
 export const handleDuplicateUserDecision = (
   duplicateAction: DuplicateAction,
-  userId: string
+  userId: string,
 ): Promise<ItemToUpsert | null> => {
-  return new Promise((resolve) => {
-    const { item, existingDetails, convertedQuantity, backendUnit } = duplicateAction;
-    
+  return new Promise(resolve => {
+    const { item, existingDetails, convertedQuantity, backendUnit } =
+      duplicateAction;
+
     Alert.alert(
-      "Item Exists",
+      'Item Exists',
       `"${item.currentName}" is already in your pantry (${existingDetails.quantity} ${existingDetails.unit}). Choose an action:`,
       [
         {
-          text: "Add Quantity",
+          text: 'Add Quantity',
           onPress: () => {
-            const existingQty = parseFloat(String(existingDetails.quantity)) || 0;
+            const existingQty =
+              parseFloat(String(existingDetails.quantity)) || 0;
             const newTotalQty = existingQty + convertedQuantity;
-            
+
             resolve({
               user_id: userId,
               item_name: item.currentName.toLowerCase(),
@@ -148,10 +152,10 @@ export const handleDuplicateUserDecision = (
               unit: backendUnit,
               description: null,
             });
-          }
+          },
         },
         {
-          text: "Replace Entry",
+          text: 'Replace Entry',
           onPress: () => {
             resolve({
               user_id: userId,
@@ -160,17 +164,17 @@ export const handleDuplicateUserDecision = (
               unit: backendUnit,
               description: null,
             });
-          }
+          },
         },
         {
-          text: "Cancel",
-          style: "cancel",
+          text: 'Cancel',
+          style: 'cancel',
           onPress: () => {
             resolve(null);
-          }
-        }
+          },
+        },
       ],
-      { cancelable: false }
+      { cancelable: false },
     );
   });
 };
@@ -183,17 +187,17 @@ export const handleDuplicateUserDecision = (
  */
 export const processDuplicateActions = async (
   duplicateActions: DuplicateAction[],
-  userId: string
+  userId: string,
 ): Promise<ItemToUpsert[]> => {
   const additionalItemsToUpsert: ItemToUpsert[] = [];
-  
+
   for (const duplicateAction of duplicateActions) {
     const result = await handleDuplicateUserDecision(duplicateAction, userId);
     if (result) {
       additionalItemsToUpsert.push(result);
     }
   }
-  
+
   return additionalItemsToUpsert;
 };
 
@@ -203,15 +207,16 @@ export const processDuplicateActions = async (
  */
 export const validateUserSession = async (): Promise<string> => {
   try {
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.getSession();
+
     if (sessionError || !sessionData?.session?.user) {
-      throw new Error(sessionError?.message || "User session not found.");
+      throw new Error(sessionError?.message || 'User session not found.');
     }
-    
+
     return sessionData.session.user.id;
   } catch (error) {
     console.error('[duplicateHandling] Session validation error:', error);
     throw error;
   }
-}; 
+};

@@ -12,8 +12,11 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
-import { useIsFocused } from '@react-navigation/native';
-import { useFocusEffect } from '@react-navigation/native';
+import {
+  useIsFocused,
+  useFocusEffect,
+  useNavigation,
+} from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useFeed, FeedItem } from '../../hooks/useFeed';
 import {
@@ -24,7 +27,6 @@ import RecipeCard from '../../components/RecipeCard';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../providers/AuthProvider';
 import { useCacheManager } from '../../hooks/useCacheManager';
-import { useNavigation } from '@react-navigation/native';
 import { useCommentCountSync } from '../../hooks/useCommentCountSync';
 
 // Import "What Can I Cook?" components
@@ -79,25 +81,33 @@ export default function FeedScreen() {
   useEffect(() => {
     if (!feedData || !user?.id) return;
 
-    console.log('[FeedScreen] 🎧 Setting up efficient real-time comment monitoring');
+    console.log(
+      '[FeedScreen] 🎧 Setting up efficient real-time comment monitoring',
+    );
 
     // Monitor comment queries for changes
     const unsubscribe = queryClient.getQueryCache().subscribe(event => {
-      if (event.type === 'updated' && event.query.queryKey[0] === 'recipe-comments') {
+      if (
+        event.type === 'updated' &&
+        event.query.queryKey[0] === 'recipe-comments'
+      ) {
         const recipeId = event.query.queryKey[1] as string;
         const commentsData = event.query.state.data;
-        
+
         // Handle both old array format and new {comments: [...]} format
         let comments: any[] = [];
         if (Array.isArray(commentsData)) {
           comments = commentsData;
-        } else if (commentsData?.comments && Array.isArray(commentsData.comments)) {
+        } else if (
+          commentsData?.comments &&
+          Array.isArray(commentsData.comments)
+        ) {
           comments = commentsData.comments;
         }
-        
+
         if (comments.length >= 0) {
           const newCommentCount = comments.length;
-          
+
           // Use efficient direct cache update instead of invalidation
           syncSingleRecipe(recipeId, user.id);
         }
@@ -114,23 +124,26 @@ export default function FeedScreen() {
   useEffect(() => {
     if (isFeedScreenFocused && feedData && feedData.length > 0 && user?.id) {
       // DISABLED - using optimized sync instead
-      return;
     }
   }, [isFeedScreenFocused, currentIndex, feedData, user?.id, cacheManager]);
 
   // OPTIMIZED LIKE SYNC: Only sync items that have 0 likes (feed RPC compensation)
   useEffect(() => {
     if (isFeedScreenFocused && feedData && feedData.length > 0 && user?.id) {
-      // Get currently visible items 
+      // Get currently visible items
       const startIndex = Math.max(0, currentIndex);
       const endIndex = Math.min(feedData.length, startIndex + 2);
       const visibleItems = feedData.slice(startIndex, endIndex);
-      
+
       // Only sync items that have 0 likes (indicating feed RPC didn't provide like data)
-      const itemsNeedingSync = visibleItems.filter(item => (item.likes ?? 0) === 0);
-      
+      const itemsNeedingSync = visibleItems.filter(
+        item => (item.likes ?? 0) === 0,
+      );
+
       if (itemsNeedingSync.length > 0) {
-        console.log(`[FeedScreen] 🔧 Syncing ${itemsNeedingSync.length} items with missing like data`);
+        console.log(
+          `[FeedScreen] 🔧 Syncing ${itemsNeedingSync.length} items with missing like data`,
+        );
         itemsNeedingSync.forEach((item: FeedItem, index: number) => {
           setTimeout(() => {
             cacheManager.updateLikeCount(item.id, user.id);
@@ -144,17 +157,21 @@ export default function FeedScreen() {
   useFocusEffect(
     useCallback(() => {
       if (feedData && feedData.length > 0 && user?.id) {
-        console.log('[FeedScreen] 🧠 Screen focused - running smart comment count sync');
-        
+        console.log(
+          '[FeedScreen] 🧠 Screen focused - running smart comment count sync',
+        );
+
         // Get visible recipes for smart sync
         const startIndex = Math.max(0, currentIndex);
         const endIndex = Math.min(feedData.length, startIndex + 3);
-        const visibleRecipeIds = feedData.slice(startIndex, endIndex).map(item => item.id);
-        
+        const visibleRecipeIds = feedData
+          .slice(startIndex, endIndex)
+          .map(item => item.id);
+
         // Use smart sync to only update what needs updating
         smartSync(visibleRecipeIds, user.id);
       }
-    }, [feedData, currentIndex, user?.id, smartSync])
+    }, [feedData, currentIndex, user?.id, smartSync]),
   );
 
   const onViewableItemsChanged = useCallback(
@@ -287,7 +304,7 @@ export default function FeedScreen() {
               overrideItemLayout={layout => {
                 layout.size = itemHeight;
               }}
-              removeClippedSubviews={true}
+              removeClippedSubviews
               decelerationRate="fast"
             />
           </View>

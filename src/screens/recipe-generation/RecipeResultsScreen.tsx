@@ -13,7 +13,10 @@ import { Feather } from '@expo/vector-icons';
 import { RecipeResultsScreenProps } from '../../navigation/types';
 import { useRecipeSuggestions } from '../../hooks/useRecipeSuggestions';
 
-export default function RecipeResultsScreen({ navigation, route }: RecipeResultsScreenProps) {
+export default function RecipeResultsScreen({
+  navigation,
+  route,
+}: RecipeResultsScreenProps) {
   const { selectedIngredients } = route.params;
 
   // Fetch recipe suggestions using our new hook
@@ -53,11 +56,12 @@ export default function RecipeResultsScreen({ navigation, route }: RecipeResults
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Finding Recipes...</Text>
         </View>
-        
+
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#10b981" />
           <Text style={styles.loadingText}>
-            Searching recipes with your {selectedIngredients.length} ingredients...
+            Searching recipes with your {selectedIngredients.length}{' '}
+            ingredients...
           </Text>
         </View>
       </SafeAreaView>
@@ -74,7 +78,7 @@ export default function RecipeResultsScreen({ navigation, route }: RecipeResults
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Recipe Results</Text>
         </View>
-        
+
         <View style={styles.errorContainer}>
           <Feather name="alert-circle" size={48} color="#ef4444" />
           <Text style={styles.errorTitle}>Oops! Something went wrong</Text>
@@ -90,7 +94,8 @@ export default function RecipeResultsScreen({ navigation, route }: RecipeResults
   }
 
   // Success state with data
-  const { recipe_matches, total_matches, ai_generation_available } = suggestionsData || {};
+  const { recipe_matches, total_matches, ai_generation_available } =
+    suggestionsData || {};
 
   return (
     <SafeAreaView style={styles.container}>
@@ -101,7 +106,8 @@ export default function RecipeResultsScreen({ navigation, route }: RecipeResults
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>Recipe Results</Text>
           <Text style={styles.headerSubtitle}>
-            {selectedIngredients.length} ingredients • {total_matches || 0} matches
+            {selectedIngredients.length} ingredients • {total_matches || 0}{' '}
+            matches
           </Text>
         </View>
       </View>
@@ -110,22 +116,19 @@ export default function RecipeResultsScreen({ navigation, route }: RecipeResults
         {/* Database Matches Section */}
         {recipe_matches && recipe_matches.length > 0 ? (
           <View style={styles.matchesSection}>
-            <Text style={styles.sectionTitle}>
-              Perfect Matches for You
-            </Text>
-            
-            {recipe_matches.map((recipe) => (
+            <Text style={styles.sectionTitle}>Perfect Matches for You</Text>
+
+            {recipe_matches.map(recipe => (
               <TouchableOpacity
                 key={recipe.id}
                 style={styles.recipeCard}
                 onPress={() => handleRecipePress(recipe.id)}
-                activeOpacity={0.7}
-              >
+                activeOpacity={0.7}>
                 {/* Recipe Thumbnail */}
                 <View style={styles.thumbnailContainer}>
                   {recipe.image_url ? (
-                    <Image 
-                      source={{ uri: recipe.image_url }} 
+                    <Image
+                      source={{ uri: recipe.image_url }}
                       style={styles.thumbnail}
                       resizeMode="cover"
                     />
@@ -134,12 +137,15 @@ export default function RecipeResultsScreen({ navigation, route }: RecipeResults
                       <Feather name="image" size={24} color="#9ca3af" />
                     </View>
                   )}
-                  
+
                   {/* Match Badge Overlay */}
-                  <View style={[
-                    styles.matchBadgeOverlay,
-                    { backgroundColor: getMatchColor(recipe.match_percentage) }
-                  ]}>
+                  <View
+                    style={[
+                      styles.matchBadgeOverlay,
+                      {
+                        backgroundColor: getMatchColor(recipe.match_percentage),
+                      },
+                    ]}>
                     <Text style={styles.matchBadgeText}>
                       {Math.round(recipe.match_percentage)}%
                     </Text>
@@ -155,11 +161,15 @@ export default function RecipeResultsScreen({ navigation, route }: RecipeResults
                     <View style={styles.recipeMetrics}>
                       <View style={styles.metricItem}>
                         <Feather name="clock" size={14} color="#6b7280" />
-                        <Text style={styles.metricText}>{recipe.cook_time}min</Text>
+                        <Text style={styles.metricText}>
+                          {recipe.cook_time}min
+                        </Text>
                       </View>
                       <View style={styles.metricItem}>
                         <Feather name="trending-up" size={14} color="#6b7280" />
-                        <Text style={styles.metricText}>{recipe.difficulty}</Text>
+                        <Text style={styles.metricText}>
+                          {recipe.difficulty}
+                        </Text>
                       </View>
                     </View>
                   </View>
@@ -167,7 +177,9 @@ export default function RecipeResultsScreen({ navigation, route }: RecipeResults
                   {/* Creator Info */}
                   <View style={styles.creatorInfo}>
                     <Feather name="user" size={14} color="#6b7280" />
-                    <Text style={styles.creatorName}>by {recipe.creator_name}</Text>
+                    <Text style={styles.creatorName}>
+                      by {recipe.creator_name}
+                    </Text>
                   </View>
 
                   {/* Missing Ingredients */}
@@ -176,7 +188,8 @@ export default function RecipeResultsScreen({ navigation, route }: RecipeResults
                       <Text style={styles.missingLabel}>Missing:</Text>
                       <Text style={styles.missingText} numberOfLines={1}>
                         {recipe.missing_ingredients.slice(0, 3).join(', ')}
-                        {recipe.missing_ingredients.length > 3 && ` +${recipe.missing_ingredients.length - 3} more`}
+                        {recipe.missing_ingredients.length > 3 &&
+                          ` +${recipe.missing_ingredients.length - 3} more`}
                       </Text>
                     </View>
                   )}
@@ -217,7 +230,9 @@ export default function RecipeResultsScreen({ navigation, route }: RecipeResults
                 </Text>
               </View>
             </View>
-            <TouchableOpacity onPress={handleAIGeneration} style={styles.aiButton}>
+            <TouchableOpacity
+              onPress={handleAIGeneration}
+              style={styles.aiButton}>
               <Text style={styles.aiButtonText}>Generate AI Recipe</Text>
               <Feather name="arrow-right" size={16} color="#fff" />
             </TouchableOpacity>
@@ -523,4 +538,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-}); 
+});

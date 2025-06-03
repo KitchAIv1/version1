@@ -29,12 +29,12 @@ interface CameraScannerModalProps {
 }
 
 const ANALYSIS_PHRASES = [
-  "Analyzing your pantry...",
-  "Identifying items...",
-  "Checking barcodes & labels...",
-  "Cross-referencing ingredients...",
-  "Almost there...",
-  "AI is working its magic!",
+  'Analyzing your pantry...',
+  'Identifying items...',
+  'Checking barcodes & labels...',
+  'Cross-referencing ingredients...',
+  'Almost there...',
+  'AI is working its magic!',
 ];
 
 export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
@@ -57,7 +57,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
   }, [visible, permissionStatus]);
 
   useEffect(() => {
-    let messageInterval: NodeJS.Timeout | undefined = undefined; // Initialize to undefined
+    let messageInterval: NodeJS.Timeout | undefined; // Initialize to undefined
     if (isAnalyzing) {
       Animated.loop(
         Animated.timing(spinValue, {
@@ -65,7 +65,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
           duration: 1500,
           easing: Easing.linear,
           useNativeDriver: true,
-        })
+        }),
       ).start();
       messageInterval = setInterval(() => {
         setAnalysisMessage(prev => {
@@ -79,7 +79,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
       setAnalysisMessage(ANALYSIS_PHRASES[0]); // Reset message
     }
     return () => {
-        if (messageInterval) clearInterval(messageInterval); // Ensure cleanup
+      if (messageInterval) clearInterval(messageInterval); // Ensure cleanup
     };
   }, [isAnalyzing, spinValue]);
 
@@ -92,12 +92,15 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
     if (cameraRef.current && !isAnalyzing) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       try {
-        const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.7 });
+        const photo = await cameraRef.current.takePictureAsync({
+          base64: true,
+          quality: 0.7,
+        });
         if (photo && photo.base64) {
           await onCapture(photo.base64); // Let the hook handle setting isAnalyzing
         }
       } catch (error) {
-        console.error("Failed to take picture:", error);
+        console.error('Failed to take picture:', error);
         // Optionally, show an alert to the user
         onClose(); // Close modal on error to prevent being stuck
       }
@@ -110,7 +113,8 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
   });
 
   const renderContent = () => {
-    if (hasPermission === null && visible) { // Still checking or just opened
+    if (hasPermission === null && visible) {
+      // Still checking or just opened
       return (
         <View style={styles.centeredMessageContainer}>
           <ActivityIndicator size="large" color="#FFF" />
@@ -121,11 +125,17 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
       return (
         <View style={styles.centeredMessageContainer}>
           <Icon name="no-photography" size={60} color="#ffc107" />
-          <Text style={styles.permissionText}>Camera access is required to scan items.</Text>
-          <TouchableOpacity style={styles.permissionButton} onPress={handleRequestPermission}>
+          <Text style={styles.permissionText}>
+            Camera access is required to scan items.
+          </Text>
+          <TouchableOpacity
+            style={styles.permissionButton}
+            onPress={handleRequestPermission}>
             <Text style={styles.permissionButtonText}>Grant Permission</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.permissionButton, styles.closeTextButton]} onPress={onClose}>
+          <TouchableOpacity
+            style={[styles.permissionButton, styles.closeTextButton]}
+            onPress={onClose}>
             <Text style={styles.permissionButtonText}>Maybe Later</Text>
           </TouchableOpacity>
         </View>
@@ -135,25 +145,26 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
     return (
       <CameraView ref={cameraRef} style={styles.cameraPreview} facing="back">
         <SafeAreaView style={styles.cameraOverlay}>
-          <TouchableOpacity 
-            style={[styles.overlayButton, styles.closeIcon]} 
-            onPress={onClose} 
-            disabled={isAnalyzing}
-          >
+          <TouchableOpacity
+            style={[styles.overlayButton, styles.closeIcon]}
+            onPress={onClose}
+            disabled={isAnalyzing}>
             <Ionicons name="close-circle" size={36} color="white" />
           </TouchableOpacity>
 
           {!isAnalyzing && (
-             <View style={styles.instructionsContainer}>
-                <Text style={styles.instructionsText}>
-                    Position items clearly in the frame. Good lighting helps!
-                </Text>
+            <View style={styles.instructionsContainer}>
+              <Text style={styles.instructionsText}>
+                Position items clearly in the frame. Good lighting helps!
+              </Text>
             </View>
           )}
 
           <View style={styles.bottomControlsContainer}>
             {!isAnalyzing && (
-              <TouchableOpacity style={styles.captureButton} onPress={takePicture}>
+              <TouchableOpacity
+                style={styles.captureButton}
+                onPress={takePicture}>
                 <Ionicons name="scan-circle-outline" size={80} color="white" />
               </TouchableOpacity>
             )}
@@ -188,7 +199,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
-    backgroundColor: 'black', 
+    backgroundColor: 'black',
   },
   cameraPreview: {
     flex: 1,
@@ -266,9 +277,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   closeTextButton: {
-      backgroundColor: 'transparent',
-      borderWidth: 1,
-      borderColor: '#757575',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#757575',
   },
   permissionButtonText: {
     color: '#FFFFFF',
@@ -277,7 +288,10 @@ const styles = StyleSheet.create({
   },
   analysisOverlay: {
     position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.85)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -298,4 +312,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CameraScannerModal; 
+export default CameraScannerModal;

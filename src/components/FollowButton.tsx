@@ -1,5 +1,10 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import {
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+} from 'react-native';
 import { useAuth } from '../providers/AuthProvider';
 import { useFollowMutation, useFollowStatus } from '../hooks/useFollowMutation';
 
@@ -14,30 +19,33 @@ export const FollowButton: React.FC<FollowButtonProps> = ({
   targetUserId,
   style,
   disabled = false,
-  onFollowChange
+  onFollowChange,
 }) => {
   const { user } = useAuth();
   const followMutation = useFollowMutation(user?.id);
-  const { data: followStatus, isLoading: statusLoading } = useFollowStatus(user?.id, targetUserId);
-  
+  const { data: followStatus, isLoading: statusLoading } = useFollowStatus(
+    user?.id,
+    targetUserId,
+  );
+
   const isFollowing = followStatus?.isFollowing || false;
   const isOwnProfile = user?.id === targetUserId;
-  
+
   // Don't show follow button for own profile
   if (isOwnProfile || !user?.id) {
     return null;
   }
-  
+
   const handleFollow = async () => {
     if (disabled || followMutation.isPending) return;
-    
+
     try {
       const action = isFollowing ? 'unfollow' : 'follow';
-      await followMutation.mutateAsync({ 
-        targetUserId, 
-        action 
+      await followMutation.mutateAsync({
+        targetUserId,
+        action,
       });
-      
+
       // Notify parent component of follow status change
       onFollowChange?.(!isFollowing);
     } catch (error) {
@@ -45,31 +53,28 @@ export const FollowButton: React.FC<FollowButtonProps> = ({
       // Could add toast notification here
     }
   };
-  
+
   const isLoading = statusLoading || followMutation.isPending;
-  
+
   return (
     <TouchableOpacity
       style={[
         styles.followButton,
         isFollowing ? styles.followingButton : styles.notFollowingButton,
         disabled && styles.disabledButton,
-        style
+        style,
       ]}
       onPress={handleFollow}
       disabled={disabled || isLoading}
-      activeOpacity={0.7}
-    >
+      activeOpacity={0.7}>
       {isLoading ? (
-        <ActivityIndicator 
-          size="small" 
-          color={isFollowing ? '#666' : '#fff'} 
-        />
+        <ActivityIndicator size="small" color={isFollowing ? '#666' : '#fff'} />
       ) : (
-        <Text style={[
-          styles.followButtonText,
-          isFollowing ? styles.followingText : styles.notFollowingText
-        ]}>
+        <Text
+          style={[
+            styles.followButtonText,
+            isFollowing ? styles.followingText : styles.notFollowingText,
+          ]}>
           {isFollowing ? 'Following' : 'Follow'}
         </Text>
       )}
@@ -108,4 +113,4 @@ const styles = StyleSheet.create({
   followingText: {
     color: '#666',
   },
-}); 
+});

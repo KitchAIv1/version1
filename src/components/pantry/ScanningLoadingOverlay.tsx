@@ -41,7 +41,7 @@ const ScanningLoadingOverlay: React.FC<ScanningLoadingOverlayProps> = ({
         duration: 2000,
         easing: Easing.linear,
         useNativeDriver: true,
-      })
+      }),
     ).start();
   };
 
@@ -57,31 +57,35 @@ const ScanningLoadingOverlay: React.FC<ScanningLoadingOverlayProps> = ({
       {isAnalyzing ? (
         <View style={styles.analysisContainer}>
           <Animated.View style={{ transform: [{ rotate: spin }] }}>
-            <MaterialCommunityIcons 
-              name="food-fork-drink" 
-              size={60} 
-              color="#fff" 
+            <MaterialCommunityIcons
+              name="food-fork-drink"
+              size={60}
+              color="#fff"
             />
           </Animated.View>
-          
-          <Text style={styles.loadingTitle}>
-            Analyzing Photo
-          </Text>
-          
-          <Text style={styles.loadingText}>
-            {analysisMessage}
-          </Text>
-          
+
+          <Text style={styles.loadingTitle}>Analyzing Photo</Text>
+
+          <Text style={styles.loadingText}>{analysisMessage}</Text>
+
           <View style={styles.progressDots}>
             <View style={[styles.progressDot, styles.progressDotActive]} />
-            <View style={[
-              styles.progressDot, 
-              isAnalyzing && analysisMessage.includes('Identifying') ? styles.progressDotActive : null
-            ]} />
-            <View style={[
-              styles.progressDot, 
-              isAnalyzing && analysisMessage.includes('Processing') ? styles.progressDotActive : null
-            ]} />
+            <View
+              style={[
+                styles.progressDot,
+                isAnalyzing && analysisMessage.includes('Identifying')
+                  ? styles.progressDotActive
+                  : null,
+              ]}
+            />
+            <View
+              style={[
+                styles.progressDot,
+                isAnalyzing && analysisMessage.includes('Processing')
+                  ? styles.progressDotActive
+                  : null,
+              ]}
+            />
           </View>
         </View>
       ) : (
@@ -150,4 +154,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ScanningLoadingOverlay; 
+export default ScanningLoadingOverlay;

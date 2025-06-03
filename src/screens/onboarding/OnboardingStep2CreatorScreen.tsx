@@ -1,5 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MainStackParamList } from '../../navigation/types';
@@ -8,14 +14,37 @@ import { MainStackParamList } from '../../navigation/types';
 // type OnboardingStep2CreatorScreenNavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'OnboardingStep2Creator'>;
 
 const tools = [
-  { title: '🎥 Upload Recipe Videos', description: 'Share your culinary masterpieces with high-quality video uploads.', icon: 'videocam-outline' },
-  { title: '🧂 Tag Ingredients & Diets', description: 'Make your recipes discoverable by tagging ingredients, dietary restrictions, and more.', icon: 'pricetag-outline' },
-  { title: '💸 Monetize Your Content', description: 'Engage with your audience and enable tips or follower subscriptions (coming soon!).', icon: 'cash-outline' },
-  { title: '📊 Performance Analytics', description: 'Track your recipe views, engagement, and follower growth (coming soon!).', icon: 'bar-chart-outline' },
+  {
+    title: '🎥 Upload Recipe Videos',
+    description:
+      'Share your culinary masterpieces with high-quality video uploads.',
+    icon: 'videocam-outline',
+  },
+  {
+    title: '🧂 Tag Ingredients & Diets',
+    description:
+      'Make your recipes discoverable by tagging ingredients, dietary restrictions, and more.',
+    icon: 'pricetag-outline',
+  },
+  {
+    title: '💸 Monetize Your Content',
+    description:
+      'Engage with your audience and enable tips or follower subscriptions (coming soon!).',
+    icon: 'cash-outline',
+  },
+  {
+    title: '📊 Performance Analytics',
+    description:
+      'Track your recipe views, engagement, and follower growth (coming soon!).',
+    icon: 'bar-chart-outline',
+  },
 ];
 
-const OnboardingStep2CreatorScreen = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList, 'OnboardingStep2Creator'>>();
+function OnboardingStep2CreatorScreen() {
+  const navigation =
+    useNavigation<
+      NativeStackNavigationProp<MainStackParamList, 'OnboardingStep2Creator'>
+    >();
 
   const handleNext = () => {
     console.log('Proceeding to OnboardingFinalScreen from Creator flow');
@@ -40,7 +69,7 @@ const OnboardingStep2CreatorScreen = () => {
       </TouchableOpacity>
     </ScrollView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -101,4 +130,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default OnboardingStep2CreatorScreen; 
+export default OnboardingStep2CreatorScreen;

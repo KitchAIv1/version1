@@ -7,7 +7,8 @@ interface PantryItem {
 }
 
 export async function pantryScan(base64: string): Promise<PantryItem[]> {
-  const { data, error } = await supabase.functions.invoke('recognize-stock', { // Changed function name
+  const { data, error } = await supabase.functions.invoke('recognize-stock', {
+    // Changed function name
     body: { image: base64 }, // Body remains the same
   });
 
@@ -26,4 +27,4 @@ export async function pantryScan(base64: string): Promise<PantryItem[]> {
   // Fallback or error if the structure is not as expected
   console.warn('Unexpected response structure from recognize-stock:', data);
   return []; // Return empty array or throw a more specific error
-} 
+}

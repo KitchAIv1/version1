@@ -10,4 +10,4 @@ export default function SearchResultsScreen(/* { route } */) {
       {/* <Text>Query: {query}</Text> */}
     </View>
   );
-}; 
+}

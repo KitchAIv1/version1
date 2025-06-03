@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MainStackParamList } from '../../navigation/types';
@@ -9,8 +16,11 @@ import { supabase } from '../../services/supabase';
 // TODO: Define navigation props if needed
 // type OnboardingStep1ScreenNavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'OnboardingStep1'>;
 
-const OnboardingStep1Screen = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList, 'OnboardingStep1'>>();
+function OnboardingStep1Screen() {
+  const navigation =
+    useNavigation<
+      NativeStackNavigationProp<MainStackParamList, 'OnboardingStep1'>
+    >();
   const { user, updateProfile, refreshProfile } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -21,7 +31,9 @@ const OnboardingStep1Screen = () => {
     }
     setIsLoading(true);
     try {
-      console.log(`[OnboardingStep1] Attempting to set role for user ID: ${user.id} to: ${selectedRole}`);
+      console.log(
+        `[OnboardingStep1] Attempting to set role for user ID: ${user.id} to: ${selectedRole}`,
+      );
 
       // Step 2.4: Update Frontend to Handle Missing Profiles (User's new logic)
       // Fetch the existing profile to ensure it exists
@@ -45,14 +57,14 @@ const OnboardingStep1Screen = () => {
           .from('profiles')
           .insert({
             id: user.id, // Assuming user.id is the UUID for profiles.id
-            username: user.email || `user-${user.id.substring(0,8)}`, // Fallback for username
+            username: user.email || `user-${user.id.substring(0, 8)}`, // Fallback for username
             bio: 'Welcome to KitchHub!', // Default bio
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             role: null, // Will be updated shortly
             onboarded: false, // Will be updated shortly
             free_ai_generations_used: 0,
-            free_scans_used: 0
+            free_scans_used: 0,
           })
           .select('id') // Select 'id' or enough fields to satisfy 'existingProfile'
           .single();
@@ -68,10 +80,21 @@ const OnboardingStep1Screen = () => {
       }
 
       // Update the existing profile
-      console.log('Updating profile with role:', selectedRole, 'onboarded:', true, 'for profile id:', existingProfile.id);
+      console.log(
+        'Updating profile with role:',
+        selectedRole,
+        'onboarded:',
+        true,
+        'for profile id:',
+        existingProfile.id,
+      );
       const { data: updateData, error: updateError } = await supabase
         .from('profiles')
-        .update({ role: selectedRole, onboarded: true, updated_at: new Date().toISOString() })
+        .update({
+          role: selectedRole,
+          onboarded: true,
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', existingProfile.id) // Use existingProfile.id which is confirmed
         .select();
 
@@ -89,41 +112,55 @@ const OnboardingStep1Screen = () => {
           await new Promise(resolve => setTimeout(resolve, 1000));
           const { data: retryData, error: retryError } = await supabase
             .from('profiles')
-            .update({ role: selectedRole, onboarded: true, updated_at: new Date().toISOString() })
+            .update({
+              role: selectedRole,
+              onboarded: true,
+              updated_at: new Date().toISOString(),
+            })
             .eq('id', existingProfile.id)
             .select();
-          
+
           if (retryError) {
             console.error(`Retry ${retries} failed:`, retryError);
             if (retries === maxRetries) {
-              Alert.alert('Failed to complete onboarding after retries. Please try again later.');
+              Alert.alert(
+                'Failed to complete onboarding after retries. Please try again later.',
+              );
             }
           } else {
             console.log('Profile updated successfully after retry:', retryData);
             finalUpdateData = retryData;
             success = true;
-            break; 
+            break;
           }
         }
         if (!success) {
-           setIsLoading(false); // Ensure loading is stopped
-           return; // Exit if all retries failed
+          setIsLoading(false); // Ensure loading is stopped
+          return; // Exit if all retries failed
         }
-         // Use finalUpdateData for logging if needed, e.g. console.log('Final update data:', finalUpdateData);
+        // Use finalUpdateData for logging if needed, e.g. console.log('Final update data:', finalUpdateData);
       } else {
         console.log('Profile updated successfully (1st attempt):', updateData);
       }
 
       // 3. Update local AuthContext state by calling refreshProfile
       if (refreshProfile) {
-        console.log('[OnboardingStep1] Calling refreshProfile to update AuthContext...');
+        console.log(
+          '[OnboardingStep1] Calling refreshProfile to update AuthContext...',
+        );
         await refreshProfile(user.id);
         console.log('[OnboardingStep1] AuthContext profile refreshed via RPC.');
       } else {
-        console.warn('[OnboardingStep1] refreshProfile function not available in AuthContext. Falling back to local update.');
+        console.warn(
+          '[OnboardingStep1] refreshProfile function not available in AuthContext. Falling back to local update.',
+        );
         // Fallback to old local update if refreshProfile is somehow not available (should not happen)
         if (updateProfile) {
-          updateProfile({ onboarded: true, role: selectedRole, username: user.email }); // Also update username as a guess
+          updateProfile({
+            onboarded: true,
+            role: selectedRole,
+            username: user.email,
+          }); // Also update username as a guess
         }
       }
 
@@ -133,11 +170,17 @@ const OnboardingStep1Screen = () => {
       } else {
         navigation.navigate('OnboardingStep2Creator');
       }
-
     } catch (e: any) {
       console.error('[OnboardingStep1] Generic error in handleSelectRole:', e);
-      if (!e.message?.includes('Could not save your role choice') && !e.message?.includes('Could not verify your profile') && !e.message?.includes('Your profile setup is incomplete')) {
-         Alert.alert('An Unexpected Error Occurred', e.message || 'There was an issue selecting your role.');
+      if (
+        !e.message?.includes('Could not save your role choice') &&
+        !e.message?.includes('Could not verify your profile') &&
+        !e.message?.includes('Your profile setup is incomplete')
+      ) {
+        Alert.alert(
+          'An Unexpected Error Occurred',
+          e.message || 'There was an issue selecting your role.',
+        );
       }
     } finally {
       setIsLoading(false);
@@ -148,23 +191,31 @@ const OnboardingStep1Screen = () => {
     <View style={styles.container}>
       <Text style={styles.title}>Welcome to Kitch Hub!</Text>
       <Text style={styles.subtitle}>What brings you here?</Text>
-      
+
       {isLoading ? (
         <ActivityIndicator size="large" color="#22c55e" />
       ) : (
         <>
-          <TouchableOpacity style={styles.button} onPress={() => handleSelectRole('user')}>
-            <Text style={styles.buttonText}>I'm here to discover recipes & manage my pantry</Text>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => handleSelectRole('user')}>
+            <Text style={styles.buttonText}>
+              I'm here to discover recipes & manage my pantry
+            </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.button} onPress={() => handleSelectRole('creator')}>
-            <Text style={styles.buttonText}>I'm here to share my recipes with the world</Text>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => handleSelectRole('creator')}>
+            <Text style={styles.buttonText}>
+              I'm here to share my recipes with the world
+            </Text>
           </TouchableOpacity>
         </>
       )}
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -203,4 +254,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default OnboardingStep1Screen; 
+export default OnboardingStep1Screen;

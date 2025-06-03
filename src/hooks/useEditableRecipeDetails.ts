@@ -32,44 +32,62 @@ interface UseEditableRecipeDetailsReturn {
   error: Error | null;
 }
 
-export const useEditableRecipeDetails = (recipeId: string | null | undefined): UseEditableRecipeDetailsReturn => {
+export const useEditableRecipeDetails = (
+  recipeId: string | null | undefined,
+): UseEditableRecipeDetailsReturn => {
   const { user } = useAuth();
   const userId = user?.id;
 
-  const {
-    data,
-    isLoading,
-    isError,
-    error,
-  } = useQuery<RecipeEditableData, Error, RecipeEditableData, QueryKey>({
+  const { data, isLoading, isError, error } = useQuery<
+    RecipeEditableData,
+    Error,
+    RecipeEditableData,
+    QueryKey
+  >({
     queryKey: ['editableRecipeDetails', recipeId, userId],
     queryFn: async () => {
       if (!recipeId) {
-        throw new Error('Recipe ID is required to fetch editable recipe details.');
+        throw new Error(
+          'Recipe ID is required to fetch editable recipe details.',
+        );
       }
       if (!userId) {
-        throw new Error('User ID is required to fetch editable recipe details.');
+        throw new Error(
+          'User ID is required to fetch editable recipe details.',
+        );
       }
 
-      console.log(`[useEditableRecipeDetails] Fetching details for recipe ID: ${recipeId} and user ID: ${userId}`);
+      console.log(
+        `[useEditableRecipeDetails] Fetching details for recipe ID: ${recipeId} and user ID: ${userId}`,
+      );
       // Call get_recipe_details, which returns more fields than needed by RecipeEditableData.
       // We will select/map only the necessary fields.
       const { data: rpcData, error: rpcError } = await supabase.rpc(
         'get_recipe_details',
-        { p_recipe_id: recipeId, p_user_id: userId }
+        { p_recipe_id: recipeId, p_user_id: userId },
       );
 
       if (rpcError) {
-        console.error(`[useEditableRecipeDetails] Supabase RPC Error for recipe ${recipeId}:`, rpcError);
+        console.error(
+          `[useEditableRecipeDetails] Supabase RPC Error for recipe ${recipeId}:`,
+          rpcError,
+        );
         throw rpcError;
       }
 
       if (!rpcData) {
-        console.warn(`[useEditableRecipeDetails] No data structure returned from RPC for recipe: ${recipeId}.`);
-        throw new Error('Editable recipe details not found or RPC returned empty.');
+        console.warn(
+          `[useEditableRecipeDetails] No data structure returned from RPC for recipe: ${recipeId}.`,
+        );
+        throw new Error(
+          'Editable recipe details not found or RPC returned empty.',
+        );
       }
-      
-      console.log(`[useEditableRecipeDetails] Raw data from RPC for ${recipeId}:`, JSON.stringify(rpcData, null, 2));
+
+      console.log(
+        `[useEditableRecipeDetails] Raw data from RPC for ${recipeId}:`,
+        JSON.stringify(rpcData, null, 2),
+      );
 
       const rawRecipe = rpcData as any; // Cast with caution, ensure RPC fields exist
 
@@ -78,30 +96,55 @@ export const useEditableRecipeDetails = (recipeId: string | null | undefined): U
       const formattedRecipe: RecipeEditableData = {
         recipe_id: String(rawRecipe.recipe_id),
         title: String(rawRecipe.title),
-        description: rawRecipe.description ? String(rawRecipe.description) : null,
-        ingredients: Array.isArray(rawRecipe.ingredients) ? rawRecipe.ingredients.map((ing: any) => ({
-          name: String(ing.name ?? ''),
-          quantity: String(ing.quantity ?? ''),
-          unit: String(ing.unit ?? ''),
-        })) : [],
-        diet_tags: Array.isArray(rawRecipe.diet_tags) ? rawRecipe.diet_tags.map(String) : [],
-        preparation_steps: Array.isArray(rawRecipe.preparation_steps) ? rawRecipe.preparation_steps.map(String) : [],
-        prep_time_minutes: typeof rawRecipe.prep_time_minutes === 'number' ? rawRecipe.prep_time_minutes : null,
-        cook_time_minutes: typeof rawRecipe.cook_time_minutes === 'number' ? rawRecipe.cook_time_minutes : null,
-        servings: typeof rawRecipe.servings === 'number' ? rawRecipe.servings : null,
+        description: rawRecipe.description
+          ? String(rawRecipe.description)
+          : null,
+        ingredients: Array.isArray(rawRecipe.ingredients)
+          ? rawRecipe.ingredients.map((ing: any) => ({
+              name: String(ing.name ?? ''),
+              quantity: String(ing.quantity ?? ''),
+              unit: String(ing.unit ?? ''),
+            }))
+          : [],
+        diet_tags: Array.isArray(rawRecipe.diet_tags)
+          ? rawRecipe.diet_tags.map(String)
+          : [],
+        preparation_steps: Array.isArray(rawRecipe.preparation_steps)
+          ? rawRecipe.preparation_steps.map(String)
+          : [],
+        prep_time_minutes:
+          typeof rawRecipe.prep_time_minutes === 'number'
+            ? rawRecipe.prep_time_minutes
+            : null,
+        cook_time_minutes:
+          typeof rawRecipe.cook_time_minutes === 'number'
+            ? rawRecipe.cook_time_minutes
+            : null,
+        servings:
+          typeof rawRecipe.servings === 'number' ? rawRecipe.servings : null,
         video_url: String(rawRecipe.video_url ?? ''), // Ensure video_url is a string
-        thumbnail_url: rawRecipe.thumbnail_url ? String(rawRecipe.thumbnail_url) : null,
-        is_public: typeof rawRecipe.is_public === 'boolean' ? rawRecipe.is_public : false,
+        thumbnail_url: rawRecipe.thumbnail_url
+          ? String(rawRecipe.thumbnail_url)
+          : null,
+        is_public:
+          typeof rawRecipe.is_public === 'boolean'
+            ? rawRecipe.is_public
+            : false,
       };
-      
+
       return formattedRecipe;
     },
     enabled: !!recipeId && !!userId,
     staleTime: 1 * 60 * 1000,
   });
 
-  return { data, isLoading, isError, error: error instanceof Error ? error : null };
+  return {
+    data,
+    isLoading,
+    isError,
+    error: error instanceof Error ? error : null,
+  };
 };
 
 // No default export needed if only one hook is in the file and it's named export
-// export default useEditableRecipeDetails; 
+// export default useEditableRecipeDetails;

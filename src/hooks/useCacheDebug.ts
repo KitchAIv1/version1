@@ -1,8 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Alert } from 'react-native';
-import { createCacheManager } from '../utils/cacheUtils';
 import { useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createCacheManager } from '../utils/cacheUtils';
 
 /**
  * Hook for cache debugging and clearing operations
@@ -57,24 +57,24 @@ export const useCacheDebug = (userId?: string) => {
   const clearProfileCache = useCallback(async () => {
     try {
       console.log('[CacheDebug] Clearing profile cache...');
-      
+
       // Clear all profile-related queries
       const profileKeys = [
         'user_recipes',
-        'saved_recipes', 
+        'saved_recipes',
         'profile_recipes',
         'my_recipes',
         'user_saved_recipes',
         'userRecipes',
         'savedRecipes',
-        'profileData'
+        'profileData',
       ];
-      
+
       for (const key of profileKeys) {
         await queryClient.invalidateQueries({ queryKey: [key] });
         queryClient.removeQueries({ queryKey: [key] });
       }
-      
+
       // Also clear any user-specific recipe queries if userId provided
       if (userId) {
         const userSpecificKeys = [
@@ -83,34 +83,40 @@ export const useCacheDebug = (userId?: string) => {
           ['profile_recipes', userId],
           ['my_recipes', userId],
           ['userRecipes', userId],
-          ['savedRecipes', userId]
+          ['savedRecipes', userId],
         ];
-        
+
         for (const key of userSpecificKeys) {
           await queryClient.invalidateQueries({ queryKey: key });
           queryClient.removeQueries({ queryKey: key });
         }
       }
-      
+
       // Clear profile-related async storage
       const profileStorageKeys = await AsyncStorage.getAllKeys();
-      const profileCacheKeys = profileStorageKeys.filter(key => 
-        key.includes('profile') || 
-        key.includes('saved') || 
-        key.includes('my_recipes') ||
-        key.includes('user_recipes')
+      const profileCacheKeys = profileStorageKeys.filter(
+        key =>
+          key.includes('profile') ||
+          key.includes('saved') ||
+          key.includes('my_recipes') ||
+          key.includes('user_recipes'),
       );
-      
+
       if (profileCacheKeys.length > 0) {
         await AsyncStorage.multiRemove(profileCacheKeys);
-        console.log(`[CacheDebug] Removed ${profileCacheKeys.length} profile cache keys from storage`);
+        console.log(
+          `[CacheDebug] Removed ${profileCacheKeys.length} profile cache keys from storage`,
+        );
       }
-      
+
       console.log('[CacheDebug] Profile cache cleared successfully');
       return { success: true, message: 'Profile cache cleared' };
     } catch (error) {
       console.error('[CacheDebug] Failed to clear profile cache:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
     }
   }, [queryClient, userId]);
 
@@ -162,75 +168,91 @@ export const useCacheDebug = (userId?: string) => {
   /**
    * Enhanced recipe-specific cache clear
    */
-  const clearRecipeSpecificCache = useCallback(async (recipeId: string) => {
-    try {
-      console.log(`[CacheDebug] Clearing cache for recipe: ${recipeId}`);
-      
-      // All possible recipe cache keys
-      const recipeKeys = [
-        ['recipeDetails', recipeId],
-        ['recipe', recipeId]
-      ];
-      
-      // Add user-specific keys if userId provided
-      if (userId) {
-        recipeKeys.push(
-          ['recipeDetails', recipeId, userId],
-          ['recipe', recipeId, userId]
-        );
+  const clearRecipeSpecificCache = useCallback(
+    async (recipeId: string) => {
+      try {
+        console.log(`[CacheDebug] Clearing cache for recipe: ${recipeId}`);
+
+        // All possible recipe cache keys
+        const recipeKeys = [
+          ['recipeDetails', recipeId],
+          ['recipe', recipeId],
+        ];
+
+        // Add user-specific keys if userId provided
+        if (userId) {
+          recipeKeys.push(
+            ['recipeDetails', recipeId, userId],
+            ['recipe', recipeId, userId],
+          );
+        }
+
+        for (const key of recipeKeys) {
+          await queryClient.invalidateQueries({ queryKey: key });
+          queryClient.removeQueries({ queryKey: key });
+          console.log(`[CacheDebug] Cleared recipe cache key:`, key);
+        }
+
+        return { success: true, message: `Recipe ${recipeId} cache cleared` };
+      } catch (error) {
+        console.error('[CacheDebug] Failed to clear recipe cache:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
       }
-      
-      for (const key of recipeKeys) {
-        await queryClient.invalidateQueries({ queryKey: key });
-        queryClient.removeQueries({ queryKey: key });
-        console.log(`[CacheDebug] Cleared recipe cache key:`, key);
-      }
-      
-      return { success: true, message: `Recipe ${recipeId} cache cleared` };
-    } catch (error) {
-      console.error('[CacheDebug] Failed to clear recipe cache:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
-    }
-  }, [queryClient, userId]);
+    },
+    [queryClient, userId],
+  );
 
   /**
    * Complete sync after recipe operations (save, delete, etc.)
    */
-  const syncAfterRecipeOperation = useCallback(async (recipeId?: string) => {
-    try {
-      console.log('[CacheDebug] Starting complete sync after recipe operation...');
-      
-      // 1. Clear feed cache
-      await clearFeedCache();
-      
-      // 2. Clear profile cache (My Recipes, Saved Recipes)
-      await clearProfileCache();
-      
-      // 3. Clear specific recipe cache if provided
-      if (recipeId) {
-        await clearRecipeSpecificCache(recipeId);
-      }
-      
-      // 4. Force refresh all related queries
-      await queryClient.refetchQueries({ 
-        predicate: (query) => {
-          const key = query.queryKey[0] as string;
-          return key.includes('recipe') || 
-                 key.includes('feed') || 
-                 key.includes('saved') || 
-                 key.includes('profile') ||
-                 key.includes('my_recipes') ||
-                 key.includes('user_recipes');
+  const syncAfterRecipeOperation = useCallback(
+    async (recipeId?: string) => {
+      try {
+        console.log(
+          '[CacheDebug] Starting complete sync after recipe operation...',
+        );
+
+        // 1. Clear feed cache
+        await clearFeedCache();
+
+        // 2. Clear profile cache (My Recipes, Saved Recipes)
+        await clearProfileCache();
+
+        // 3. Clear specific recipe cache if provided
+        if (recipeId) {
+          await clearRecipeSpecificCache(recipeId);
         }
-      });
-      
-      console.log('[CacheDebug] Complete sync completed successfully');
-      return { success: true, message: 'Complete sync completed' };
-    } catch (error) {
-      console.error('[CacheDebug] Failed to complete sync:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
-    }
-  }, [clearFeedCache, clearProfileCache, clearRecipeSpecificCache, queryClient]);
+
+        // 4. Force refresh all related queries
+        await queryClient.refetchQueries({
+          predicate: query => {
+            const key = query.queryKey[0] as string;
+            return (
+              key.includes('recipe') ||
+              key.includes('feed') ||
+              key.includes('saved') ||
+              key.includes('profile') ||
+              key.includes('my_recipes') ||
+              key.includes('user_recipes')
+            );
+          },
+        });
+
+        console.log('[CacheDebug] Complete sync completed successfully');
+        return { success: true, message: 'Complete sync completed' };
+      } catch (error) {
+        console.error('[CacheDebug] Failed to complete sync:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    },
+    [clearFeedCache, clearProfileCache, clearRecipeSpecificCache, queryClient],
+  );
 
   /**
    * Get cache statistics for debugging
@@ -238,7 +260,7 @@ export const useCacheDebug = (userId?: string) => {
   const getCacheStats = () => {
     const cache = queryClient.getQueryCache();
     const queries = cache.getAll();
-    
+
     return {
       totalQueries: queries.length,
       activeQueries: queries.filter(q => q.state.status === 'success').length,
@@ -262,24 +284,24 @@ export const useCacheDebug = (userId?: string) => {
     showCacheClearDialog,
     clearAllCaches,
     clearDataCachesOnly,
-    
+
     // Specific cache clearing
     clearProfileCache,
     clearFeedCache,
     clearPantryCache,
-    
+
     // Refresh functions
     forceRefreshAllQueries,
-    
+
     // Debug utilities
     getCacheStats,
     logCacheState,
-    
+
     // Direct access to cache manager
     cacheManager,
-    
+
     // New functions
     clearRecipeSpecificCache,
     syncAfterRecipeOperation,
   };
-}; 
+};

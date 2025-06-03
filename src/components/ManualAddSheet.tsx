@@ -54,23 +54,32 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
   unitOptions,
 }) => {
   const { getDefaultLocation, savePreference } = useStorageLocationPreference();
-  
+
   const [itemName, setItemName] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [unit, setUnit] = useState(unitOptions[0]?.value || 'units');
   const [description, setDescription] = useState('');
-  const [storageLocation, setStorageLocation] = useState<StorageLocation>(getDefaultLocation());
+  const [storageLocation, setStorageLocation] =
+    useState<StorageLocation>(getDefaultLocation());
   const [isSaving, setIsSaving] = useState(false);
 
   const isEditMode = mode === 'edit';
 
   useEffect(() => {
-    if (initialItemData && isVisible && isEditMode) {
+    if (initialItemData && isEditMode) {
       setItemName(initialItemData.item_name);
-      setQuantity(initialItemData.quantity.toString());
+      // Safely handle quantity - ensure it's a number and convert to string
+      const quantity = initialItemData.quantity;
+      setQuantity(
+        quantity !== undefined && quantity !== null 
+          ? String(quantity) 
+          : '1'
+      );
       setUnit(initialItemData.unit || unitOptions[0]?.value || 'units');
       setDescription(initialItemData.description || '');
-      setStorageLocation(initialItemData.storage_location || getDefaultLocation());
+      setStorageLocation(
+        initialItemData.storage_location || getDefaultLocation(),
+      );
     } else if (!isVisible || !isEditMode) {
       // Reset form when modal is closed or in add mode
       setItemName('');
@@ -88,7 +97,10 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
     }
     const numQuantity = parseFloat(quantity);
     if (isNaN(numQuantity) || numQuantity <= 0) {
-      Alert.alert('Validation Error', 'Please enter a valid positive quantity.');
+      Alert.alert(
+        'Validation Error',
+        'Please enter a valid positive quantity.',
+      );
       return;
     }
 
@@ -97,16 +109,16 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
       const itemToSubmit = {
         item_name: itemName.trim(),
         quantity: numQuantity,
-        unit: unit,
+        unit,
         description: description.trim() || null,
         storage_location: storageLocation,
         original_item_name: isEditMode ? initialItemData?.item_name : undefined,
       };
-      
+
       if (!isEditMode) {
         await savePreference(storageLocation);
       }
-      
+
       await onSubmit(itemToSubmit);
     } catch (error) {
       console.error('Error submitting item:', error);
@@ -118,14 +130,12 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
   return (
     <Modal
       animationType="slide"
-      transparent={true}
+      transparent
       visible={isVisible}
-      onRequestClose={onClose}
-    >
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : "height"} 
-        style={styles.keyboardAvoidingView}
-      >
+      onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoidingView}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -142,7 +152,11 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
               {isEditMode && initialItemData && initialItemData.created_at && (
                 <View style={styles.timestampContainer}>
                   <View style={styles.timestampRow}>
-                    <Ionicons name="add-circle-outline" size={16} color="#666" />
+                    <Ionicons
+                      name="add-circle-outline"
+                      size={16}
+                      color="#666"
+                    />
                     <Text style={styles.timestampLabel}>Added: </Text>
                     <Text style={styles.timestampValue}>
                       {formatDetailedTimestamp(initialItemData.created_at)}
@@ -180,19 +194,21 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
                 <View style={[styles.formGroup, styles.unitPickerContainer]}>
                   <Text style={styles.label}>Unit*</Text>
                   <RNPickerSelect
-                    onValueChange={(value: string | null) => value && setUnit(value)}
+                    onValueChange={(value: string | null) =>
+                      value && setUnit(value)
+                    }
                     items={unitOptions}
                     style={pickerSelectStyles}
                     value={unit}
                     disabled={isSaving}
-                    placeholder={{ label: "Select unit...", value: null }}
+                    placeholder={{ label: 'Select unit...', value: null }}
                     useNativeAndroidPickerStyle={false}
                     Icon={() => (
-                      <Ionicons 
-                        name="chevron-down" 
-                        size={20} 
-                        color="#888" 
-                        style={styles.pickerIcon} 
+                      <Ionicons
+                        name="chevron-down"
+                        size={20}
+                        color="#888"
+                        style={styles.pickerIcon}
                       />
                     )}
                   />
@@ -203,7 +219,7 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
               <StorageLocationPicker
                 selectedLocation={storageLocation}
                 onLocationChange={setStorageLocation}
-                required={true}
+                required
               />
 
               <View style={styles.formGroup}>
@@ -220,11 +236,13 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
                 />
               </View>
 
-              <TouchableOpacity 
-                style={[styles.submitButton, isSaving && styles.submitButtonDisabled]}
+              <TouchableOpacity
+                style={[
+                  styles.submitButton,
+                  isSaving && styles.submitButtonDisabled,
+                ]}
                 onPress={handleSubmit}
-                disabled={isSaving}
-              >
+                disabled={isSaving}>
                 {isSaving ? (
                   <ActivityIndicator color="#FFF" />
                 ) : (
@@ -386,4 +404,4 @@ const pickerSelectStyles = StyleSheet.create({
   },
 });
 
-export default ManualAddSheet; 
+export default ManualAddSheet;

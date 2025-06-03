@@ -8,7 +8,7 @@ import {
   FlatList,
   TextInput,
   Image,
-  ActivityIndicator
+  ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -24,17 +24,21 @@ interface SelectFromMyRecipesModalProps {
   isVisible: boolean;
   onClose: () => void;
   // Send back id, name, and thumbnail for optimistic update in meal planner
-  onRecipeSelect: (recipe: { recipe_id: string; recipe_name: string; thumbnail_url: string | null }) => void; 
+  onRecipeSelect: (recipe: {
+    recipe_id: string;
+    recipe_name: string;
+    thumbnail_url: string | null;
+  }) => void;
   recipes: RecipeForModal[]; // User's own recipes
   isLoading?: boolean; // To show a loader if recipes are being fetched by parent
 }
 
-const SelectFromMyRecipesModal: React.FC<SelectFromMyRecipesModalProps> = ({ 
-  isVisible, 
-  onClose, 
-  onRecipeSelect, 
+const SelectFromMyRecipesModal: React.FC<SelectFromMyRecipesModalProps> = ({
+  isVisible,
+  onClose,
+  onRecipeSelect,
   recipes,
-  isLoading = false
+  isLoading = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -42,22 +46,24 @@ const SelectFromMyRecipesModal: React.FC<SelectFromMyRecipesModalProps> = ({
     if (!searchTerm) {
       return recipes;
     }
-    return recipes.filter(recipe => 
-      recipe.recipe_name.toLowerCase().includes(searchTerm.toLowerCase())
+    return recipes.filter(recipe =>
+      recipe.recipe_name.toLowerCase().includes(searchTerm.toLowerCase()),
     );
   }, [recipes, searchTerm]);
 
   const handleSelect = (recipe: RecipeForModal) => {
     onRecipeSelect({
-        recipe_id: recipe.recipe_id,
-        recipe_name: recipe.recipe_name,
-        thumbnail_url: recipe.thumbnail_url
+      recipe_id: recipe.recipe_id,
+      recipe_name: recipe.recipe_name,
+      thumbnail_url: recipe.thumbnail_url,
     });
     onClose(); // Close modal after selection
   };
 
   const renderRecipeItem = ({ item }: { item: RecipeForModal }) => (
-    <TouchableOpacity style={styles.recipeItem} onPress={() => handleSelect(item)}>
+    <TouchableOpacity
+      style={styles.recipeItem}
+      onPress={() => handleSelect(item)}>
       {item.thumbnail_url ? (
         <Image source={{ uri: item.thumbnail_url }} style={styles.thumbnail} />
       ) : (
@@ -65,26 +71,29 @@ const SelectFromMyRecipesModal: React.FC<SelectFromMyRecipesModalProps> = ({
           <Icon name="image-off-outline" size={24} color="#adb5bd" />
         </View>
       )}
-      <Text style={styles.recipeName} numberOfLines={2}>{item.recipe_name}</Text>
+      <Text style={styles.recipeName} numberOfLines={2}>
+        {item.recipe_name}
+      </Text>
     </TouchableOpacity>
   );
 
   return (
     <Modal
       animationType="slide"
-      transparent={true}
+      transparent
       visible={isVisible}
-      onRequestClose={onClose}
-    >
+      onRequestClose={onClose}>
       <View style={styles.centeredView}>
         <View style={styles.modalView}>
           <View style={styles.headerRow}>
             <Text style={styles.modalTitle}>Select a Recipe</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeIconContainer}>
-                <Icon name="close-circle" size={28} color="#495057" />
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeIconContainer}>
+              <Icon name="close-circle" size={28} color="#495057" />
             </TouchableOpacity>
           </View>
-          
+
           <TextInput
             style={styles.searchInput}
             placeholder="Search your recipes..."
@@ -94,10 +103,16 @@ const SelectFromMyRecipesModal: React.FC<SelectFromMyRecipesModalProps> = ({
           />
 
           {isLoading ? (
-            <ActivityIndicator size="large" color="#22c55e" style={styles.loader}/>
+            <ActivityIndicator
+              size="large"
+              color="#22c55e"
+              style={styles.loader}
+            />
           ) : filteredRecipes.length === 0 ? (
             <Text style={styles.noRecipesText}>
-              {searchTerm ? 'No recipes match your search.' : 'You have no recipes to select from.'}
+              {searchTerm
+                ? 'No recipes match your search.'
+                : 'You have no recipes to select from.'}
             </Text>
           ) : (
             <FlatList
@@ -211,8 +226,8 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: 30,
-  }
+  },
   // Removed old closeButton styles as we are using an icon now
 });
 
-export default SelectFromMyRecipesModal; 
+export default SelectFromMyRecipesModal;

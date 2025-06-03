@@ -1,26 +1,42 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Modal, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { MealSlot } from '../../hooks/useDailyMealPlan';
+import {
+  View,
+  Text,
+  Modal,
+  StyleSheet,
+  TouchableOpacity,
+  Platform,
+} from 'react-native';
 import { format, addDays, startOfDay } from 'date-fns';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker'; // For date picking
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from '@react-native-community/datetimepicker'; // For date picking
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MealSlot } from '../../hooks/useDailyMealPlan';
 
 interface AddToMealPlannerModalProps {
   isVisible: boolean;
   onClose: () => void;
   onAddToPlan: (date: Date, slot: MealSlot) => void;
-  recipeName?: string; 
+  recipeName?: string;
 }
 
-const MEAL_SLOTS_AVAILABLE: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+const MEAL_SLOTS_AVAILABLE: MealSlot[] = [
+  'breakfast',
+  'lunch',
+  'dinner',
+  'snack',
+];
 
-const AddToMealPlannerModal: React.FC<AddToMealPlannerModalProps> = ({ 
-  isVisible, 
-  onClose, 
+const AddToMealPlannerModal: React.FC<AddToMealPlannerModalProps> = ({
+  isVisible,
+  onClose,
   onAddToPlan,
-  recipeName
+  recipeName,
 }) => {
-  const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
+  const [selectedDate, setSelectedDate] = useState<Date>(
+    startOfDay(new Date()),
+  );
   const [selectedSlot, setSelectedSlot] = useState<MealSlot | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -37,7 +53,8 @@ const AddToMealPlannerModal: React.FC<AddToMealPlannerModalProps> = ({
     setShowDatePicker(Platform.OS === 'ios'); // Keep open on iOS until user dismisses
     if (date) {
       setSelectedDate(startOfDay(date));
-      if (Platform.OS !== 'ios') { // On Android, it closes automatically
+      if (Platform.OS !== 'ios') {
+        // On Android, it closes automatically
         setShowDatePicker(false);
       }
     }
@@ -59,33 +76,49 @@ const AddToMealPlannerModal: React.FC<AddToMealPlannerModalProps> = ({
   return (
     <Modal
       animationType="slide"
-      transparent={true}
+      transparent
       visible={isVisible}
-      onRequestClose={onClose}
-    >
+      onRequestClose={onClose}>
       <View style={styles.centeredView}>
         <View style={styles.modalView}>
           <View style={styles.header}>
-            <Text style={styles.modalTitle}>Add "{recipeName || 'Recipe'}" to Plan</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButtonHeader}>
-                <Icon name="close-circle" size={26} color="#6c757d" />
+            <Text style={styles.modalTitle}>
+              Add "{recipeName || 'Recipe'}" to Plan
+            </Text>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeButtonHeader}>
+              <Icon name="close-circle" size={26} color="#6c757d" />
             </TouchableOpacity>
           </View>
 
           <Text style={styles.sectionTitle}>Select Date</Text>
           <View style={styles.dateSelectionContainer}>
-            <TouchableOpacity style={styles.dateButton} onPress={() => setSelectedDate(startOfDay(new Date()))}>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => setSelectedDate(startOfDay(new Date()))}>
               <Text style={styles.dateButtonText}>Today</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.dateButton} onPress={() => setSelectedDate(startOfDay(addDays(new Date(), 1)))}>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() =>
+                setSelectedDate(startOfDay(addDays(new Date(), 1)))
+              }>
               <Text style={styles.dateButtonText}>Tomorrow</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.dateButton} onPress={showPicker}>
-              <Icon name="calendar-month" size={20} color="#007bff" style={{marginRight: 5}} />
+              <Icon
+                name="calendar-month"
+                size={20}
+                color="#007bff"
+                style={{ marginRight: 5 }}
+              />
               <Text style={styles.dateButtonText}>Pick Date</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.selectedDateText}>Selected: {format(selectedDate, 'EEE, MMM d, yyyy')}</Text>
+          <Text style={styles.selectedDateText}>
+            Selected: {format(selectedDate, 'EEE, MMM d, yyyy')}
+          </Text>
 
           {showDatePicker && (
             <DateTimePicker
@@ -96,9 +129,11 @@ const AddToMealPlannerModal: React.FC<AddToMealPlannerModalProps> = ({
               minimumDate={new Date()} // Optional: prevent past dates
             />
           )}
-           {/* On iOS, if display is 'spinner', need a confirm button for the picker itself if not inline */} 
+          {/* On iOS, if display is 'spinner', need a confirm button for the picker itself if not inline */}
           {showDatePicker && Platform.OS === 'ios' && (
-            <TouchableOpacity onPress={() => setShowDatePicker(false)} style={styles.iosPickerConfirmButton}>
+            <TouchableOpacity
+              onPress={() => setShowDatePicker(false)}
+              style={styles.iosPickerConfirmButton}>
               <Text style={styles.iosPickerConfirmText}>Done</Text>
             </TouchableOpacity>
           )}
@@ -106,35 +141,38 @@ const AddToMealPlannerModal: React.FC<AddToMealPlannerModalProps> = ({
           <Text style={styles.sectionTitle}>Select Meal Slot</Text>
           <View style={styles.slotSelectionContainer}>
             {MEAL_SLOTS_AVAILABLE.map(slot => (
-              <TouchableOpacity 
-                key={slot} 
+              <TouchableOpacity
+                key={slot}
                 style={[
                   styles.slotButton,
-                  selectedSlot === slot && styles.selectedSlotButton
-                ]} 
-                onPress={() => setSelectedSlot(slot)}
-              >
-                <Text 
+                  selectedSlot === slot && styles.selectedSlotButton,
+                ]}
+                onPress={() => setSelectedSlot(slot)}>
+                <Text
                   style={[
                     styles.slotButtonText,
-                    selectedSlot === slot && styles.selectedSlotButtonText
-                  ]}
-                >
+                    selectedSlot === slot && styles.selectedSlotButtonText,
+                  ]}>
                   {slot.charAt(0).toUpperCase() + slot.slice(1)}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
-          
+
           <View style={styles.actionButtonRow}>
-            <TouchableOpacity style={[styles.actionButton, styles.cancelButton]} onPress={onClose}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.cancelButton]}
+              onPress={onClose}>
               <Text style={styles.actionButtonText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-                style={[styles.actionButton, styles.confirmButton, !selectedSlot && styles.disabledButton]}
-                onPress={handleConfirm} 
-                disabled={!selectedSlot}
-            >
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                styles.confirmButton,
+                !selectedSlot && styles.disabledButton,
+              ]}
+              onPress={handleConfirm}
+              disabled={!selectedSlot}>
               <Text style={styles.actionButtonText}>Add to Plan</Text>
             </TouchableOpacity>
           </View>
@@ -181,7 +219,7 @@ const styles = StyleSheet.create({
     marginLeft: 30, // Offset for close button to truly center title
   },
   closeButtonHeader: {
-    padding: 5, 
+    padding: 5,
     position: 'absolute', // Position it if flex doesn't center well with title
     right: 0,
     top: 0,
@@ -271,7 +309,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 12,
     elevation: 2,
-    flex: 1, 
+    flex: 1,
     alignItems: 'center',
   },
   cancelButton: {
@@ -292,4 +330,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AddToMealPlannerModal; 
+export default AddToMealPlannerModal;

@@ -13,7 +13,7 @@ module.exports = (() => {
   // 👇  Map troublesome Node modules to safe shims or browser polyfills
   config.resolver.extraNodeModules = {
     // existing polyfills & shims
-    events: require.resolve('events/'),          // trailing slash = main file
+    events: require.resolve('events/'), // trailing slash = main file
     stream: require.resolve('stream-browserify'),
     buffer: require.resolve('buffer/'),
     tty: require.resolve('tty-browserify'),

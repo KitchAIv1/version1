@@ -12,17 +12,24 @@ type Props = {
   onAddItem?: (item: GroceryItemInput) => Promise<void>;
 };
 
-export default function IngredientRow({ ing, matched, missing, isAdded, recipeName, onAddItem }: Props) {
+export default function IngredientRow({
+  ing,
+  matched,
+  missing,
+  isAdded,
+  recipeName,
+  onAddItem,
+}: Props) {
   const handleAddItem = async () => {
     if (!ing.name) {
-      Alert.alert("Error", "Ingredient name is missing.");
+      Alert.alert('Error', 'Ingredient name is missing.');
       return;
     }
     const itemToAdd: GroceryItemInput = {
       item_name: ing.name,
       quantity: ing.quantity ? parseFloat(ing.quantity) : null,
       unit: ing.unit || null,
-      recipeName: recipeName,
+      recipeName,
     };
     if (isNaN(itemToAdd.quantity as number)) {
       itemToAdd.quantity = 1;
@@ -31,7 +38,10 @@ export default function IngredientRow({ ing, matched, missing, isAdded, recipeNa
       try {
         await onAddItem(itemToAdd);
       } catch (error: any) {
-        Alert.alert("Error", error.message || "Could not add item to grocery list.");
+        Alert.alert(
+          'Error',
+          error.message || 'Could not add item to grocery list.',
+        );
       }
     }
   };
@@ -41,41 +51,59 @@ export default function IngredientRow({ ing, matched, missing, isAdded, recipeNa
       {/* Icon Section */}
       <View style={styles.iconContainer}>
         {matched && <Feather name="check-circle" size={18} color="#22c55e" />}
-        {missing && !isAdded && !onAddItem && <Feather name="x-circle" size={18} color="#dc2626" />}
-        {missing && isAdded && <Feather name="check-circle" size={18} color="#fbbf24" />}
+        {missing && !isAdded && !onAddItem && (
+          <Feather name="x-circle" size={18} color="#dc2626" />
+        )}
+        {missing && isAdded && (
+          <Feather name="check-circle" size={18} color="#fbbf24" />
+        )}
       </View>
       {/* Text Group */}
       <View style={styles.textGroupContainer}>
         {ing.quantity && (
-          <Text style={[styles.textBase, styles.qtyText, matched ? styles.matchedText : styles.missingText, styles.boldText]}>
+          <Text
+            style={[
+              styles.textBase,
+              styles.qtyText,
+              matched ? styles.matchedText : styles.missingText,
+              styles.boldText,
+            ]}>
             {ing.quantity}
           </Text>
         )}
         {ing.unit && (
-          <Text style={[styles.textBase, styles.unitText, matched ? styles.matchedUnitText : styles.missingUnitText, styles.boldText]}>
+          <Text
+            style={[
+              styles.textBase,
+              styles.unitText,
+              matched ? styles.matchedUnitText : styles.missingUnitText,
+              styles.boldText,
+            ]}>
             {ing.unit}
           </Text>
         )}
-        <Text 
+        <Text
           style={[
-            styles.textBase, 
-            styles.nameText, 
+            styles.textBase,
+            styles.nameText,
             matched ? styles.matchedText : styles.missingText,
           ]}
           numberOfLines={1}
-          ellipsizeMode="tail"
-        >
+          ellipsizeMode="tail">
           {ing.name}
         </Text>
       </View>
       {/* ADD/ADDED Button Section */}
       {isAdded ? (
-        <View style={[styles.addButton, styles.addedState]}> 
+        <View style={[styles.addButton, styles.addedState]}>
           <Feather name="check" size={16} color="#166534" />
           <Text style={styles.addedButtonText}>ADDED</Text>
         </View>
       ) : missing && onAddItem ? (
-        <TouchableOpacity onPress={handleAddItem} style={styles.addButton} activeOpacity={0.7}>
+        <TouchableOpacity
+          onPress={handleAddItem}
+          style={styles.addButton}
+          activeOpacity={0.7}>
           <Feather name="plus-circle" size={18} color="#b45309" />
         </TouchableOpacity>
       ) : null}
@@ -139,11 +167,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginLeft: 8,
-    paddingHorizontal: 8, 
-    paddingVertical: 6,   
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     borderRadius: 6,
   },
-  addedState: { // Style for the "ADDED" state view
+  addedState: {
+    // Style for the "ADDED" state view
     backgroundColor: '#f0fdf4', // Light green background
     borderColor: '#bbf7d0',
     borderWidth: 1,
@@ -155,4 +184,4 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     textTransform: 'uppercase',
   },
-}); 
+});

@@ -17,29 +17,31 @@ export interface DayItemProps {
   onPress: () => void;
 }
 
-const DayItem: React.FC<DayItemProps> = React.memo(({ date, isSelected, onPress }) => {
-  return (
-    <TouchableOpacity 
-      style={[styles.dayItem, isSelected && styles.selectedDayItem]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <Text style={[styles.dayText, isSelected && styles.selectedDayText]}>
-        {formatShortDay(date)}
-      </Text>
-      <Text style={[styles.dayNumber, isSelected && styles.selectedDayNumber]}>
-        {formatDayNumber(date)}
-      </Text>
-    </TouchableOpacity>
-  );
-});
+const DayItem: React.FC<DayItemProps> = React.memo(
+  ({ date, isSelected, onPress }) => {
+    return (
+      <TouchableOpacity
+        style={[styles.dayItem, isSelected && styles.selectedDayItem]}
+        onPress={onPress}
+        activeOpacity={0.7}>
+        <Text style={[styles.dayText, isSelected && styles.selectedDayText]}>
+          {formatShortDay(date)}
+        </Text>
+        <Text
+          style={[styles.dayNumber, isSelected && styles.selectedDayNumber]}>
+          {formatDayNumber(date)}
+        </Text>
+      </TouchableOpacity>
+    );
+  },
+);
 
 const styles = StyleSheet.create({
   dayItem: {
     paddingVertical: 12,
-    paddingHorizontal: 8, 
-    borderRadius: 12, 
-    marginHorizontal: 4, 
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    marginHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 48,
@@ -77,4 +79,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default DayItem; 
+export default DayItem;

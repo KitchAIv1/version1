@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  View, 
-  Alert, 
-  Text, 
-  KeyboardAvoidingView, 
-  Platform, 
-  ScrollView, 
-  TouchableOpacity, 
+import {
+  View,
+  Alert,
+  Text,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  TouchableOpacity,
   StyleSheet,
   Dimensions,
   StatusBar,
@@ -15,29 +15,29 @@ import {
 } from 'react-native';
 import { TextInput, ActivityIndicator } from 'react-native-paper';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
-import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { AuthStackParamList } from '../../navigation/AuthStack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { AuthStackParamList } from '../../navigation/AuthStack';
+import { supabase } from '../../services/supabase';
 
 type Nav = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
 // Color constants
 const COLORS = {
-  primary: '#22c55e',         // Kitch Green
-  primaryDark: '#16a34a',     // Darker green for gradients
-  background: '#FAF7F0',      // Light warm background
+  primary: '#22c55e', // Kitch Green
+  primaryDark: '#16a34a', // Darker green for gradients
+  background: '#FAF7F0', // Light warm background
   white: '#FFFFFF',
-  text: '#374151',            // Dark text
-  textLight: '#6b7280',       // Muted gray text
-  textMedium: '#556373',      // Medium gray text
-  border: '#d1d5db',          // Border gray
-  borderLight: '#E5E7EB',     // Lighter border
-  error: '#ef4444',           // Error red
-  success: '#10b981',         // Success green
-  warning: '#f59e0b',         // Warning orange
+  text: '#374151', // Dark text
+  textLight: '#6b7280', // Muted gray text
+  textMedium: '#556373', // Medium gray text
+  border: '#d1d5db', // Border gray
+  borderLight: '#E5E7EB', // Lighter border
+  error: '#ef4444', // Error red
+  success: '#10b981', // Success green
+  warning: '#f59e0b', // Warning orange
 };
 
 // Email validation regex
@@ -52,7 +52,7 @@ export default function LoginScreen() {
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
-  
+
   const videoRef = useRef<Video>(null);
   const [videoStatus, setVideoStatus] = useState({
     isPlaying: false,
@@ -126,14 +126,14 @@ export default function LoginScreen() {
   const onLogin = async () => {
     const isEmailValid = validateEmail(email);
     const isPasswordValid = validatePassword(password);
-    
+
     if (!isEmailValid || !isPasswordValid) {
       Vibration.vibrate(100); // Haptic feedback for errors
       return;
     }
 
     setIsLoading(true);
-    
+
     // Button press animation
     Animated.sequence([
       Animated.timing(buttonScale, {
@@ -148,7 +148,10 @@ export default function LoginScreen() {
       }),
     ]).start();
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
     setIsLoading(false);
 
     if (error) {
@@ -209,21 +212,27 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="transparent"
+        translucent
+      />
+
       {/* Background Video with Fallback */}
       <View style={styles.videoContainer}>
         {!videoStatus.error ? (
           <Video
             ref={videoRef}
-            source={{ uri: 'https://stream.mux.com/N02BoIP01zPNboqHJ6TuTDaQBVAkWoEL6aF4fLPk00EKNM.m3u8' }}
+            source={{
+              uri: 'https://stream.mux.com/N02BoIP01zPNboqHJ6TuTDaQBVAkWoEL6aF4fLPk00EKNM.m3u8',
+            }}
             style={styles.backgroundVideo}
             resizeMode={ResizeMode.COVER}
             shouldPlay={false}
             isLooping
             isMuted
             onLoad={handleVideoLoad}
-            onError={(error) => {
+            onError={error => {
               console.error('Video error event:', error);
               setVideoStatus({
                 isLoaded: false,
@@ -243,42 +252,41 @@ export default function LoginScreen() {
         )}
         <View style={styles.overlay} />
       </View>
-      
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidView}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      >
-        <ScrollView 
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
+        <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <Animated.View 
+          showsVerticalScrollIndicator={false}>
+          <Animated.View
             style={[
               styles.cardContainer,
               {
                 opacity: fadeAnim,
                 transform: [{ translateY: slideAnim }],
               },
-            ]}
-          >
+            ]}>
             {/* Branding */}
             <View style={styles.brandingContainer}>
               <Text style={styles.welcomeText}>Welcome back to</Text>
               <Text style={styles.brandText}>Kitch</Text>
-              <Text style={styles.taglineText}>AI-powered cooking made personal.</Text>
+              <Text style={styles.taglineText}>
+                AI-powered cooking made personal.
+              </Text>
             </View>
-            
+
             {/* Form Fields */}
             <View style={styles.formContainer}>
               {/* Email Input */}
               <View style={styles.inputContainer}>
-                <MaterialCommunityIcons 
-                  name="email-outline" 
-                  size={22} 
-                  color={emailError ? COLORS.error : COLORS.textLight} 
-                  style={styles.inputIcon} 
+                <MaterialCommunityIcons
+                  name="email-outline"
+                  size={22}
+                  color={emailError ? COLORS.error : COLORS.textLight}
+                  style={styles.inputIcon}
                 />
                 <TextInput
                   ref={emailInputRef}
@@ -291,11 +299,15 @@ export default function LoginScreen() {
                   returnKeyType="next"
                   mode="flat"
                   style={[styles.input, emailError && styles.inputError]}
-                  underlineColor={emailError ? COLORS.error : COLORS.borderLight}
-                  activeUnderlineColor={emailError ? COLORS.error : COLORS.primary}
+                  underlineColor={
+                    emailError ? COLORS.error : COLORS.borderLight
+                  }
+                  activeUnderlineColor={
+                    emailError ? COLORS.error : COLORS.primary
+                  }
                   error={!!emailError}
-                  theme={{ 
-                    colors: { 
+                  theme={{
+                    colors: {
                       primary: emailError ? COLORS.error : COLORS.primary,
                       text: COLORS.text,
                       placeholder: COLORS.textLight,
@@ -308,14 +320,14 @@ export default function LoginScreen() {
                   <Text style={styles.errorText}>{emailError}</Text>
                 ) : null}
               </View>
-              
+
               {/* Password Input */}
               <View style={styles.inputContainer}>
-                <MaterialCommunityIcons 
-                  name="lock-outline" 
-                  size={22} 
-                  color={passwordError ? COLORS.error : COLORS.textLight} 
-                  style={styles.inputIcon} 
+                <MaterialCommunityIcons
+                  name="lock-outline"
+                  size={22}
+                  color={passwordError ? COLORS.error : COLORS.textLight}
+                  style={styles.inputIcon}
                 />
                 <TextInput
                   ref={passwordInputRef}
@@ -327,17 +339,21 @@ export default function LoginScreen() {
                   returnKeyType="done"
                   mode="flat"
                   style={[styles.input, passwordError && styles.inputError]}
-                  underlineColor={passwordError ? COLORS.error : COLORS.borderLight}
-                  activeUnderlineColor={passwordError ? COLORS.error : COLORS.primary}
+                  underlineColor={
+                    passwordError ? COLORS.error : COLORS.borderLight
+                  }
+                  activeUnderlineColor={
+                    passwordError ? COLORS.error : COLORS.primary
+                  }
                   error={!!passwordError}
                   right={
-                    <TextInput.Icon 
-                      icon={secureTextEntry ? "eye" : "eye-off"} 
+                    <TextInput.Icon
+                      icon={secureTextEntry ? 'eye' : 'eye-off'}
                       onPress={toggleSecureEntry}
                     />
                   }
-                  theme={{ 
-                    colors: { 
+                  theme={{
+                    colors: {
                       primary: passwordError ? COLORS.error : COLORS.primary,
                       text: COLORS.text,
                       placeholder: COLORS.textLight,
@@ -350,83 +366,93 @@ export default function LoginScreen() {
                   <Text style={styles.errorText}>{passwordError}</Text>
                 ) : null}
               </View>
-              
+
               {/* Remember Me & Forgot Password Row */}
               <View style={styles.optionsRow}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.rememberMeContainer}
-                  onPress={() => setRememberMe(!rememberMe)}
-                >
-                  <MaterialCommunityIcons 
-                    name={rememberMe ? "checkbox-marked" : "checkbox-blank-outline"} 
-                    size={20} 
-                    color={rememberMe ? COLORS.primary : COLORS.textLight} 
+                  onPress={() => setRememberMe(!rememberMe)}>
+                  <MaterialCommunityIcons
+                    name={
+                      rememberMe ? 'checkbox-marked' : 'checkbox-blank-outline'
+                    }
+                    size={20}
+                    color={rememberMe ? COLORS.primary : COLORS.textLight}
                   />
                   <Text style={styles.rememberMeText}>Remember me</Text>
                 </TouchableOpacity>
-                
-                <TouchableOpacity 
+
+                <TouchableOpacity
                   style={styles.forgotPasswordContainer}
-                  onPress={() => Alert.alert("Forgot Password", "Password reset functionality coming soon.")}
-                >
-                  <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+                  onPress={() =>
+                    Alert.alert(
+                      'Forgot Password',
+                      'Password reset functionality coming soon.',
+                    )
+                  }>
+                  <Text style={styles.forgotPasswordText}>
+                    Forgot password?
+                  </Text>
                 </TouchableOpacity>
               </View>
-              
+
               {/* Login Button */}
               <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[
-                    styles.loginButton, 
+                    styles.loginButton,
                     !isFormValid && styles.loginButtonDisabled,
-                    isFormValid && styles.loginButtonActive
+                    isFormValid && styles.loginButtonActive,
                   ]}
                   onPress={onLogin}
-                  disabled={!isFormValid || isLoading}
-                >
+                  disabled={!isFormValid || isLoading}>
                   {isLoading ? (
                     <ActivityIndicator color={COLORS.white} size="small" />
                   ) : (
                     <>
                       <Text style={styles.loginButtonText}>Log in</Text>
-                      <MaterialCommunityIcons 
-                        name="arrow-right" 
-                        size={20} 
-                        color={COLORS.white} 
+                      <MaterialCommunityIcons
+                        name="arrow-right"
+                        size={20}
+                        color={COLORS.white}
                         style={styles.loginButtonIcon}
                       />
                     </>
                   )}
                 </TouchableOpacity>
               </Animated.View>
-              
+
               {/* Divider */}
               <View style={styles.divider}>
                 <View style={styles.dividerLine} />
                 <Text style={styles.dividerText}>or continue with</Text>
                 <View style={styles.dividerLine} />
               </View>
-              
+
               {/* Enhanced Google Button */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.googleButton}
-                onPress={() => Alert.alert("Google Sign-In", "Coming soon!")}
-              >
+                onPress={() => Alert.alert('Google Sign-In', 'Coming soon!')}>
                 <View style={styles.googleButtonContent}>
                   <View style={styles.googleIconContainer}>
-                    <MaterialCommunityIcons name="google" size={20} color="#4285F4" />
+                    <MaterialCommunityIcons
+                      name="google"
+                      size={20}
+                      color="#4285F4"
+                    />
                   </View>
-                  <Text style={styles.googleButtonText}>Continue with Google</Text>
+                  <Text style={styles.googleButtonText}>
+                    Continue with Google
+                  </Text>
                 </View>
               </TouchableOpacity>
-              
+
               {/* Sign Up Link */}
               <View style={styles.signupContainer}>
                 <Text style={styles.signupText}>Don't have an account?</Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => !isLoading && nav.replace('Signup')}
-                  style={styles.signupButton}
-                >
+                  style={styles.signupButton}>
                   <Text style={styles.signupButtonText}>Sign up</Text>
                 </TouchableOpacity>
               </View>
@@ -448,13 +474,13 @@ const styles = StyleSheet.create({
   },
   videoContainer: {
     ...StyleSheet.absoluteFillObject,
-    height: height,
-    width: width,
+    height,
+    width,
   },
   backgroundVideo: {
     ...StyleSheet.absoluteFillObject,
-    height: height,
-    width: width,
+    height,
+    width,
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
@@ -632,4 +658,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 15,
   },
-}); 
+});

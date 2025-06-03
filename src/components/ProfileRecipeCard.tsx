@@ -1,11 +1,20 @@
 import React, { useState } from 'react';
-import { View, Text, Image, StyleSheet, Dimensions, TouchableOpacity, Animated, Alert } from 'react-native';
-import { COLORS } from '../constants/theme'; // Assuming you have a theme file
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  Dimensions,
+  TouchableOpacity,
+  Animated,
+  Alert,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons'; // Add Feather icons for subtle enhancements
 import { useNavigation } from '@react-navigation/native'; // Added useNavigation
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // Added NativeStackNavigationProp
-import { MainStackParamList } from '../navigation/types'; // Added MainStackParamList
 import { useMutation, useQueryClient } from '@tanstack/react-query'; // Added for mutations
+import { MainStackParamList } from '../navigation/types'; // Added MainStackParamList
+import { COLORS } from '../constants/theme'; // Assuming you have a theme file
 import { supabase } from '../services/supabase'; // Added for Supabase client
 import { useAuth } from '../providers/AuthProvider'; // Added to get user ID
 
@@ -21,199 +30,246 @@ interface ProfileRecipeCardProps {
   context: 'myRecipes' | 'savedRecipes' | 'otherUserRecipes'; // Added otherUserRecipes context
 }
 
-const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/150/D3D3D3/808080?text=No+Image';
+const PLACEHOLDER_IMAGE =
+  'https://via.placeholder.com/150/D3D3D3/808080?text=No+Image';
 const CARD_MARGIN = 6; // Slightly reduced for tighter grid
 const NUM_COLUMNS = 2;
 const screenWidth = Dimensions.get('window').width;
-const cardWidth = (screenWidth - (NUM_COLUMNS + 1) * CARD_MARGIN * 2) / NUM_COLUMNS;
+const cardWidth =
+  (screenWidth - (NUM_COLUMNS + 1) * CARD_MARGIN * 2) / NUM_COLUMNS;
 
 // Simple date formatter (you might want to use a library like date-fns for more complex formatting)
 const formatDate = (dateString: string) => {
   try {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
   } catch (e) {
     return 'Invalid date';
   }
 };
 
-const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = React.memo(({ item, onPress, context }) => {
-  const { user } = useAuth(); // Moved user declaration earlier
-  console.log(`[ProfileRecipeCard] Rendering card for "${item.recipe_name}", thumbnail_url: "${item.thumbnail_url}", context: "${context}", creator_id: "${item.creator_user_id}", current_user_id: "${user?.id}"`);
-
-  const thumbnailHeight = cardWidth * 0.8; // Slightly taller ratio for better visibility
-  
-  // Add animation for card press feedback - memoized to prevent recreation
-  const scaleAnim = React.useMemo(() => new Animated.Value(1), []);
-  
-  // Initialize navigation
-  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
-  const queryClient = useQueryClient(); // Added queryClient
-
-  const deleteRecipeMut = useMutation({
-    mutationFn: async (recipeIdToDelete: string) => {
-      // This is for hard deleting user's own recipe
-      const { error } = await supabase.rpc('delete_recipe', { p_recipe_id: recipeIdToDelete });
-      if (error) {
-        console.error('Error deleting recipe:', error);
-        throw new Error(error.message || 'Failed to delete recipe.');
-      }
-      return recipeIdToDelete;
-    },
-    onSuccess: (deletedRecipeId) => {
-      Alert.alert('Success', `Recipe "${item.recipe_name}" has been deleted.`);
-      if (user?.id) {
-        queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
-      }
-      queryClient.invalidateQueries({ queryKey: ['feed'] });
-      console.log(`Recipe ${deletedRecipeId} deleted, invalidated profile query for user ${user?.id} and feed query.`);
-    },
-    onError: (error: Error) => {
-      Alert.alert('Error', error.message || 'Could not delete the recipe. Please try again.');
-    },
-  });
-
-  const unsaveRecipeMut = useMutation({
-    mutationFn: async (recipeIdToUnsave: string) => {
-      if (!user?.id) {
-        throw new Error("User not authenticated to unsave recipe.");
-      }
-      const { error } = await supabase.rpc('unsave_recipe', { 
-        p_recipe_id: recipeIdToUnsave,
-        p_user_id: user.id 
-      });
-      if (error) {
-        console.error('Error unsaving recipe:', error);
-        throw new Error(error.message || 'Failed to unsave recipe.');
-      }
-      return recipeIdToUnsave;
-    },
-    onSuccess: (unsavedRecipeId) => {
-      Alert.alert('Success', `Recipe "${item.recipe_name}" has been unsaved.`);
-      if (user?.id) {
-        queryClient.invalidateQueries({ queryKey: ['profile', user.id] }); // Refreshes saved list
-      }
-      // Optionally, invalidate feed if saved status affects feed display, though less common
-      // queryClient.invalidateQueries({ queryKey: ['feed'] }); 
-      console.log(`Recipe ${unsavedRecipeId} unsaved, invalidated profile query for user ${user?.id}.`);
-    },
-    onError: (error: Error) => {
-      Alert.alert('Error', error.message || 'Could not unsave the recipe. Please try again.');
-    },
-  });
-
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.97,
-      friction: 7,
-      tension: 40,
-      useNativeDriver: true
-    }).start();
-  };
-  
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      friction: 5,
-      tension: 40,
-      useNativeDriver: true
-    }).start();
-  };
-
-  const handleMenuPress = () => {
-    const isMyRecipeContext = context === 'myRecipes';
-    const isOwner = item.creator_user_id === user?.id;
-
-    const options: Array<any> = []; // Initialize options array
-
-    // Add "Edit Recipe" option conditionally
-    if (isMyRecipeContext || (context === 'savedRecipes' && isOwner)) {
-      options.push({
-        text: 'Edit Recipe',
-        onPress: () => {
-          navigation.navigate('EditRecipe', { recipeId: item.recipe_id });
-        },
-      });
-    }
-
-    // Add "Delete Recipe" or "Unsave Recipe" option
-    options.push({
-      text: isMyRecipeContext ? 'Delete Recipe' : 'Unsave Recipe',
-      onPress: () => {
-        if (isMyRecipeContext) {
-          // Optionally, add another confirmation for permanent deletion
-          Alert.alert(
-            "Confirm Delete",
-            `Are you sure you want to permanently delete "${item.recipe_name}"? This action cannot be undone.`,
-            [
-              { text: "Cancel", style: "cancel" },
-              { text: "Delete", style: "destructive", onPress: () => deleteRecipeMut.mutate(item.recipe_id) }
-            ]
-          );
-        } else {
-          unsaveRecipeMut.mutate(item.recipe_id);
-        }
-      },
-      style: 'destructive' as 'destructive' | 'default' | 'cancel', // Ensure type correctness
-    });
-
-    // Add "Cancel" option
-    options.push({
-      text: 'Cancel',
-      style: 'cancel' as 'destructive' | 'default' | 'cancel',
-    });
-
-    Alert.alert(
-      `Options for "${item.recipe_name}"`,
-      'What would you like to do?',
-      options,
-      { cancelable: true }
+const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = React.memo(
+  ({ item, onPress, context }) => {
+    const { user } = useAuth(); // Moved user declaration earlier
+    console.log(
+      `[ProfileRecipeCard] Rendering card for "${item.recipe_name}", thumbnail_url: "${item.thumbnail_url}", context: "${context}", creator_id: "${item.creator_user_id}", current_user_id: "${user?.id}"`,
     );
-  };
 
-  return (
-    <TouchableOpacity 
-      style={styles.cardWrapper}
-      activeOpacity={1}
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-    >
-      <Animated.View style={[
-        styles.cardContainer,
-        { transform: [{ scale: scaleAnim }] }
-      ]}>
-        <View style={styles.imageContainer}>
-          <Image 
-            source={{ uri: item.thumbnail_url || PLACEHOLDER_IMAGE }}
-            style={[styles.thumbnail, { height: thumbnailHeight }]} 
-            resizeMode="cover"
-            onError={(e) => console.error(`[ProfileRecipeCard] Image load error for ${item.recipe_name}:`, e.nativeEvent.error)}
-          />
-          {/* Optional overlay gradient could go here */}
-          {context !== 'otherUserRecipes' && (
-            <TouchableOpacity onPress={handleMenuPress} style={styles.menuButton}>
-              <Feather name="more-vertical" size={22} color={COLORS.white || '#fff'} />
-            </TouchableOpacity>
-          )}
-        </View>
-        
-        <View style={styles.infoContainer}>
-          <Text style={styles.recipeName} numberOfLines={2} ellipsizeMode="tail">
-            {item.recipe_name}
-          </Text>
-          
-          <View style={styles.metaContainer}>
-            <Feather name="calendar" size={12} color={COLORS.textSecondary || '#777'} style={styles.icon} />
-            <Text style={styles.dateText}>
-              {formatDate(item.created_at)}
-            </Text>
+    const thumbnailHeight = cardWidth * 0.8; // Slightly taller ratio for better visibility
+
+    // Add animation for card press feedback - memoized to prevent recreation
+    const scaleAnim = React.useMemo(() => new Animated.Value(1), []);
+
+    // Initialize navigation
+    const navigation =
+      useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+    const queryClient = useQueryClient(); // Added queryClient
+
+    const deleteRecipeMut = useMutation({
+      mutationFn: async (recipeIdToDelete: string) => {
+        // This is for hard deleting user's own recipe
+        const { error } = await supabase.rpc('delete_recipe', {
+          p_recipe_id: recipeIdToDelete,
+        });
+        if (error) {
+          console.error('Error deleting recipe:', error);
+          throw new Error(error.message || 'Failed to delete recipe.');
+        }
+        return recipeIdToDelete;
+      },
+      onSuccess: deletedRecipeId => {
+        Alert.alert(
+          'Success',
+          `Recipe "${item.recipe_name}" has been deleted.`,
+        );
+        if (user?.id) {
+          queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
+        }
+        queryClient.invalidateQueries({ queryKey: ['feed'] });
+        console.log(
+          `Recipe ${deletedRecipeId} deleted, invalidated profile query for user ${user?.id} and feed query.`,
+        );
+      },
+      onError: (error: Error) => {
+        Alert.alert(
+          'Error',
+          error.message || 'Could not delete the recipe. Please try again.',
+        );
+      },
+    });
+
+    const unsaveRecipeMut = useMutation({
+      mutationFn: async (recipeIdToUnsave: string) => {
+        if (!user?.id) {
+          throw new Error('User not authenticated to unsave recipe.');
+        }
+        const { error } = await supabase.rpc('unsave_recipe', {
+          p_recipe_id: recipeIdToUnsave,
+          p_user_id: user.id,
+        });
+        if (error) {
+          console.error('Error unsaving recipe:', error);
+          throw new Error(error.message || 'Failed to unsave recipe.');
+        }
+        return recipeIdToUnsave;
+      },
+      onSuccess: unsavedRecipeId => {
+        Alert.alert(
+          'Success',
+          `Recipe "${item.recipe_name}" has been unsaved.`,
+        );
+        if (user?.id) {
+          queryClient.invalidateQueries({ queryKey: ['profile', user.id] }); // Refreshes saved list
+        }
+        // Optionally, invalidate feed if saved status affects feed display, though less common
+        // queryClient.invalidateQueries({ queryKey: ['feed'] });
+        console.log(
+          `Recipe ${unsavedRecipeId} unsaved, invalidated profile query for user ${user?.id}.`,
+        );
+      },
+      onError: (error: Error) => {
+        Alert.alert(
+          'Error',
+          error.message || 'Could not unsave the recipe. Please try again.',
+        );
+      },
+    });
+
+    const handlePressIn = () => {
+      Animated.spring(scaleAnim, {
+        toValue: 0.97,
+        friction: 7,
+        tension: 40,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const handlePressOut = () => {
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 5,
+        tension: 40,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const handleMenuPress = () => {
+      const isMyRecipeContext = context === 'myRecipes';
+      const isOwner = item.creator_user_id === user?.id;
+
+      const options: Array<any> = []; // Initialize options array
+
+      // Add "Edit Recipe" option conditionally
+      if (isMyRecipeContext || (context === 'savedRecipes' && isOwner)) {
+        options.push({
+          text: 'Edit Recipe',
+          onPress: () => {
+            navigation.navigate('EditRecipe', { recipeId: item.recipe_id });
+          },
+        });
+      }
+
+      // Add "Delete Recipe" or "Unsave Recipe" option
+      options.push({
+        text: isMyRecipeContext ? 'Delete Recipe' : 'Unsave Recipe',
+        onPress: () => {
+          if (isMyRecipeContext) {
+            // Optionally, add another confirmation for permanent deletion
+            Alert.alert(
+              'Confirm Delete',
+              `Are you sure you want to permanently delete "${item.recipe_name}"? This action cannot be undone.`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete',
+                  style: 'destructive',
+                  onPress: () => deleteRecipeMut.mutate(item.recipe_id),
+                },
+              ],
+            );
+          } else {
+            unsaveRecipeMut.mutate(item.recipe_id);
+          }
+        },
+        style: 'destructive' as 'destructive' | 'default' | 'cancel', // Ensure type correctness
+      });
+
+      // Add "Cancel" option
+      options.push({
+        text: 'Cancel',
+        style: 'cancel' as 'destructive' | 'default' | 'cancel',
+      });
+
+      Alert.alert(
+        `Options for "${item.recipe_name}"`,
+        'What would you like to do?',
+        options,
+        { cancelable: true },
+      );
+    };
+
+    return (
+      <TouchableOpacity
+        style={styles.cardWrapper}
+        activeOpacity={1}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}>
+        <Animated.View
+          style={[styles.cardContainer, { transform: [{ scale: scaleAnim }] }]}>
+          <View style={styles.imageContainer}>
+            <Image
+              source={{ uri: item.thumbnail_url || PLACEHOLDER_IMAGE }}
+              style={[styles.thumbnail, { height: thumbnailHeight }]}
+              resizeMode="cover"
+              onError={e =>
+                console.error(
+                  `[ProfileRecipeCard] Image load error for ${item.recipe_name}:`,
+                  e.nativeEvent.error,
+                )
+              }
+            />
+            {/* Optional overlay gradient could go here */}
+            {context !== 'otherUserRecipes' && (
+              <TouchableOpacity
+                onPress={handleMenuPress}
+                style={styles.menuButton}>
+                <Feather
+                  name="more-vertical"
+                  size={22}
+                  color={COLORS.white || '#fff'}
+                />
+              </TouchableOpacity>
+            )}
           </View>
-        </View>
-      </Animated.View>
-    </TouchableOpacity>
-  );
-});
+
+          <View style={styles.infoContainer}>
+            <Text
+              style={styles.recipeName}
+              numberOfLines={2}
+              ellipsizeMode="tail">
+              {item.recipe_name}
+            </Text>
+
+            <View style={styles.metaContainer}>
+              <Feather
+                name="calendar"
+                size={12}
+                color={COLORS.textSecondary || '#777'}
+                style={styles.icon}
+              />
+              <Text style={styles.dateText}>{formatDate(item.created_at)}</Text>
+            </View>
+          </View>
+        </Animated.View>
+      </TouchableOpacity>
+    );
+  },
+);
 
 const styles = StyleSheet.create({
   cardWrapper: {
@@ -273,7 +329,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)', // Semi-transparent background for better visibility
     padding: 6,
     borderRadius: 15, // Circular background
-  }
+  },
 });
 
-export default ProfileRecipeCard; 
+export default ProfileRecipeCard;

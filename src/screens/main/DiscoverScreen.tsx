@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { View, TextInput, FlatList, TouchableOpacity, Image, Text, SafeAreaView } from 'react-native';
+import {
+  View,
+  TextInput,
+  FlatList,
+  TouchableOpacity,
+  Image,
+  Text,
+  SafeAreaView,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MainStackParamList } from '../../navigation/types';
@@ -8,7 +16,7 @@ import { MainStackParamList } from '../../navigation/types';
 const dummy = Array.from({ length: 12 }).map((_, i) => ({
   id: String(i),
   title: `Recipe ${i + 1}`,
-  thumb: `https://picsum.photos/seed/${i+1}/300/300`, // Use picsum for varied images
+  thumb: `https://picsum.photos/seed/${i + 1}/300/300`, // Use picsum for varied images
 }));
 
 // Define navigation prop type specifically for this screen's context
@@ -25,13 +33,19 @@ export default function DiscoverScreen() {
     }
   };
 
-  const renderItem = ({ item }: { item: typeof dummy[0] }) => (
+  const renderItem = ({ item }: { item: (typeof dummy)[0] }) => (
     <TouchableOpacity
       className="w-1/2 p-1" // Use Tailwind for padding
       onPress={() => nav.navigate('RecipeDetail', { id: item.id })} // Use correct typing
     >
-      <Image source={{ uri: item.thumb }} className="w-full h-40 rounded-lg bg-gray-200" /> {/* Added placeholder bg */}
-      <Text numberOfLines={1} className="mt-1 text-sm font-medium text-gray-800">
+      <Image
+        source={{ uri: item.thumb }}
+        className="w-full h-40 rounded-lg bg-gray-200"
+      />{' '}
+      {/* Added placeholder bg */}
+      <Text
+        numberOfLines={1}
+        className="mt-1 text-sm font-medium text-gray-800">
         {item.title}
       </Text>
     </TouchableOpacity>
@@ -40,7 +54,7 @@ export default function DiscoverScreen() {
   return (
     // Use SafeAreaView for top area
     <SafeAreaView className="flex-1 bg-white">
-      <View className="p-4"> 
+      <View className="p-4">
         <TextInput
           placeholder="Search recipes or ingredients"
           value={query}
@@ -52,7 +66,7 @@ export default function DiscoverScreen() {
       </View>
       <FlatList
         data={dummy} // Use dummy data for now
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         renderItem={renderItem}
         numColumns={2}
         showsVerticalScrollIndicator={false}
@@ -60,4 +74,4 @@ export default function DiscoverScreen() {
       />
     </SafeAreaView>
   );
-} 
+}

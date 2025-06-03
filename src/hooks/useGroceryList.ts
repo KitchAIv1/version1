@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../services/supabase';
 import uuid from 'react-native-uuid';
+import { supabase } from '../services/supabase';
 
 // Define a type for the grocery item
 export interface GroceryListItem {
@@ -25,25 +25,27 @@ export const useGroceryList = () => {
         .order('added_at'); // Ensure this column exists and is sortable
       if (error) throw error;
       return data as GroceryListItem[];
-    }
+    },
   });
 
   // Renamed items to inputItems to avoid conflict with potential future variable name
   const insert = useMutation<
-    unknown, 
-    Error, 
+    unknown,
+    Error,
     { name: string; qty: number; unit?: string }[] // Input items
   >({
-    mutationFn: async (inputItems: { name: string; qty: number; unit?: string }[]) => {
+    mutationFn: async (
+      inputItems: { name: string; qty: number; unit?: string }[],
+    ) => {
       const { data, error } = await supabase.from('grocery_list').insert(
-        inputItems.map((i) => ({
+        inputItems.map(i => ({
           id: uuid.v4() as string,
           name: i.name,
           qty: i.qty || 1,
           unit: i.unit || '',
           // added_at is likely handled by the database default
           is_checked: false, // Default for new items
-        }))
+        })),
       );
       if (error) throw error;
       return data;
@@ -56,12 +58,15 @@ export const useGroceryList = () => {
   // Assuming toggleDone means deleting the item from the list once checked
   // If it means updating an is_checked field, the mutationFn would be different (an update operation)
   const toggleDone = useMutation<
-    unknown, 
-    Error, 
+    unknown,
+    Error,
     string // id of the item
   >({
     mutationFn: async (id: string) => {
-      const { data, error } = await supabase.from('grocery_list').delete().eq('id', id);
+      const { data, error } = await supabase
+        .from('grocery_list')
+        .delete()
+        .eq('id', id);
       if (error) throw error;
       return data;
     },
@@ -71,4 +76,4 @@ export const useGroceryList = () => {
   });
 
   return { ...list, insert, toggleDone };
-}; 
+};

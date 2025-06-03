@@ -8,7 +8,7 @@ import { AuthStackParamList } from '../../navigation/AuthStack';
 // Define the specific navigation prop type for this screen
 type Nav = NativeStackNavigationProp<AuthStackParamList, 'Splash'>;
 
-const SplashScreen = () => {
+function SplashScreen() {
   // Get session and loading state from auth context
   const { session, loading } = useAuth(); // Use 'loading' as defined in AuthProvider
   const navigation = useNavigation<Nav>();
@@ -19,15 +19,18 @@ const SplashScreen = () => {
       if (!loading) {
         if (session) {
           // If session exists, user is logged in. Reset to MainTabs.
-          navigation.reset({ index: 0, routes: [{ name: 'MainTabs' as never }] });
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'MainTabs' as never }],
+          });
         } else {
           // If no session, user is not logged in. Replace Splash with Login.
           navigation.replace('Login');
         }
       }
       // No specific cleanup needed on blur for this logic, so return undefined or nothing.
-      return undefined; 
-    }, [loading, session, navigation]) // Dependencies for the effect
+      return undefined;
+    }, [loading, session, navigation]), // Dependencies for the effect
   );
 
   // Show loading indicator while checking session
@@ -36,6 +39,6 @@ const SplashScreen = () => {
       <ActivityIndicator size="large" color="#00B388" />
     </View>
   );
-};
+}
 
-export default SplashScreen; 
+export default SplashScreen;

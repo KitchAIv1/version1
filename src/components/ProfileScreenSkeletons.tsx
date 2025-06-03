@@ -2,11 +2,11 @@ import React from 'react';
 import { View, StyleSheet, Animated, Easing } from 'react-native';
 
 // Animated skeleton placeholder
-const SkeletonPlaceholder: React.FC<{ width: number | string; height: number; borderRadius?: number }> = ({ 
-  width, 
-  height, 
-  borderRadius = 4 
-}) => {
+const SkeletonPlaceholder: React.FC<{
+  width: number | string;
+  height: number;
+  borderRadius?: number;
+}> = ({ width, height, borderRadius = 4 }) => {
   const animatedValue = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
@@ -24,7 +24,7 @@ const SkeletonPlaceholder: React.FC<{ width: number | string; height: number; bo
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: false,
         }),
-      ])
+      ]),
     );
     animation.start();
     return () => animation.stop();
@@ -108,19 +108,19 @@ export const ProfileScreenSkeleton: React.FC = () => (
     <View style={styles.header}>
       <SkeletonPlaceholder width={100} height={24} borderRadius={4} />
     </View>
-    
+
     {/* Avatar Row Skeleton */}
     <AvatarRowSkeleton />
-    
+
     {/* Bio Skeleton */}
     <BioSkeleton />
-    
+
     {/* Buttons Skeleton */}
     <View style={styles.buttonRow}>
       <SkeletonPlaceholder width="45%" height={40} borderRadius={8} />
       <SkeletonPlaceholder width="45%" height={40} borderRadius={8} />
     </View>
-    
+
     {/* Tab Bar Skeleton */}
     <View style={styles.tabBar}>
       <SkeletonPlaceholder width={80} height={40} borderRadius={4} />
@@ -128,7 +128,7 @@ export const ProfileScreenSkeleton: React.FC = () => (
       <SkeletonPlaceholder width={80} height={40} borderRadius={4} />
       <SkeletonPlaceholder width={80} height={40} borderRadius={4} />
     </View>
-    
+
     {/* Recipe Grid Skeleton */}
     <RecipeGridSkeleton />
   </View>
@@ -212,4 +212,4 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 6,
   },
-}); 
+});

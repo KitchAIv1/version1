@@ -13,24 +13,24 @@ interface StorageLocationPickerProps {
 // Storage location icons mapping
 const STORAGE_ICONS: Record<StorageLocation, string> = {
   refrigerator: 'snow-outline',
-  freezer: 'cube-outline', 
+  freezer: 'cube-outline',
   cupboard: 'storefront-outline',
-  condiments: 'flask-outline'
+  condiments: 'flask-outline',
 };
 
 // Storage location colors
 const STORAGE_COLORS: Record<StorageLocation, string> = {
   refrigerator: '#3b82f6', // Blue
-  freezer: '#6366f1',      // Indigo  
-  cupboard: '#8b5cf6',     // Purple
-  condiments: '#f59e0b'    // Amber
+  freezer: '#6366f1', // Indigo
+  cupboard: '#8b5cf6', // Purple
+  condiments: '#f59e0b', // Amber
 };
 
 export const StorageLocationPicker: React.FC<StorageLocationPickerProps> = ({
   selectedLocation,
   onLocationChange,
   style,
-  required = false
+  required = false,
 }) => {
   return (
     <View style={[styles.container, style]}>
@@ -40,40 +40,44 @@ export const StorageLocationPicker: React.FC<StorageLocationPickerProps> = ({
         </Text>
         <Text style={styles.helpText}>Where do you store this item?</Text>
       </View>
-      
+
       <View style={styles.optionsContainer}>
         {Object.entries(STORAGE_LOCATIONS).map(([value, label]) => {
           const location = value as StorageLocation;
           const isSelected = selectedLocation === location;
           const iconName = STORAGE_ICONS[location];
           const color = STORAGE_COLORS[location];
-          
+
           return (
             <TouchableOpacity
               key={location}
               style={[
                 styles.optionButton,
                 isSelected && styles.selectedOption,
-                isSelected && { borderColor: color, backgroundColor: `${color}10` }
+                isSelected && {
+                  borderColor: color,
+                  backgroundColor: `${color}10`,
+                },
               ]}
               onPress={() => onLocationChange(location)}
-              activeOpacity={0.7}
-            >
-              <View style={[
-                styles.iconContainer,
-                isSelected && { backgroundColor: color }
-              ]}>
-                <Ionicons 
-                  name={iconName as any} 
-                  size={20} 
-                  color={isSelected ? '#fff' : color} 
+              activeOpacity={0.7}>
+              <View
+                style={[
+                  styles.iconContainer,
+                  isSelected && { backgroundColor: color },
+                ]}>
+                <Ionicons
+                  name={iconName as any}
+                  size={20}
+                  color={isSelected ? '#fff' : color}
                 />
               </View>
-              <Text style={[
-                styles.optionText,
-                isSelected && styles.selectedOptionText,
-                isSelected && { color: color }
-              ]}>
+              <Text
+                style={[
+                  styles.optionText,
+                  isSelected && styles.selectedOptionText,
+                  isSelected && { color },
+                ]}>
                 {label}
               </Text>
               {isSelected && (
@@ -145,4 +149,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default StorageLocationPicker; 
+export default StorageLocationPicker;

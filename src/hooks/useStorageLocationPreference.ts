@@ -6,7 +6,9 @@ const STORAGE_LOCATION_PREFERENCE_KEY = 'lastUsedStorageLocation';
 const DEFAULT_STORAGE_LOCATION: StorageLocation = 'cupboard';
 
 export const useStorageLocationPreference = () => {
-  const [lastUsedLocation, setLastUsedLocation] = useState<StorageLocation>(DEFAULT_STORAGE_LOCATION);
+  const [lastUsedLocation, setLastUsedLocation] = useState<StorageLocation>(
+    DEFAULT_STORAGE_LOCATION,
+  );
   const [isLoading, setIsLoading] = useState(true);
 
   // Load saved preference on mount
@@ -19,12 +21,21 @@ export const useStorageLocationPreference = () => {
       const saved = await AsyncStorage.getItem(STORAGE_LOCATION_PREFERENCE_KEY);
       if (saved && isValidStorageLocation(saved)) {
         setLastUsedLocation(saved as StorageLocation);
-        console.log('[useStorageLocationPreference] Loaded last used location:', saved);
+        console.log(
+          '[useStorageLocationPreference] Loaded last used location:',
+          saved,
+        );
       } else {
-        console.log('[useStorageLocationPreference] No saved preference, using default:', DEFAULT_STORAGE_LOCATION);
+        console.log(
+          '[useStorageLocationPreference] No saved preference, using default:',
+          DEFAULT_STORAGE_LOCATION,
+        );
       }
     } catch (error) {
-      console.error('[useStorageLocationPreference] Error loading preference:', error);
+      console.error(
+        '[useStorageLocationPreference] Error loading preference:',
+        error,
+      );
     } finally {
       setIsLoading(false);
     }
@@ -36,7 +47,10 @@ export const useStorageLocationPreference = () => {
       setLastUsedLocation(location);
       console.log('[useStorageLocationPreference] Saved preference:', location);
     } catch (error) {
-      console.error('[useStorageLocationPreference] Error saving preference:', error);
+      console.error(
+        '[useStorageLocationPreference] Error saving preference:',
+        error,
+      );
     }
   }, []);
 
@@ -48,11 +62,11 @@ export const useStorageLocationPreference = () => {
     lastUsedLocation,
     isLoading,
     savePreference,
-    getDefaultLocation
+    getDefaultLocation,
   };
 };
 
 // Helper function to validate storage location
 const isValidStorageLocation = (value: string): boolean => {
   return ['refrigerator', 'freezer', 'cupboard', 'condiments'].includes(value);
-}; 
+};

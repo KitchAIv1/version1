@@ -1,5 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+} from 'react-native';
 
 interface FoodPreferencesSelectorProps {
   currentPreferences: string[];
@@ -8,18 +14,18 @@ interface FoodPreferencesSelectorProps {
 
 // Updated list of allowed diet tags from backend (normalized)
 const AVAILABLE_PREFERENCES = [
-  "carnivore",
-  "gluten-free",
-  "hyper-keto",
-  "intermittent-fasting",
-  "keto",
-  "low-carb",
-  "low-fodmap",
-  "mediterranean",
-  "paleo",
-  "standard",
-  "vegan",
-  "vegetarian",
+  'carnivore',
+  'gluten-free',
+  'hyper-keto',
+  'intermittent-fasting',
+  'keto',
+  'low-carb',
+  'low-fodmap',
+  'mediterranean',
+  'paleo',
+  'standard',
+  'vegan',
+  'vegetarian',
 ];
 
 const FoodPreferencesSelector: React.FC<FoodPreferencesSelectorProps> = ({
@@ -28,7 +34,7 @@ const FoodPreferencesSelector: React.FC<FoodPreferencesSelectorProps> = ({
 }) => {
   const togglePreference = (preference: string) => {
     const newPreferences = currentPreferences.includes(preference)
-      ? currentPreferences.filter((p) => p !== preference)
+      ? currentPreferences.filter(p => p !== preference)
       : [...currentPreferences, preference];
     onPreferencesChange(newPreferences);
   };
@@ -37,15 +43,21 @@ const FoodPreferencesSelector: React.FC<FoodPreferencesSelectorProps> = ({
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Select Your Food Preferences:</Text>
       <View style={styles.preferencesList}>
-        {AVAILABLE_PREFERENCES.map((preference) => {
+        {AVAILABLE_PREFERENCES.map(preference => {
           const isSelected = currentPreferences.includes(preference);
           return (
             <TouchableOpacity
               key={preference}
-              style={[styles.preferenceItem, isSelected && styles.preferenceItemSelected]}
-              onPress={() => togglePreference(preference)}
-            >
-              <Text style={[styles.preferenceText, isSelected && styles.preferenceTextSelected]}>
+              style={[
+                styles.preferenceItem,
+                isSelected && styles.preferenceItemSelected,
+              ]}
+              onPress={() => togglePreference(preference)}>
+              <Text
+                style={[
+                  styles.preferenceText,
+                  isSelected && styles.preferenceTextSelected,
+                ]}>
                 {preference}
               </Text>
             </TouchableOpacity>
@@ -93,4 +105,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default FoodPreferencesSelector; 
+export default FoodPreferencesSelector;

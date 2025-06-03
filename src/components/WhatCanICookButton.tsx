@@ -81,14 +81,22 @@ function WhatCanICookButton({
 
   const buttonStyle = [
     styles.button,
-    variant === 'primary' ? styles.primaryButton : variant === 'secondary' ? styles.secondaryButton : styles.textButton,
+    variant === 'primary'
+      ? styles.primaryButton
+      : variant === 'secondary'
+        ? styles.secondaryButton
+        : styles.textButton,
     !isEnabled && styles.disabledButton,
     style,
   ];
 
   const textStyle = [
     styles.buttonText,
-    variant === 'primary' ? styles.primaryText : variant === 'secondary' ? styles.secondaryText : styles.textText,
+    variant === 'primary'
+      ? styles.primaryText
+      : variant === 'secondary'
+        ? styles.secondaryText
+        : styles.textText,
     !isEnabled && styles.disabledText,
   ];
 

@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from 'react';
 import {
   View,
   Text,
@@ -13,24 +19,48 @@ import {
   Pressable,
   Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
+import { format } from 'date-fns';
+import { useQueryClient } from '@tanstack/react-query';
 import { MainStackParamList } from '../../navigation/types';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../providers/AuthProvider';
 import { useAccessControl } from '../../hooks/useAccessControl';
-import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
 import { getShortRelativeTime } from '../../utils/dateUtils';
 import ManualAddSheet from '../../components/ManualAddSheet';
-import { useQueryClient } from '@tanstack/react-query';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// Import optimized hooks and components
-import { usePantryData, useRefreshPantryData, usePantryMutations, PantryItem, groupItemsByStorageLocation, StorageLocation } from '../../hooks/usePantryData';
-import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+// Import NEW aging-related hooks and components
+import {
+  useStockAging,
+  useAgingStatistics,
+  useFilteredAgingItems,
+  StockAgingItem,
+  AgeGroup,
+} from '../../hooks/useStockAging';
+import {
+  useAgingNotifications,
+  useUnreadNotificationsCount,
+} from '../../hooks/useAgingNotifications';
+import { PantryItemWithAging } from '../../components/PantryItemWithAging';
+import { AgeFilterTabs } from '../../components/AgeFilterTabs';
+import { AgingNotificationsPanel } from '../../components/AgingNotificationsPanel';
+
+// Import RESTORED original hooks and components
+import {
+  usePantryData,
+  usePantryMutations,
+  PantryItem,
+  groupItemsByStorageLocation,
+  StorageLocation,
+} from '../../hooks/usePantryData';
 import { PantryItemComponent } from '../../components/PantryItemComponent';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import SearchInput from '../../components/SearchInput';
 import { StorageLocationTabs } from '../../components/StorageLocationTabs';
 import { useStorageLocationPreference } from '../../hooks/useStorageLocationPreference';
@@ -43,181 +73,237 @@ import { useWhatCanICook } from '../../hooks/useWhatCanICook';
 // Navigation type
 type PantryNavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
-// Constants
-const ACTIVE_COLOR = '#10b981'; // Same as ProfileScreen and GroceryListScreen
+// Constants - OPTIMIZED: Move outside component to prevent recreation
+const ACTIVE_COLOR = '#10b981';
+const DEBOUNCE_DELAY = 300;
 
-interface UnitOption {
-  label: string;
-  value: string;
-}
+// OPTIMIZED: Pre-define unit options to prevent recreation
+const UNIT_OPTIONS = [
+  { label: 'Units', value: 'units' },
+  { label: 'Grams', value: 'grams' },
+  { label: 'Cups', value: 'cups' },
+  { label: 'Milliliters', value: 'ml' },
+  { label: 'Liters', value: 'l' },
+  { label: 'Kilograms', value: 'kg' },
+  { label: 'Ounces', value: 'oz' },
+  { label: 'Pounds', value: 'lbs' },
+];
+
+// OPTIMIZED: Memoized empty state component
+const EmptyState = React.memo(() => (
+  <View style={styles.emptyStateContainer}>
+    <Ionicons name="archive-outline" size={48} color="#cbd5e1" />
+    <Text style={styles.emptyStateTitle}>Your pantry is empty</Text>
+    <Text style={styles.emptyStateText}>
+      Add ingredients by scanning with camera or adding manually
+    </Text>
+  </View>
+));
+EmptyState.displayName = 'EmptyState';
+
+// OPTIMIZED: Memoized loading state component
+const LoadingState = React.memo(() => (
+  <View style={styles.loadingContainer}>
+    <ActivityIndicator size="large" color={ACTIVE_COLOR} />
+    <Text style={styles.loadingText}>Loading your pantry...</Text>
+  </View>
+));
+LoadingState.displayName = 'LoadingState';
+
+// OPTIMIZED: Memoized search empty state
+const SearchEmptyState = React.memo(() => (
+  <View style={styles.emptyStateContainer}>
+    <Ionicons name="search-outline" size={48} color="#cbd5e1" />
+    <Text style={styles.emptyStateTitle}>No items found</Text>
+    <Text style={styles.emptyStateText}>
+      Try adjusting your search or filter criteria
+    </Text>
+  </View>
+));
+SearchEmptyState.displayName = 'SearchEmptyState';
 
 export default function PantryScreen() {
   const navigation = useNavigation<PantryNavigationProp>();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
-  const { 
-    performPantryScan, 
-    canPerformScan, 
-    isProcessing, 
+  const {
+    performPantryScan,
+    canPerformScan,
+    isProcessing,
     getUsageDisplay,
-    FREEMIUM_SCAN_LIMIT 
+    FREEMIUM_SCAN_LIMIT,
   } = useAccessControl();
+
+  // HYBRID APPROACH: Try aging data first, fallback to regular pantry data
+  const {
+    data: agingItems = [],
+    isLoading: agingLoading,
+    error: agingError,
+    refetch: refetchAging,
+  } = useStockAging(user?.id);
+
+  // OPTIMIZED: Only fetch pantry data if aging data is not available
+  const shouldFetchPantryData = useMemo(
+    () => agingItems.length === 0 && !agingLoading && !agingError,
+    [agingItems.length, agingLoading, agingError],
+  );
+
+  const {
+    data: pantryItems = [],
+    isLoading: pantryLoading,
+    error: pantryError,
+    refetch: refetchPantry,
+  } = usePantryData(shouldFetchPantryData ? user?.id : undefined);
+
+  // OPTIMIZED: Smart data selection with memoization
+  const { displayItems, isLoading, fetchError, refetch, hasAgingFeatures } =
+    useMemo(() => {
+      const hasAging = agingItems.length > 0;
+      return {
+        displayItems: hasAging ? agingItems : pantryItems,
+        isLoading: hasAging ? agingLoading : pantryLoading,
+        fetchError: hasAging ? agingError : pantryError,
+        refetch: hasAging ? refetchAging : refetchPantry,
+        hasAgingFeatures: hasAging,
+      };
+    }, [
+      agingItems,
+      pantryItems,
+      agingLoading,
+      pantryLoading,
+      agingError,
+      pantryError,
+      refetchAging,
+      refetchPantry,
+    ]);
+
+  // OPTIMIZED: Memoize aging features
+  const agingStatistics = useAgingStatistics(agingItems);
+  const { notifications = [] } = useAgingNotifications(user?.id);
   
-  // Use optimized React Query hook for data fetching
-  const { 
-    data: pantryItems = [], 
-    isLoading, 
-    error: fetchError, 
-    refetch 
-  } = usePantryData(user?.id);
-  
-  // Use optimized hooks for cache management
-  const refreshPantryData = useRefreshPantryData();
+  // Since we don't have is_read functionality, use total count for badge
+  const unreadCount = notifications.length;
+
+  // RESTORED: Original pantry functionality - optimized
   const { invalidatePantryCache } = usePantryMutations(user?.id);
-  
-  // Storage location preference hook
   const { lastUsedLocation } = useStorageLocationPreference();
-  
-  // State
+
+  // State - OPTIMIZED: Use stable initial values
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const [activeStorageLocation, setActiveStorageLocation] = useState<StorageLocation>(lastUsedLocation);
-  
-  // Stable search handler to prevent re-renders
-  const handleSearchChange = useCallback((text: string) => {
-    console.log('[PantryScreen] Search input changed:', text);
-    setSearchQuery(text);
-  }, []);
-  
-  // Stable clear handler
-  const handleClearSearch = useCallback(() => {
-    setSearchQuery('');
-  }, []);
-  
-  // Debounced search for better performance
-  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
-  
-  // Add debugging for pantry items count
-  useEffect(() => {
-    console.log('[PantryScreen] Pantry items loaded:', {
-      totalCount: pantryItems.length,
-      isLoading,
-      hasError: !!fetchError,
-      sampleItems: pantryItems.slice(0, 5).map(item => ({
-        id: item.id,
-        name: item.item_name,
-        quantity: item.quantity,
-        unit: item.unit
-      }))
-    });
-  }, [pantryItems, isLoading, fetchError]);
-  
-  // Memoized grouped items by storage location for better performance
-  const groupedItems = useMemo(() => {
-    console.log('[PantryScreen] Grouping items by storage location:', {
-      totalItems: pantryItems.length,
-      sampleItems: pantryItems.slice(0, 3).map(item => ({
-        name: item.item_name,
-        location: item.storage_location || 'cupboard'
-      }))
-    });
-    
-    return groupItemsByStorageLocation(pantryItems);
-  }, [pantryItems]);
-
-  // Memoized item counts for tabs
-  const itemCounts = useMemo(() => {
-    const counts = {
-      refrigerator: groupedItems.refrigerator.length,
-      freezer: groupedItems.freezer.length,
-      cupboard: groupedItems.cupboard.length,
-      condiments: groupedItems.condiments.length,
-    };
-    
-    console.log('[PantryScreen] Item counts by location:', counts);
-    return counts;
-  }, [groupedItems]);
-  
-  // Memoized filtered items for better performance (now supports both storage location and search)
-  const filteredItems = useMemo(() => {
-    console.log('[PantryScreen] Filtering items:', {
-      searchQuery,
-      debouncedSearchQuery,
-      activeStorageLocation,
-      totalItems: pantryItems.length
-    });
-    
-    // Start with items from the active storage location
-    const locationItems = groupedItems[activeStorageLocation] || [];
-    
-    // If no search query, return all items from active location
-    if (!debouncedSearchQuery.trim()) {
-      console.log('[PantryScreen] No search query, returning location items:', {
-        location: activeStorageLocation,
-        itemCount: locationItems.length
-      });
-      return locationItems;
-    }
-    
-    // Apply search filter to location items
-    const lowerQuery = debouncedSearchQuery.toLowerCase().trim();
-    const filtered = locationItems.filter(item => {
-      const itemName = item.item_name.toLowerCase();
-      const matches = itemName.includes(lowerQuery);
-      if (matches) {
-        console.log('[PantryScreen] Item matches search in location:', {
-          item: item.item_name,
-          location: activeStorageLocation
-        });
-      }
-      return matches;
-    });
-    
-    console.log('[PantryScreen] Filtered results:', {
-      query: lowerQuery,
-      location: activeStorageLocation,
-      locationItems: locationItems.length,
-      filteredCount: filtered.length,
-      filteredItems: filtered.map(item => item.item_name)
-    });
-    
-    return filtered;
-  }, [debouncedSearchQuery, groupedItems, activeStorageLocation]);
-  
-  // Manual Add Sheet state
-  const [isManualAddSheetVisible, setIsManualAddSheetVisible] = useState(false);
-  const [editingItem, setEditingItem] = useState<PantryItem | null>(null);
-  
-  // Upgrade Modal state
+  const [activeStorageLocation, setActiveStorageLocation] =
+    useState<StorageLocation>(lastUsedLocation);
+  const [ageFilter, setAgeFilter] = useState<AgeGroup | 'all'>('all');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  
-  // Animation values
+  const [isManualAddSheetVisible, setIsManualAddSheetVisible] = useState(false);
+  const [editingItem, setEditingItem] = useState<
+    StockAgingItem | PantryItem | null
+  >(null);
+  const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
+
+  // OPTIMIZED: Debounced search with proper memoization
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, DEBOUNCE_DELAY);
+
+  // OPTIMIZED: Grouped items with dependency optimization
+  const groupedItems = useMemo(() => {
+    if (hasAgingFeatures) {
+      const convertedItems: PantryItem[] = agingItems.map(item => ({
+        id: item.id,
+        user_id: item.user_id,
+        item_name: item.item_name,
+        quantity: item.quantity,
+        unit: item.unit,
+        description: item.description,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        storage_location:
+          (item.storage_location as StorageLocation) || 'cupboard',
+      }));
+      return groupItemsByStorageLocation(convertedItems);
+    }
+    return groupItemsByStorageLocation(pantryItems);
+  }, [agingItems, pantryItems, hasAgingFeatures]);
+
+  // OPTIMIZED: Item counts with shallow comparison
+  const itemCounts = useMemo(
+    () => ({
+      refrigerator: groupedItems.refrigerator?.length || 0,
+      freezer: groupedItems.freezer?.length || 0,
+      cupboard: groupedItems.cupboard?.length || 0,
+      condiments: groupedItems.condiments?.length || 0,
+    }),
+    [groupedItems],
+  );
+
+  // OPTIMIZED: Filtered items with efficient filtering
+  const filteredItems = useMemo(() => {
+    const locationItems = groupedItems[activeStorageLocation] || [];
+
+    if (hasAgingFeatures && ageFilter !== 'all') {
+      const agingItemsForLocation = agingItems.filter(
+        item =>
+          ((item.storage_location as StorageLocation) || 'cupboard') ===
+          activeStorageLocation,
+      );
+      const filteredByAge = useFilteredAgingItems(
+        agingItemsForLocation,
+        ageFilter,
+      );
+
+      if (debouncedSearchQuery.trim()) {
+        const query = debouncedSearchQuery.toLowerCase();
+        return filteredByAge.filter(item =>
+          item.item_name.toLowerCase().includes(query),
+        );
+      }
+      return filteredByAge;
+    }
+
+    if (debouncedSearchQuery.trim()) {
+      const query = debouncedSearchQuery.toLowerCase();
+      return locationItems.filter(item =>
+        item.item_name.toLowerCase().includes(query),
+      );
+    }
+
+    return locationItems;
+  }, [
+    groupedItems,
+    activeStorageLocation,
+    hasAgingFeatures,
+    ageFilter,
+    agingItems,
+    debouncedSearchQuery,
+  ]);
+
+  // OPTIMIZED: Pantry item count
+  const pantryItemCount = displayItems.length;
+
+  // "What Can I Cook?" feature hook - OPTIMIZED: Only load when needed
+  const {
+    handleWhatCanICookPress,
+    handleCloseModal,
+    handleNavigateToPantry,
+    showInsufficientModal,
+  } = useWhatCanICook();
+
+  // OPTIMIZED: Stable animation values
   const scanButtonScale = useRef(new Animated.Value(1)).current;
   const addButtonScale = useRef(new Animated.Value(1)).current;
 
-  // Memoize usage data to prevent unnecessary recalculations
+  // OPTIMIZED: Memoized usage data
   const usageData = useMemo(() => getUsageDisplay(), [getUsageDisplay]);
 
-  // Unit options
-  const unitOptions: UnitOption[] = [
-    { label: 'Units', value: 'units' },
-    { label: 'Grams', value: 'grams' },
-    { label: 'Cups', value: 'cups' },
-    { label: 'Milliliters', value: 'ml' },
-    { label: 'Liters', value: 'l' },
-    { label: 'Kilograms', value: 'kg' },
-    { label: 'Ounces', value: 'oz' },
-    { label: 'Pounds', value: 'lbs' }
-  ];
+  // OPTIMIZED: Stable event handlers
+  const handleSearchChange = useCallback((text: string) => {
+    setSearchQuery(text);
+  }, []);
 
-  // Legacy fetch function for backward compatibility (now uses React Query internally)
-  const fetchPantryData = useCallback(async () => {
-    // This now triggers React Query refetch
-    await refetch();
-  }, [refetch]);
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+  }, []);
 
-  // Refresh handler - now uses React Query
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -229,311 +315,395 @@ export default function PantryScreen() {
     }
   }, [refetch]);
 
-  // Animation helper
-  const animateButtonPress = (animatedValue: Animated.Value, toValue: number) => {
-    Animated.spring(animatedValue, {
-      toValue,
-      useNativeDriver: true,
-      friction: 7,
-      tension: 40
-    }).start();
-  };
+  // OPTIMIZED: Animation helper
+  const animateButtonPress = useCallback(
+    (animatedValue: Animated.Value, toValue: number) => {
+      Animated.spring(animatedValue, {
+        toValue,
+        useNativeDriver: true,
+        friction: 7,
+        tension: 40,
+      }).start();
+    },
+    [],
+  );
 
-  // Camera handlers with access control
-  const handleScanPress = async () => {
-    // Check access before navigating to scanning screen
+  const handleScanPress = useCallback(async () => {
     if (!canPerformScan()) {
       setShowUpgradeModal(true);
       return;
     }
-
-    // Navigate to dedicated scanning screen
     navigation.navigate('PantryScan');
-  };
+  }, [canPerformScan, navigation]);
 
-  const handleManualAddPress = () => {
+  const handleManualAddPress = useCallback(() => {
     setEditingItem(null);
     setIsManualAddSheetVisible(true);
-  };
+  }, []);
 
-  // Memoized event handlers for better performance
-  const handleEditItem = useCallback((item: PantryItem) => {
+  const handleEditItem = useCallback((item: StockAgingItem | PantryItem) => {
     setEditingItem(item);
     setIsManualAddSheetVisible(true);
   }, []);
 
-  const handleDeleteItem = useCallback((item: PantryItem) => {
-    Alert.alert(
-      'Delete Item',
-      `Are you sure you want to remove "${item.item_name}" from your pantry?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('stock')
-                .delete()
-                .eq('id', item.id);
-              
-              if (error) throw error;
-              
-              // Invalidate cache to refresh data
-              invalidatePantryCache();
-            } catch (err: any) {
-              Alert.alert('Error', 'Failed to delete item');
-            }
-          }
-        }
-      ]
-    );
-  }, [invalidatePantryCache]);
-
-  // Handle manual add sheet submission
-  const handleSaveItemFromSheet = async (submittedItem: any) => {
-    if (!user?.id) {
-      Alert.alert("Error", "User session not found. Cannot save item.");
-      return;
-    }
-
-    try {
-      let result;
-      
-      if (submittedItem.original_item_name) {
-        // Edit mode - include storage_location in update
-        const { error: updateError } = await supabase
-          .from('stock')
-          .update({ 
-            item_name: submittedItem.item_name, 
-            quantity: submittedItem.quantity, 
-            unit: submittedItem.unit,
-            description: submittedItem.description,
-            storage_location: submittedItem.storage_location || 'cupboard'
-          })
-          .eq('user_id', user.id)
-          .eq('item_name', submittedItem.original_item_name);
-        
-        if (updateError) throw updateError;
-        result = 'updated';
-      } else {
-        // Add mode - include storage_location in insert
-        const { error: insertError } = await supabase
-          .from('stock')
-          .insert({
-            user_id: user.id,
-            item_name: submittedItem.item_name,
-            quantity: submittedItem.quantity,
-            unit: submittedItem.unit,
-            description: submittedItem.description,
-            storage_location: submittedItem.storage_location || 'cupboard'
-          });
-        
-        if (insertError) throw insertError;
-        result = 'added';
-      }
-
-      // Close the sheet first for immediate feedback
-      setIsManualAddSheetVisible(false);
-      setEditingItem(null);
-      
-      // Immediately invalidate and refetch pantry data
-      invalidatePantryCache();
-      await refetch();
-      
-      // Also invalidate feed cache to refresh recipe matches
-      queryClient.invalidateQueries({ queryKey: ['feed'] });
-      
-      // CRITICAL: Invalidate recipe details and pantry match caches
-      // This ensures ingredients tabs update immediately
-      queryClient.invalidateQueries({ queryKey: ['recipeDetails'] });
-      queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
-      
-      // Show success feedback
+  const handleDeleteItem = useCallback(
+    (item: StockAgingItem | PantryItem) => {
       Alert.alert(
-        'Success!', 
-        `Item ${result} successfully. ${result === 'added' ? 'Checking for recipe matches...' : ''}`,
-        [{ text: 'OK', style: 'default' }]
-      );
-      
-    } catch (err: any) {
-      console.error('Error saving item:', err);
-      Alert.alert('Error', `Failed to save item: ${err.message}`);
-    }
-  };
+        'Delete Item',
+        `Are you sure you want to delete "${item.item_name}" from your pantry?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                const { error } = await supabase
+                  .from('stock')
+                  .delete()
+                  .eq('id', item.id);
 
-  const handleCloseSheet = () => {
+                if (error) throw error;
+
+                await refetch();
+                Alert.alert('Success', 'Item deleted successfully');
+              } catch (error: any) {
+                console.error('[PantryScreen] Error deleting item:', error);
+                Alert.alert('Error', error.message || 'Failed to delete item');
+              }
+            },
+          },
+        ],
+      );
+    },
+    [refetch],
+  );
+
+  const handleCloseSheet = useCallback(() => {
     setIsManualAddSheetVisible(false);
     setEditingItem(null);
-  };
+  }, []);
 
-  // Convert error to string for display
-  const error = fetchError ? (fetchError as any).message || 'Failed to load pantry data' : null;
+  const handleToggleNotifications = useCallback(() => {
+    setShowNotificationsPanel(prev => !prev);
+  }, []);
 
-  // "What Can I Cook?" feature hook - moved before memoized components
-  const {
-    pantryItemCount,
-    showInsufficientModal,
-    handleWhatCanICookPress,
-    handleCloseModal,
-    handleNavigateToPantry,
-  } = useWhatCanICook();
+  const handleCloseNotifications = useCallback(() => {
+    setShowNotificationsPanel(false);
+  }, []);
 
-  // Header component
-  const renderPantryHeader = useCallback(() => (
-    <View style={styles.pantryHeaderContainer}>
-      {/* Action Buttons Section - Award-Winning Design */}
-      <View style={styles.actionButtonsSection}>
-        {/* Primary Action - What Can I Cook? (Hero Button) */}
-        <View style={styles.heroButtonContainer}>
-          <WhatCanICookButton
-            pantryItemCount={pantryItemCount}
-            onPress={handleWhatCanICookPress}
-            style={styles.heroButton}
-            variant="primary"
-          />
-        </View>
+  const handleViewItemFromNotification = useCallback(
+    (itemId: string) => {
+      const item = displayItems.find(item => item.id === itemId);
+      if (item) {
+        setEditingItem(item);
+        setIsManualAddSheetVisible(true);
+      }
+      setShowNotificationsPanel(false);
+    },
+    [displayItems],
+  );
 
-        {/* Secondary Actions - Scan & Add (Side by Side) */}
-        <View style={styles.secondaryActionsContainer}>
-          <Pressable
-            style={[
-              styles.secondaryActionButton, 
-              styles.scanButton, 
-              (isProcessing || !canPerformScan()) && styles.disabledButton
-            ]}
-            onPress={handleScanPress}
-            onPressIn={() => !(isProcessing) && animateButtonPress(scanButtonScale, 0.95)}
-            onPressOut={() => !(isProcessing) && animateButtonPress(scanButtonScale, 1)}
-            disabled={isProcessing}
-          >
-            <Animated.View style={[styles.secondaryButtonContent, { transform: [{ scale: scanButtonScale }] }]}>
-              <View style={styles.secondaryButtonIconContainer}>
-                {(isProcessing) ? (
-                  <ActivityIndicator size={24} color={ACTIVE_COLOR} />
-                ) : (
-                  <Ionicons 
-                    name="camera" 
-                    size={24} 
-                    color={canPerformScan() ? ACTIVE_COLOR : '#9ca3af'} 
-                  />
-                )}
-              </View>
-              <View style={styles.secondaryButtonTextContainer}>
-                <Text style={[
-                  styles.secondaryButtonTitle, 
-                  !canPerformScan() && styles.disabledButtonText
+  const handleSaveItemFromSheet = useCallback(
+    async (itemData: any) => {
+      try {
+        const {
+          data: { user: currentUser },
+        } = await supabase.auth.getUser();
+        if (!currentUser?.id) {
+          throw new Error('User not authenticated');
+        }
+
+        const payload = {
+          user_id: currentUser.id,
+          item_name: itemData.item_name.toLowerCase(),
+          quantity: itemData.quantity,
+          unit: itemData.unit,
+          description: itemData.description,
+          storage_location: itemData.storage_location,
+        };
+
+        let result;
+        if (editingItem) {
+          result = await supabase
+            .from('stock')
+            .update(payload)
+            .eq('id', editingItem.id);
+        } else {
+          result = await supabase.from('stock').insert(payload);
+        }
+
+        if (result.error) throw result.error;
+
+        await refetch();
+        handleCloseSheet();
+
+        Alert.alert(
+          'Success',
+          editingItem ? 'Item updated successfully' : 'Item added successfully',
+        );
+      } catch (error: any) {
+        console.error('[PantryScreen] Error saving item:', error);
+        Alert.alert('Error', error.message || 'Failed to save item');
+      }
+    },
+    [editingItem, refetch, handleCloseSheet],
+  );
+
+  // OPTIMIZED: Memoized header component with stable dependencies
+  const renderPantryHeader = useCallback(
+    () => (
+      <View style={styles.pantryHeaderContainer}>
+        <View style={styles.actionButtonsSection}>
+          <View style={styles.heroButtonContainer}>
+            <WhatCanICookButton
+              pantryItemCount={pantryItemCount}
+              onPress={handleWhatCanICookPress}
+              style={styles.heroButton}
+              variant="primary"
+            />
+          </View>
+
+          <View style={styles.secondaryActionsContainer}>
+            <Pressable
+              style={[
+                styles.secondaryActionButton,
+                styles.scanButton,
+                (isProcessing || !canPerformScan()) && styles.disabledButton,
+              ]}
+              onPress={handleScanPress}
+              onPressIn={() =>
+                !isProcessing && animateButtonPress(scanButtonScale, 0.95)
+              }
+              onPressOut={() =>
+                !isProcessing && animateButtonPress(scanButtonScale, 1)
+              }
+              disabled={isProcessing}>
+              <Animated.View
+                style={[
+                  styles.secondaryButtonContent,
+                  { transform: [{ scale: scanButtonScale }] },
                 ]}>
-                  {(isProcessing) ? 'Processing...' : 'Scan'}
-                </Text>
-                <Text style={[
-                  styles.secondaryButtonSubtitle, 
-                  !canPerformScan() && styles.disabledButtonText
-                ]}>
-                  Use camera
-                </Text>
-                {/* Scan Counter Badge */}
-                {usageData.showUsage && (
-                  <View style={[
-                    styles.modernScanBadge, 
-                    !canPerformScan() && styles.modernScanBadgeWarning
+                <View
+                  style={[
+                    styles.secondaryButtonIconContainer,
+                    styles.scanButtonIconContainer,
                   ]}>
-                    <Text style={[
-                      styles.modernScanBadgeText, 
-                      !canPerformScan() && styles.modernScanBadgeTextWarning
-                    ]}>
-                      {(() => {
-                        const [used, total] = usageData.scanUsage.split('/').map(Number);
-                        const remaining = total - used;
-                        return `${remaining} left`;
-                      })()}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </Animated.View>
-          </Pressable>
+                  <Ionicons name="camera" size={24} color="#fff" />
+                </View>
+                <View style={styles.secondaryButtonTextContainer}>
+                  <Text style={styles.secondaryButtonTitle}>Scan</Text>
+                  <Text style={styles.secondaryButtonSubtitle}>
+                    {usageData.scanUsage}
+                  </Text>
+                </View>
+              </Animated.View>
+            </Pressable>
 
-          <Pressable
-            style={[styles.secondaryActionButton, styles.addButton]}
-            onPress={handleManualAddPress}
-            onPressIn={() => animateButtonPress(addButtonScale, 0.95)}
-            onPressOut={() => animateButtonPress(addButtonScale, 1)}
-          >
-            <Animated.View style={[styles.secondaryButtonContent, { transform: [{ scale: addButtonScale }] }]}>
-              <View style={[styles.secondaryButtonIconContainer, styles.addButtonIconContainer]}>
-                <Ionicons name="add-circle" size={24} color={ACTIVE_COLOR} />
-              </View>
-              <View style={styles.secondaryButtonTextContainer}>
-                <Text style={styles.secondaryButtonTitleWhite}>Add</Text>
-                <Text style={styles.secondaryButtonSubtitleWhite}>Manually</Text>
-              </View>
-            </Animated.View>
-          </Pressable>
+            <Pressable
+              style={[styles.secondaryActionButton, styles.addButton]}
+              onPress={handleManualAddPress}
+              onPressIn={() => animateButtonPress(addButtonScale, 0.95)}
+              onPressOut={() => animateButtonPress(addButtonScale, 1)}>
+              <Animated.View
+                style={[
+                  styles.secondaryButtonContent,
+                  { transform: [{ scale: addButtonScale }] },
+                ]}>
+                <View
+                  style={[
+                    styles.secondaryButtonIconContainer,
+                    styles.addButtonIconContainer,
+                  ]}>
+                  <Ionicons name="add-circle" size={24} color={ACTIVE_COLOR} />
+                </View>
+                <View style={styles.secondaryButtonTextContainer}>
+                  <Text style={styles.secondaryButtonTitleWhite}>Add</Text>
+                  <Text style={styles.secondaryButtonSubtitleWhite}>
+                    Manually
+                  </Text>
+                </View>
+              </Animated.View>
+            </Pressable>
+          </View>
         </View>
       </View>
-    </View>
-  ), [pantryItemCount, handleWhatCanICookPress, isProcessing, canPerformScan, usageData, handleScanPress, scanButtonScale, handleManualAddPress, addButtonScale]);
-
-  // Optimized render function using memoized component
-  const renderPantryItem = useCallback(({ item }: { item: PantryItem }) => {
-    return (
-      <PantryItemComponent 
-        item={item} 
-        onEdit={handleEditItem} 
-        onDelete={handleDeleteItem} 
-      />
-    );
-  }, [handleEditItem, handleDeleteItem]);
-
-  // Memoized key extractor
-  const keyExtractor = useCallback((item: PantryItem) => item.id, []);
-
-  // Empty state
-  const renderEmptyState = () => (
-    <View style={styles.emptyStateContainer}>
-      <Ionicons name="archive-outline" size={48} color="#cbd5e1" />
-      <Text style={styles.emptyStateTitle}>Your pantry is empty</Text>
-      <Text style={styles.emptyStateText}>
-        Add ingredients by scanning with camera or adding manually
-      </Text>
-    </View>
+    ),
+    [
+      pantryItemCount,
+      handleWhatCanICookPress,
+      isProcessing,
+      canPerformScan,
+      usageData,
+      handleScanPress,
+      scanButtonScale,
+      handleManualAddPress,
+      addButtonScale,
+      animateButtonPress,
+    ],
   );
+
+  // OPTIMIZED: Render item function with stable dependencies
+  const renderPantryItem = useCallback(
+    ({ item }: { item: StockAgingItem | PantryItem }) => {
+      if (hasAgingFeatures && 'age_group' in item) {
+        return (
+          <PantryItemWithAging
+            item={item as StockAgingItem}
+            onEdit={handleEditItem}
+            onDelete={handleDeleteItem}
+          />
+        );
+      }
+      return (
+        <PantryItemComponent
+          item={item as PantryItem}
+          onEdit={handleEditItem}
+          onDelete={handleDeleteItem}
+        />
+      );
+    },
+    [hasAgingFeatures, handleEditItem, handleDeleteItem],
+  );
+
+  // OPTIMIZED: Stable key extractor
+  const keyExtractor = useCallback(
+    (item: StockAgingItem | PantryItem) => item.id,
+    [],
+  );
+
+  // OPTIMIZED: Get item layout for better performance (assuming fixed height)
+  const getItemLayout = useCallback(
+    (data: any, index: number) => ({
+      length: 80, // Approximate item height
+      offset: 80 * index,
+      index,
+    }),
+    [],
+  );
+
+  // OPTIMIZED: Memoized error state
+  const renderErrorState = useCallback(
+    () => (
+      <View style={styles.errorContainer}>
+        <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
+        <Text style={styles.errorTitle}>Something went wrong</Text>
+        <Text style={styles.errorText}>{fetchError?.message}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={onRefresh}>
+          <Text style={styles.retryButtonText}>Try Again</Text>
+        </TouchableOpacity>
+      </View>
+    ),
+    [fetchError?.message, onRefresh],
+  );
+
+  // OPTIMIZED: Memoized list empty component based on state
+  const listEmptyComponent = useMemo(() => {
+    if (isLoading && displayItems.length === 0) {
+      return <LoadingState />;
+    }
+    if (fetchError) {
+      return renderErrorState();
+    }
+    if (searchQuery || ageFilter !== 'all') {
+      return <SearchEmptyState />;
+    }
+    return <EmptyState />;
+  }, [
+    isLoading,
+    displayItems.length,
+    fetchError,
+    searchQuery,
+    ageFilter,
+    renderErrorState,
+  ]);
 
   return (
     <View style={styles.container}>
-      {/* Fixed Green Header - covers status bar area and stays fixed */}
       <View style={styles.fixedGreenHeader}>
         <SafeAreaView edges={['top']} />
       </View>
-      
-      {/* Content below green header */}
-      <View style={[styles.contentBelowHeader, { marginTop: insets.top }]}>
-        {/* Fixed Search Bar - completely isolated from list */}
-        <View style={styles.fixedSearchContainer}>
-          <View style={styles.headerRow}>
-            <Text style={styles.pantryTitle}>My Pantry</Text>
+
+      <View style={[styles.contentBelowHeader, { paddingTop: insets.top }]}>
+        {/* RESTORED: Header Section */}
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>My Pantry</Text>
+            <Text style={styles.headerSubtitle}>
+              {pantryItemCount} items •{' '}
+              {hasAgingFeatures
+                ? `${agingStatistics.red} need attention`
+                : 'Smart aging enabled'}
+            </Text>
+          </View>
+          <View style={styles.headerActions}>
+            {hasAgingFeatures && (
+              <TouchableOpacity
+                style={[styles.notificationButton, styles.notificationBellHeader]}
+                onPress={handleToggleNotifications}
+                accessibilityLabel={`Aging alerts, ${unreadCount} unread`}
+                accessibilityHint="Open aging notifications panel">
+                <Ionicons
+                  name={
+                    unreadCount > 0 ? 'notifications' : 'notifications-outline'
+                  }
+                  size={24}
+                  color={unreadCount > 0 ? '#ef4444' : '#6b7280'}
+                />
+                {unreadCount > 0 && (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
             <View style={styles.itemCountBadge}>
-              <Text style={styles.itemCountText}>{pantryItems.length}</Text>
+              <Text style={styles.itemCountText}>{pantryItemCount}</Text>
             </View>
           </View>
-          
-          <SearchInput
-            placeholder="Search your pantry..."
-            onSearchChange={handleSearchChange}
-            onClear={handleClearSearch}
-          />
         </View>
-        
-        {/* NEW: Storage Location Tabs */}
+
+        {/* Search Section */}
+        <View style={styles.searchSection}>
+          <View style={styles.searchRow}>
+            <View style={styles.searchInputContainer}>
+              <SearchInput
+                onSearchChange={handleSearchChange}
+                onClear={handleClearSearch}
+                placeholder="Search your pantry..."
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* RESTORED: Storage Location Tabs */}
         <StorageLocationTabs
           activeLocation={activeStorageLocation}
           onLocationChange={setActiveStorageLocation}
           itemCounts={itemCounts}
         />
-        
-        {/* Main Content - Now using optimized FlatList */}
+
+        {hasAgingFeatures && (
+          <AgeFilterTabs
+            selectedFilter={ageFilter}
+            onFilterChange={setAgeFilter}
+            statistics={agingStatistics}
+          />
+        )}
+
+        {!hasAgingFeatures &&
+          agingItems.length === 0 &&
+          pantryItems.length > 0 && (
+            <View style={styles.fallbackModeContainer}>
+              <Text style={styles.fallbackModeText}>
+                💡 Smart aging features will be available when the backend is
+                ready
+              </Text>
+            </View>
+          )}
+
         <View style={styles.mainContent}>
           <FlatList
             data={filteredItems}
@@ -541,118 +711,107 @@ export default function PantryScreen() {
             keyExtractor={keyExtractor}
             ListHeaderComponent={renderPantryHeader}
             ListHeaderComponentStyle={styles.listHeader}
-            ListEmptyComponent={
-              isLoading && pantryItems.length === 0 ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color={ACTIVE_COLOR} />
-                  <Text style={styles.loadingText}>Loading your pantry...</Text>
-                </View>
-              ) : error ? (
-                <View style={styles.errorContainer}>
-                  <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
-                  <Text style={styles.errorTitle}>Something went wrong</Text>
-                  <Text style={styles.errorText}>{error}</Text>
-                  <TouchableOpacity style={styles.retryButton} onPress={fetchPantryData}>
-                    <Text style={styles.retryButtonText}>Try Again</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : searchQuery ? (
-                <View style={styles.emptyStateContainer}>
-                  <Ionicons name="search-outline" size={48} color="#cbd5e1" />
-                  <Text style={styles.emptyStateTitle}>No items found</Text>
-                  <Text style={styles.emptyStateText}>
-                    Try a different search term or add new items to your pantry
-                  </Text>
-                </View>
-              ) : (
-                renderEmptyState()
-              )
-            }
+            ListEmptyComponent={listEmptyComponent}
             refreshControl={
-              <RefreshControl 
-                refreshing={refreshing} 
-                onRefresh={onRefresh} 
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
                 colors={[ACTIVE_COLOR]}
                 tintColor={ACTIVE_COLOR}
               />
             }
             showsVerticalScrollIndicator={false}
-            removeClippedSubviews={false}
-            maxToRenderPerBatch={20}
-            windowSize={21}
-            initialNumToRender={15}
-            updateCellsBatchingPeriod={50}
-            getItemLayout={undefined}
+            removeClippedSubviews
+            maxToRenderPerBatch={10}
+            windowSize={10}
+            initialNumToRender={8}
+            updateCellsBatchingPeriod={100}
+            getItemLayout={getItemLayout}
             contentContainerStyle={styles.listContentContainer}
             keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="none"
+            keyboardDismissMode="on-drag"
             scrollEventThrottle={16}
           />
         </View>
       </View>
 
       {/* Manual Add/Edit Sheet */}
-      <ManualAddSheet 
+      <ManualAddSheet
         isVisible={isManualAddSheetVisible}
         onClose={handleCloseSheet}
         onSubmit={handleSaveItemFromSheet}
         mode={editingItem ? 'edit' : 'add'}
-        initialItemData={editingItem}
-        unitOptions={unitOptions}
+        initialItemData={
+          editingItem
+            ? {
+                id: editingItem.id,
+                user_id: editingItem.user_id,
+                item_name: editingItem.item_name,
+                quantity: editingItem.quantity || 1,
+                unit: editingItem.unit || 'units',
+                description: editingItem.description || '',
+                created_at: editingItem.created_at,
+                updated_at: editingItem.updated_at || editingItem.created_at,
+                storage_location: (editingItem as any)
+                  .storage_location as StorageLocation || 'cupboard',
+              }
+            : null
+        }
+        unitOptions={UNIT_OPTIONS}
       />
 
       {/* Upgrade Modal */}
       <Modal
         visible={showUpgradeModal}
-        transparent={true}
+        transparent
         animationType="fade"
-        onRequestClose={() => setShowUpgradeModal(false)}
-      >
+        onRequestClose={() => setShowUpgradeModal(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Ionicons name="camera-outline" size={48} color="#ef4444" />
-              <Text style={styles.modalTitle}>Scan Limit Reached!</Text>
-            </View>
-            
-            <Text style={styles.modalMessage}>
-              You've used your <Text style={styles.modalHighlight}>3 free pantry scans</Text> this month! 
-            </Text>
-            
-            <Text style={styles.modalSubMessage}>
-              Go Premium for unlimited smart scans + AI recipe matching.
-            </Text>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={styles.modalCancelButton}
-                onPress={() => setShowUpgradeModal(false)}
-              >
-                <Text style={styles.modalCancelText}>Maybe Later</Text>
+              <Text style={styles.modalTitle}>Upgrade Required</Text>
+              <TouchableOpacity onPress={() => setShowUpgradeModal(false)}>
+                <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.modalUpgradeButton}
+            </View>
+            <Text style={styles.modalText}>
+              You've reached your scanning limit. Upgrade to Premium for
+              unlimited scans and more features!
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalSecondaryButton}
+                onPress={() => setShowUpgradeModal(false)}>
+                <Text style={styles.modalSecondaryButtonText}>Maybe Later</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalPrimaryButton}
                 onPress={() => {
                   setShowUpgradeModal(false);
-                  navigation.navigate('UpgradeScreen');
-                }}
-              >
-                <Ionicons name="arrow-up-circle" size={20} color="#fff" />
-                <Text style={styles.modalUpgradeText}>Upgrade Now</Text>
+                  // Navigate to subscription/upgrade screen
+                }}>
+                <Text style={styles.modalPrimaryButtonText}>Upgrade Now</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* "What Can I Cook?" Insufficient Items Modal */}
+      {/* Insufficient Items Modal */}
       <InsufficientItemsModal
         visible={showInsufficientModal}
         onClose={handleCloseModal}
         onNavigateToPantry={handleNavigateToPantry}
         currentItemCount={pantryItemCount}
       />
+
+      {hasAgingFeatures && (
+        <AgingNotificationsPanel
+          isVisible={showNotificationsPanel}
+          onClose={handleCloseNotifications}
+          onViewItem={handleViewItemFromNotification}
+        />
+      )}
     </View>
   );
 }
@@ -707,26 +866,25 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: 80,
     justifyContent: 'flex-end',
   },
   itemCountBadge: {
-    backgroundColor: ACTIVE_COLOR,
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    minWidth: 24,
+    backgroundColor: '#374151',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    minWidth: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: ACTIVE_COLOR,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
   },
   itemCountText: {
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '700',
     color: '#fff',
     textAlign: 'center',
   },
@@ -737,47 +895,55 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  searchContainer: {
+  searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
   },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
+  searchInputContainer: {
     flex: 1,
-    fontSize: 16,
-    color: '#1f2937',
-    paddingVertical: 4,
+  },
+  notificationButton: {
+    padding: 8,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#ef4444',
+    borderRadius: 12,
+    paddingHorizontal: 2,
+    paddingVertical: 1,
+  },
+  notificationBadgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  listContentContainer: {
+    paddingBottom: 20,
+  },
+  listHeader: {
+    marginBottom: 0,
   },
   actionButtonsSection: {
-    flexDirection: 'column',
     paddingHorizontal: 16,
     paddingVertical: 20,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    gap: 16,
   },
   heroButtonContainer: {
-    width: '100%',
+    marginBottom: 16,
   },
   heroButton: {
     backgroundColor: ACTIVE_COLOR,
     borderRadius: 16,
-    paddingVertical: 18,
+    paddingVertical: 16,
     paddingHorizontal: 20,
-    shadowColor: ACTIVE_COLOR,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 6,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   secondaryActionsContainer: {
     flexDirection: 'row',
@@ -785,72 +951,84 @@ const styles = StyleSheet.create({
   },
   secondaryActionButton: {
     flex: 1,
-    borderRadius: 16,
-    paddingVertical: 16,
+    borderRadius: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
+    alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   scanButton: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 2,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
-  },
-  addButton: {
     backgroundColor: ACTIVE_COLOR,
   },
+  addButton: {
+    backgroundColor: '#374151',
+  },
   secondaryButtonContent: {
-    flexDirection: 'column',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
   secondaryButtonIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    borderRadius: 8,
+    padding: 6,
+  },
+  scanButtonIconContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  addButtonIconContainer: {
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   secondaryButtonTextContainer: {
     alignItems: 'center',
   },
   secondaryButtonTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1f2937',
-    textAlign: 'center',
-  },
-  secondaryButtonSubtitle: {
-    fontSize: 13,
-    color: '#6b7280',
-    textAlign: 'center',
-    marginTop: 2,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 2,
   },
   secondaryButtonTitleWhite: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
     color: '#fff',
-    textAlign: 'center',
+    marginBottom: 2,
+  },
+  secondaryButtonSubtitle: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   secondaryButtonSubtitleWhite: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-    marginTop: 2,
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   disabledButton: {
-    opacity: 0.5,
+    opacity: 0.6,
   },
-  disabledButtonText: {
-    color: '#9ca3af',
-  },
-  list: {
+  emptyStateContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   loadingContainer: {
     flex: 1,
@@ -867,14 +1045,14 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
     paddingVertical: 40,
+    paddingHorizontal: 20,
   },
   errorTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#ef4444',
-    marginTop: 12,
+    marginTop: 16,
     marginBottom: 8,
     textAlign: 'center',
   },
@@ -882,6 +1060,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
     textAlign: 'center',
+    lineHeight: 20,
     marginBottom: 20,
   },
   retryButton: {
@@ -895,179 +1074,119 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  emptyStateContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 40,
-  },
-  emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#6b7280',
-    marginTop: 12,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptyStateText: {
-    fontSize: 14,
-    color: '#9ca3af',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 40,
   },
   modalContainer: {
     backgroundColor: '#fff',
-    padding: 24,
     borderRadius: 16,
+    padding: 24,
     width: '100%',
-    maxWidth: 380,
+    maxWidth: 340,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
     elevation: 8,
   },
   modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#1f2937',
-    marginTop: 12,
     textAlign: 'center',
   },
-  modalMessage: {
+  modalText: {
     fontSize: 16,
     color: '#6b7280',
     textAlign: 'center',
-    marginBottom: 12,
     lineHeight: 22,
-  },
-  modalHighlight: {
-    fontWeight: 'bold',
-    color: '#ef4444',
-  },
-  modalSubMessage: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 8,
   },
   modalButtons: {
     flexDirection: 'column',
     gap: 12,
     marginTop: 24,
   },
-  modalCancelButton: {
+  modalSecondaryButton: {
     backgroundColor: '#f3f4f6',
     paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
-  modalCancelText: {
+  modalSecondaryButtonText: {
     color: '#6b7280',
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
   },
-  modalUpgradeButton: {
+  modalPrimaryButton: {
     backgroundColor: ACTIVE_COLOR,
     paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
     shadowColor: ACTIVE_COLOR,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 4,
   },
-  modalUpgradeText: {
+  modalPrimaryButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
     marginLeft: 8,
   },
-  listContentContainer: {
-    paddingHorizontal: 16,
-  },
-  whatCanICookContainer: {
-    flex: 1,
-    marginRight: 8,
-  },
-  whatCanICookButton: {
-    backgroundColor: 'rgba(16, 185, 129, 0.08)',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  modernScanBadge: {
-    backgroundColor: ACTIVE_COLOR,
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginTop: 4,
-    alignSelf: 'center',
-  },
-  modernScanBadgeWarning: {
-    backgroundColor: '#ef4444',
-  },
-  modernScanBadgeText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  modernScanBadgeTextWarning: {
-    color: '#fff',
-  },
-  addButtonIconContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-  },
-  listHeader: {
-    paddingHorizontal: 16,
-  },
-  fixedSearchContainer: {
-    backgroundColor: '#fff',
-    paddingTop: 20, // Add space below green header
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    flexDirection: 'column',
-    gap: 12,
-  },
   pantryTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#1f2937',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flex: 1,
   },
   safeAreaContent: {
     flex: 1,
   },
-}); 
+  fallbackModeContainer: {
+    backgroundColor: '#f0f9ff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0f2fe',
+  },
+  fallbackModeText: {
+    fontSize: 13,
+    color: '#0c4a6e',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  headerContent: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1f2937',
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  notificationBellHeader: {
+    marginRight: 8,
+  },
+});

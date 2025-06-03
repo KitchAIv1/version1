@@ -12,12 +12,16 @@ export type AuthStackParamList = {
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
-const AuthStack = () => (
-  <Stack.Navigator initialRouteName="Splash" screenOptions={{ headerShown: false }}>
-    <Stack.Screen name="Splash" component={SplashScreen} />
-    <Stack.Screen name="Login" component={LoginScreen} />
-    <Stack.Screen name="Signup" component={SignupScreen} />
-  </Stack.Navigator>
-);
+function AuthStack() {
+  return (
+    <Stack.Navigator
+      initialRouteName="Splash"
+      screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Splash" component={SplashScreen} />
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Signup" component={SignupScreen} />
+    </Stack.Navigator>
+  );
+}
 
-export default AuthStack; 
+export default AuthStack;

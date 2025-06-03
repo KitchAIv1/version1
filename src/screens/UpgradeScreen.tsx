@@ -30,7 +30,7 @@ export default function UpgradeScreen() {
   const processPayment = async (): Promise<boolean> => {
     // Simulate payment processing delay
     await new Promise(resolve => setTimeout(resolve, 2000));
-    
+
     // For demo purposes, always return true
     // In production, integrate with actual payment provider
     return true;
@@ -63,7 +63,10 @@ export default function UpgradeScreen() {
                   .eq('id', user.id);
 
                 if (error) {
-                  Alert.alert('Error', 'Payment processed but failed to update account. Please contact support.');
+                  Alert.alert(
+                    'Error',
+                    'Payment processed but failed to update account. Please contact support.',
+                  );
                   return;
                 }
 
@@ -78,19 +81,25 @@ export default function UpgradeScreen() {
                       text: 'Continue',
                       onPress: () => navigation.goBack(),
                     },
-                  ]
+                  ],
                 );
               } else {
-                Alert.alert('Payment Failed', 'Your payment could not be processed. Please try again.');
+                Alert.alert(
+                  'Payment Failed',
+                  'Your payment could not be processed. Please try again.',
+                );
               }
             } catch (error: any) {
-              Alert.alert('Error', error.message || 'An unexpected error occurred during upgrade.');
+              Alert.alert(
+                'Error',
+                error.message || 'An unexpected error occurred during upgrade.',
+              );
             } finally {
               setIsUpgrading(false);
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -129,14 +138,18 @@ export default function UpgradeScreen() {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#1f2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Upgrade to PREMIUM</Text>
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}>
         {/* Current Tier Display */}
         <View style={styles.currentTierSection}>
           <Text style={styles.sectionTitle}>Current Plan</Text>
@@ -146,23 +159,33 @@ export default function UpgradeScreen() {
         {/* Premium Benefits */}
         <View style={styles.benefitsSection}>
           <Text style={styles.sectionTitle}>PREMIUM Features</Text>
-          
+
           {features.map((feature, index) => (
             <View key={index} style={styles.featureRow}>
               <View style={styles.featureIcon}>
-                <Ionicons name={feature.icon as any} size={24} color="#10b981" />
+                <Ionicons
+                  name={feature.icon as any}
+                  size={24}
+                  color="#10b981"
+                />
               </View>
               <View style={styles.featureContent}>
                 <Text style={styles.featureTitle}>{feature.title}</Text>
-                <Text style={styles.featureDescription}>{feature.description}</Text>
+                <Text style={styles.featureDescription}>
+                  {feature.description}
+                </Text>
                 <View style={styles.featureComparison}>
                   <View style={styles.comparisonItem}>
                     <Text style={styles.comparisonLabel}>FREEMIUM</Text>
-                    <Text style={styles.comparisonValue}>{feature.freemium}</Text>
+                    <Text style={styles.comparisonValue}>
+                      {feature.freemium}
+                    </Text>
                   </View>
                   <View style={styles.comparisonItem}>
                     <Text style={styles.comparisonLabel}>PREMIUM</Text>
-                    <Text style={[styles.comparisonValue, styles.premiumValue]}>{feature.premium}</Text>
+                    <Text style={[styles.comparisonValue, styles.premiumValue]}>
+                      {feature.premium}
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -178,7 +201,9 @@ export default function UpgradeScreen() {
               <Text style={styles.price}>{PREMIUM_PRICE}</Text>
               <Text style={styles.pricePeriod}>/month</Text>
             </View>
-            <Text style={styles.pricingSubtext}>Cancel anytime • No hidden fees</Text>
+            <Text style={styles.pricingSubtext}>
+              Cancel anytime • No hidden fees
+            </Text>
           </View>
         </View>
       </ScrollView>
@@ -187,10 +212,12 @@ export default function UpgradeScreen() {
       {usageData.tierDisplay === 'FREEMIUM' && (
         <View style={styles.upgradeButtonContainer}>
           <TouchableOpacity
-            style={[styles.upgradeButton, isUpgrading && styles.upgradeButtonDisabled]}
+            style={[
+              styles.upgradeButton,
+              isUpgrading && styles.upgradeButtonDisabled,
+            ]}
             onPress={handleUpgrade}
-            disabled={isUpgrading}
-          >
+            disabled={isUpgrading}>
             {isUpgrading ? (
               <ActivityIndicator color="#fff" />
             ) : (
@@ -364,4 +391,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 8,
   },
-}); 
+});

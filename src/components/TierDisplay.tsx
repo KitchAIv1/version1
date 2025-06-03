@@ -9,10 +9,10 @@ interface TierDisplayProps {
   compact?: boolean;
 }
 
-export const TierDisplay: React.FC<TierDisplayProps> = ({ 
-  onUpgradePress, 
+export const TierDisplay: React.FC<TierDisplayProps> = ({
+  onUpgradePress,
   showUpgradeButton = true,
-  compact = false 
+  compact = false,
 }) => {
   const { getUsageDisplay } = useAccessControl();
   const usageData = getUsageDisplay();
@@ -27,7 +27,8 @@ export const TierDisplay: React.FC<TierDisplayProps> = ({
   const getTierIcon = () => {
     if (usageData.tierDisplay.includes('CREATOR')) {
       return 'star';
-    } else if (usageData.tierDisplay.includes('PREMIUM')) {
+    }
+    if (usageData.tierDisplay.includes('PREMIUM')) {
       return 'diamond';
     }
     return 'person';
@@ -47,14 +48,18 @@ export const TierDisplay: React.FC<TierDisplayProps> = ({
   return (
     <View style={styles.container}>
       {/* Tier Status */}
-      <View style={[styles.tierContainer, { backgroundColor: `${getTierColor()}15` }]}>
+      <View
+        style={[
+          styles.tierContainer,
+          { backgroundColor: `${getTierColor()}15` },
+        ]}>
         <View style={styles.tierHeader}>
           <Ionicons name={getTierIcon()} size={24} color={getTierColor()} />
           <Text style={[styles.tierText, { color: getTierColor() }]}>
             {usageData.tierDisplay}
           </Text>
         </View>
-        
+
         {usageData.tierDisplay.includes('CREATOR') && (
           <Text style={styles.creatorSubtext}>
             Unlimited access to all features
@@ -66,14 +71,14 @@ export const TierDisplay: React.FC<TierDisplayProps> = ({
       {usageData.showUsage && (
         <View style={styles.usageContainer}>
           <Text style={styles.usageTitle}>Monthly Usage</Text>
-          
+
           <View style={styles.usageRow}>
             <View style={styles.usageItem}>
               <Ionicons name="camera-outline" size={20} color="#6b7280" />
               <Text style={styles.usageLabel}>Pantry Scans</Text>
               <Text style={styles.usageValue}>{usageData.scanUsage}</Text>
             </View>
-            
+
             <View style={styles.usageItem}>
               <Ionicons name="bulb-outline" size={20} color="#6b7280" />
               <Text style={styles.usageLabel}>AI Recipes</Text>
@@ -83,7 +88,9 @@ export const TierDisplay: React.FC<TierDisplayProps> = ({
 
           {/* Upgrade Button */}
           {showUpgradeButton && onUpgradePress && (
-            <TouchableOpacity style={styles.upgradeButton} onPress={onUpgradePress}>
+            <TouchableOpacity
+              style={styles.upgradeButton}
+              onPress={onUpgradePress}>
               <Ionicons name="arrow-up-circle" size={20} color="#fff" />
               <Text style={styles.upgradeButtonText}>Upgrade to PREMIUM</Text>
             </TouchableOpacity>
@@ -195,4 +202,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
   },
-}); 
+});

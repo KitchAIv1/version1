@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../services/supabase'; // Assuming supabase client is here
 import { PostgrestError } from '@supabase/supabase-js';
+import { supabase } from '../services/supabase'; // Assuming supabase client is here
 
 // Define the structure of a single comment based on the RPC output
 export interface RecipeComment {
   comment_id: number;
   recipe_id: string; // UUIDs are strings in JS/TS
-  user_id: string;   // UUIDs are strings in JS/TS
+  user_id: string; // UUIDs are strings in JS/TS
   comment_text: string;
   created_at: string; // Timestamps are typically strings, can be parsed to Date
   username: string;
@@ -49,50 +49,56 @@ export const useRecipeComments = ({ recipeId }: UseRecipeCommentsProps) => {
 // NEW: Lightweight comment count fetcher for efficient real-time sync
 export const fetchCommentCount = async (recipeId: string): Promise<number> => {
   if (!recipeId) return 0;
-  
+
   console.log(`[fetchCommentCount] 📊 Fetching count for recipe ${recipeId}`);
-  
+
   // Use direct table count for maximum efficiency
   const { count, error } = await supabase
     .from('recipe_comments')
     .select('*', { count: 'exact', head: true })
     .eq('recipe_id', recipeId);
-  
+
   if (error) {
     console.error(`[fetchCommentCount] Error for recipe ${recipeId}:`, error);
     return 0;
   }
-  
+
   const commentCount = count || 0;
-  console.log(`[fetchCommentCount] ✅ Recipe ${recipeId} has ${commentCount} comments`);
-  
+  console.log(
+    `[fetchCommentCount] ✅ Recipe ${recipeId} has ${commentCount} comments`,
+  );
+
   return commentCount;
 };
 
 // NEW: Batch comment count fetcher for multiple recipes
-export const fetchMultipleCommentCounts = async (recipeIds: string[]): Promise<Record<string, number>> => {
+export const fetchMultipleCommentCounts = async (
+  recipeIds: string[],
+): Promise<Record<string, number>> => {
   if (!recipeIds.length) return {};
-  
-  console.log(`[fetchMultipleCommentCounts] 📊 Batch fetching counts for ${recipeIds.length} recipes`);
-  
+
+  console.log(
+    `[fetchMultipleCommentCounts] 📊 Batch fetching counts for ${recipeIds.length} recipes`,
+  );
+
   const { data, error } = await supabase
     .from('recipe_comments')
     .select('recipe_id')
     .in('recipe_id', recipeIds);
-  
+
   if (error) {
     console.error('[fetchMultipleCommentCounts] Error:', error);
     return {};
   }
-  
+
   // Count comments per recipe
   const counts: Record<string, number> = {};
-  recipeIds.forEach(id => counts[id] = 0); // Initialize all to 0
-  
+  recipeIds.forEach(id => (counts[id] = 0)); // Initialize all to 0
+
   data.forEach(comment => {
     counts[comment.recipe_id] = (counts[comment.recipe_id] || 0) + 1;
   });
-  
+
   console.log(`[fetchMultipleCommentCounts] ✅ Batch result:`, counts);
   return counts;
-}; 
+};

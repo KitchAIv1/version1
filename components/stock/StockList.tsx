@@ -30,38 +30,44 @@ export const StockList: React.FC<StockListProps> = ({
   onRefresh,
   isRefreshing = false,
 }) => {
-
   const renderItem = ({ item }: { item: StockItem }) => (
-    <TouchableOpacity 
-      style={styles.itemContainer} 
+    <TouchableOpacity
+      style={styles.itemContainer}
       onPress={() => onEdit(item)}
-      activeOpacity={0.7}
-    >
+      activeOpacity={0.7}>
       <View style={styles.itemIconContainer}>
         <Icon name="kitchen" size={20} color="#4CAF50" />
       </View>
       <View style={styles.itemContent}>
-        <Text style={styles.itemName}>{item.item_name.charAt(0).toUpperCase() + item.item_name.slice(1)}</Text>
+        <Text style={styles.itemName}>
+          {item.item_name.charAt(0).toUpperCase() + item.item_name.slice(1)}
+        </Text>
         <View style={styles.itemDetailsRow}>
-            <View style={styles.quantityChip}>
-                <Text style={styles.quantityChipText}>
-                    {`${item.quantity} ${item.unit || ''}`.trim()}
-                </Text>
-            </View>
-            {/* Add more details like expiry or description summary here if needed */}
+          <View style={styles.quantityChip}>
+            <Text style={styles.quantityChipText}>
+              {`${item.quantity} ${item.unit || ''}`.trim()}
+            </Text>
+          </View>
+          {/* Add more details like expiry or description summary here if needed */}
         </View>
         {item.description && (
-            <Text style={styles.itemDescription} numberOfLines={1}>{item.description}</Text>
+          <Text style={styles.itemDescription} numberOfLines={1}>
+            {item.description}
+          </Text>
         )}
       </View>
       <View style={styles.itemActions}>
-        <TouchableOpacity onPress={() => onEdit(item)} style={styles.actionButton}>
+        <TouchableOpacity
+          onPress={() => onEdit(item)}
+          style={styles.actionButton}>
           <Icon name="edit" size={22} color="#757575" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => {
+        <TouchableOpacity
+          onPress={() => {
             // Consider adding a confirmation alert here before deleting
             onDelete(item);
-        }} style={styles.actionButton}>
+          }}
+          style={styles.actionButton}>
           <Icon name="delete-outline" size={24} color="#F44336" />
         </TouchableOpacity>
       </View>
@@ -84,9 +90,9 @@ export const StockList: React.FC<StockListProps> = ({
         <Text style={styles.errorTitle}>Oops! Something went wrong.</Text>
         <Text style={styles.errorText}>{error}</Text>
         {onRefresh && (
-            <TouchableOpacity style={styles.retryButton} onPress={onRefresh}>
-                <Text style={styles.retryButtonText}>Try Again</Text>
-            </TouchableOpacity>
+          <TouchableOpacity style={styles.retryButton} onPress={onRefresh}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
         )}
       </View>
     );
@@ -108,18 +114,18 @@ export const StockList: React.FC<StockListProps> = ({
     <FlatList
       data={data}
       renderItem={renderItem}
-      keyExtractor={(item) => item.id?.toString() || item.item_name} // Use ID if available, else name
+      keyExtractor={item => item.id?.toString() || item.item_name} // Use ID if available, else name
       style={styles.list}
       contentContainerStyle={styles.listContentContainer}
       showsVerticalScrollIndicator={false}
       refreshControl={
         onRefresh ? (
-            <RefreshControl
-                refreshing={isRefreshing}
-                onRefresh={onRefresh}
-                colors={["#22c55e"]}
-                tintColor={"#22c55e"}
-            />
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            colors={['#22c55e']}
+            tintColor="#22c55e"
+          />
         ) : undefined
       }
     />
@@ -133,7 +139,7 @@ const styles = StyleSheet.create({
   },
   listContentContainer: {
     paddingHorizontal: 10,
-    paddingBottom: 20, 
+    paddingBottom: 20,
   },
   itemContainer: {
     flexDirection: 'row',
@@ -170,7 +176,7 @@ const styles = StyleSheet.create({
   itemDetailsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 3, 
+    marginBottom: 3,
   },
   quantityChip: {
     backgroundColor: '#e0e0e0', // Neutral chip background
@@ -193,7 +199,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   actionButton: {
-    padding: 8, 
+    padding: 8,
     marginLeft: 8,
   },
   centeredMessageContainer: {
@@ -248,4 +254,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default StockList; 
+export default StockList;

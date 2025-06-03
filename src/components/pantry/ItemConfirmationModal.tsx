@@ -53,22 +53,27 @@ const ItemConfirmationModal: React.FC<ItemConfirmationModalProps> = ({
   useEffect(() => {
     if (items && isVisible) {
       console.log('[ItemConfirmationModal] Processing scanned items...');
-      const newProcessedItems = items.map((item, index) => {
-        const itemNameLower = (item.name || '').toLowerCase().trim();
-        const initialQuantityStr = String(item.quantity || '1');
-        const initialFrontendUnit = getFrontendUnit(initialQuantityStr);
+      const newProcessedItems = items
+        .map((item, index) => {
+          const itemNameLower = (item.name || '').toLowerCase().trim();
+          const initialQuantityStr = String(item.quantity || '1');
+          const initialFrontendUnit = getFrontendUnit(initialQuantityStr);
 
-        return {
-          id: `temp-${index}-${Date.now()}`,
-          scannedName: item.name || '',
-          scannedQuantity: item.quantity || '1',
-          currentName: itemNameLower,
-          currentQuantity: parseQuantity(initialQuantityStr),
-          currentUnit: initialFrontendUnit,
-        };
-      }).filter(item => item.currentName);
+          return {
+            id: `temp-${index}-${Date.now()}`,
+            scannedName: item.name || '',
+            scannedQuantity: item.quantity || '1',
+            currentName: itemNameLower,
+            currentQuantity: parseQuantity(initialQuantityStr),
+            currentUnit: initialFrontendUnit,
+          };
+        })
+        .filter(item => item.currentName);
 
-      console.log('[ItemConfirmationModal] Initial processed items:', newProcessedItems);
+      console.log(
+        '[ItemConfirmationModal] Initial processed items:',
+        newProcessedItems,
+      );
       setProcessedItems(newProcessedItems);
     } else {
       setProcessedItems([]);
@@ -93,7 +98,10 @@ const ItemConfirmationModal: React.FC<ItemConfirmationModalProps> = ({
     const quantityParsed = parseQuantity(editedQuantity);
 
     if (!nameTrimmed || quantityParsed <= 0) {
-      Alert.alert('Error', 'Item name must not be empty and quantity must be positive.');
+      Alert.alert(
+        'Error',
+        'Item name must not be empty and quantity must be positive.',
+      );
       return;
     }
 
@@ -106,8 +114,8 @@ const ItemConfirmationModal: React.FC<ItemConfirmationModalProps> = ({
               currentQuantity: quantityParsed,
               currentUnit: editedUnit,
             }
-          : item
-      )
+          : item,
+      ),
     );
 
     console.log(`[ItemConfirmationModal] Saved edit for ID ${editingItemId}`);
@@ -115,10 +123,12 @@ const ItemConfirmationModal: React.FC<ItemConfirmationModalProps> = ({
   };
 
   const handleDelete = (idToDelete: string) => {
-    setProcessedItems(currentItems => 
-      currentItems.filter(item => item.id !== idToDelete)
+    setProcessedItems(currentItems =>
+      currentItems.filter(item => item.id !== idToDelete),
     );
-    console.log(`[ItemConfirmationModal] Removed item with temporary ID ${idToDelete}`);
+    console.log(
+      `[ItemConfirmationModal] Removed item with temporary ID ${idToDelete}`,
+    );
   };
 
   const handleConfirm = async () => {
@@ -132,28 +142,35 @@ const ItemConfirmationModal: React.FC<ItemConfirmationModalProps> = ({
       const userId = await validateUserSession();
 
       // Process items for duplicates
-      const { itemsToUpsert, duplicateActions } = await processItemsForDuplicates(
-        processedItems,
-        userId
-      );
+      const { itemsToUpsert, duplicateActions } =
+        await processItemsForDuplicates(processedItems, userId);
 
       // Handle duplicate actions if any
-      const additionalItems = await processDuplicateActions(duplicateActions, userId);
+      const additionalItems = await processDuplicateActions(
+        duplicateActions,
+        userId,
+      );
 
       // Combine all items to upsert
       const finalItemsToUpsert = [...itemsToUpsert, ...additionalItems];
 
-      console.log('[ItemConfirmationModal] Final items to upsert:', finalItemsToUpsert);
+      console.log(
+        '[ItemConfirmationModal] Final items to upsert:',
+        finalItemsToUpsert,
+      );
 
       if (finalItemsToUpsert.length > 0) {
         onConfirm(finalItemsToUpsert);
       } else {
-        Alert.alert("No Changes", "No items were added or updated.");
+        Alert.alert('No Changes', 'No items were added or updated.');
         onCancel();
       }
     } catch (error) {
       console.error('[ItemConfirmationModal] Error in handleConfirm:', error);
-      Alert.alert("Error", `Failed to process items: ${(error as Error).message}`);
+      Alert.alert(
+        'Error',
+        `Failed to process items: ${(error as Error).message}`,
+      );
     }
   };
 
@@ -167,18 +184,20 @@ const ItemConfirmationModal: React.FC<ItemConfirmationModalProps> = ({
             value={editedName}
             onChangeText={setEditedName}
             placeholder="Item Name"
-            autoFocus={true}
+            autoFocus
           />
           <TextInput
             style={[styles.input, styles.quantityInput]}
             value={editedQuantity}
-            onChangeText={(value) => setEditedQuantity(value.replace(/[^0-9.]/g, ''))}
+            onChangeText={value =>
+              setEditedQuantity(value.replace(/[^0-9.]/g, ''))
+            }
             placeholder="Quantity"
             keyboardType="decimal-pad"
           />
           <View style={styles.unitPickerWrapper}>
             <RNPickerSelect
-              onValueChange={(value) => setEditedUnit(value || 'units')}
+              onValueChange={value => setEditedUnit(value || 'units')}
               items={unitOptions}
               value={editedUnit}
               style={pickerSelectStyles}
@@ -186,13 +205,14 @@ const ItemConfirmationModal: React.FC<ItemConfirmationModalProps> = ({
               useNativeAndroidPickerStyle={false}
             />
           </View>
-          <TouchableOpacity onPress={handleSaveEdit} style={styles.actionButton}>
+          <TouchableOpacity
+            onPress={handleSaveEdit}
+            style={styles.actionButton}>
             <Ionicons name="checkmark-circle" size={28} color="#22c55e" />
           </TouchableOpacity>
-          <TouchableOpacity 
-            onPress={() => setEditingItemId(null)} 
-            style={styles.actionButton}
-          >
+          <TouchableOpacity
+            onPress={() => setEditingItemId(null)}
+            style={styles.actionButton}>
             <Ionicons name="close-circle" size={28} color="#ef4444" />
           </TouchableOpacity>
         </View>
@@ -209,10 +229,14 @@ const ItemConfirmationModal: React.FC<ItemConfirmationModalProps> = ({
           </Text>
         </View>
         <View style={styles.actionsContainer}>
-          <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
+          <TouchableOpacity
+            onPress={() => handleEdit(item)}
+            style={styles.actionButton}>
             <Ionicons name="pencil" size={22} color="#6b7280" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.actionButton}>
+          <TouchableOpacity
+            onPress={() => handleDelete(item.id)}
+            style={styles.actionButton}>
             <Ionicons name="trash-outline" size={24} color="#ef4444" />
           </TouchableOpacity>
         </View>
@@ -220,21 +244,21 @@ const ItemConfirmationModal: React.FC<ItemConfirmationModalProps> = ({
     );
   };
 
-  const renderSectionHeader = ({ section: { title } }: { section: { title: string } }) => (
-    <Text style={styles.sectionHeader}>{title}</Text>
-  );
+  const renderSectionHeader = ({
+    section: { title },
+  }: {
+    section: { title: string };
+  }) => <Text style={styles.sectionHeader}>{title}</Text>;
 
   return (
     <Modal
       animationType="slide"
-      transparent={true}
+      transparent
       visible={isVisible}
-      onRequestClose={onCancel}
-    >
+      onRequestClose={onCancel}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.modalOverlay}
-      >
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Confirm Scanned Items</Text>
@@ -246,7 +270,7 @@ const ItemConfirmationModal: React.FC<ItemConfirmationModalProps> = ({
           {processedItems.length > 0 ? (
             <SectionList
               sections={sections}
-              keyExtractor={(item) => item.id}
+              keyExtractor={item => item.id}
               renderItem={renderItem}
               renderSectionHeader={renderSectionHeader}
               stickySectionHeadersEnabled={false}
@@ -265,11 +289,11 @@ const ItemConfirmationModal: React.FC<ItemConfirmationModalProps> = ({
             <TouchableOpacity
               style={[
                 styles.confirmButton,
-                (isProcessing || processedItems.length === 0) && styles.disabledButton
+                (isProcessing || processedItems.length === 0) &&
+                  styles.disabledButton,
               ]}
               onPress={handleConfirm}
-              disabled={isProcessing || processedItems.length === 0}
-            >
+              disabled={isProcessing || processedItems.length === 0}>
               {isProcessing ? (
                 <ActivityIndicator color="#FFF" size="small" />
               ) : (
@@ -316,7 +340,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     padding: 16,
     height: '85%',
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: -3 },
     shadowOpacity: 0.1,
     shadowRadius: 5,
@@ -455,4 +479,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ItemConfirmationModal; 
+export default ItemConfirmationModal;

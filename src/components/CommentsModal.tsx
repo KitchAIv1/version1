@@ -17,11 +17,11 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { formatDistance } from 'date-fns';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../providers/AuthProvider';
 import { supabase } from '../services/supabase';
 import { COLORS } from '../constants/theme';
-import { formatDistance } from 'date-fns';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RecipeDetailsData } from '../hooks/useRecipeDetails';
 
 interface Comment {
@@ -42,7 +42,9 @@ interface CommentsModalProps {
 const CommentItem = memo(({ comment }: { comment: Comment }) => {
   const formatCommentDate = useCallback((dateString: string) => {
     try {
-      return formatDistance(new Date(dateString), new Date(), { addSuffix: true });
+      return formatDistance(new Date(dateString), new Date(), {
+        addSuffix: true,
+      });
     } catch (e) {
       return 'recently';
     }
@@ -60,7 +62,9 @@ const CommentItem = memo(({ comment }: { comment: Comment }) => {
         )}
         <View style={styles.commentInfo}>
           <Text style={styles.username}>{comment.username || 'Anonymous'}</Text>
-          <Text style={styles.timestamp}>{formatCommentDate(comment.created_at)}</Text>
+          <Text style={styles.timestamp}>
+            {formatCommentDate(comment.created_at)}
+          </Text>
         </View>
       </View>
       <Text style={styles.commentText}>{comment.comment_text}</Text>
@@ -73,31 +77,39 @@ const EmptyComments = memo(() => (
   <View style={styles.emptyState}>
     <Feather name="message-circle" size={48} color={COLORS.textSecondary} />
     <Text style={styles.emptyText}>No comments yet.</Text>
-    <Text style={styles.emptySubtext}>Be the first to share your thoughts!</Text>
+    <Text style={styles.emptySubtext}>
+      Be the first to share your thoughts!
+    </Text>
   </View>
 ));
 
-export default function CommentsModal({ visible, onClose, recipeId }: CommentsModalProps) {
+export default function CommentsModal({
+  visible,
+  onClose,
+  recipeId,
+}: CommentsModalProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { top, bottom } = useSafeAreaInsets();
   const [commentText, setCommentText] = useState('');
   const inputRef = useRef<TextInput>(null);
-  
+
   // Animation for modal slide up/down
   const slideAnim = useRef(new Animated.Value(0)).current;
-  
+
   // Keyboard animation for Instagram-style behavior
   const keyboardAnim = useRef(new Animated.Value(0)).current;
-  
+
   // Track if modal has been opened to defer heavy operations
   const hasOpenedRef = useRef(false);
-  
+
   // Pan responder for swipe to dismiss
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        return gestureState.dy > 0 && gestureState.dy > Math.abs(gestureState.dx);
+        return (
+          gestureState.dy > 0 && gestureState.dy > Math.abs(gestureState.dx)
+        );
       },
       onPanResponderMove: (evt, gestureState) => {
         if (gestureState.dy > 0) {
@@ -114,39 +126,39 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
           }).start();
         }
       },
-    })
+    }),
   ).current;
 
   // Keyboard listeners for Instagram-style behavior
   React.useEffect(() => {
     const keyboardWillShowListener = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => {
+      e => {
         const keyboardHeight = e.endCoordinates.height;
         const keyboardDuration = e.duration || 250;
-        
+
         const gapSize = 20;
         const moveUpDistance = keyboardHeight - gapSize;
-        
+
         Animated.timing(keyboardAnim, {
           toValue: -moveUpDistance,
           duration: keyboardDuration,
           useNativeDriver: true,
         }).start();
-      }
+      },
     );
 
     const keyboardWillHideListener = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      (e) => {
+      e => {
         const keyboardDuration = e.duration || 250;
-        
+
         Animated.timing(keyboardAnim, {
           toValue: 0,
           duration: keyboardDuration,
           useNativeDriver: true,
         }).start();
-      }
+      },
     );
 
     return () => {
@@ -164,35 +176,40 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
     queryKey: ['recipe-comments', recipeId],
     queryFn: async () => {
       if (!recipeId) return [];
-      
+
       console.log('[CommentsModal] 🔍 FETCHING COMMENTS for recipe:', recipeId);
-      
-      const { data, error } = await supabase
-        .rpc('get_recipe_comments', {
-          p_recipe_id: recipeId
-        });
-      
+
+      const { data, error } = await supabase.rpc('get_recipe_comments', {
+        p_recipe_id: recipeId,
+      });
+
       if (error) {
         console.error('[CommentsModal] 🚨 RPC ERROR fetching comments:', {
           error_message: error.message,
           error_code: error.code,
           error_details: error.details,
           recipe_id: recipeId,
-          full_error: error
+          full_error: error,
         });
         throw error;
       }
-      
+
       console.log('[CommentsModal] ✅ COMMENTS FETCHED:', {
         recipe_id: recipeId,
         raw_data: data,
         data_type: typeof data,
-        data_structure: data && typeof data === 'object' ? Object.keys(data) : 'not_object',
+        data_structure:
+          data && typeof data === 'object' ? Object.keys(data) : 'not_object',
         comments_array: data?.comments ? Array.isArray(data.comments) : false,
         comments_length: data?.comments ? data.comments.length : 0,
-        sample_comment: data?.comments && Array.isArray(data.comments) && data.comments.length > 0 ? data.comments[0] : null
+        sample_comment:
+          data?.comments &&
+          Array.isArray(data.comments) &&
+          data.comments.length > 0
+            ? data.comments[0]
+            : null,
       });
-      
+
       // Handle the new RPC response structure: { comments: [...] }
       let result = [];
       if (data && data.comments && Array.isArray(data.comments)) {
@@ -200,13 +217,13 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
       } else if (Array.isArray(data)) {
         result = data; // Fallback for direct array response
       }
-      
+
       console.log('[CommentsModal] 📋 PROCESSED COMMENTS:', {
         recipe_id: recipeId,
         final_result_length: result.length,
-        final_result_type: Array.isArray(result) ? 'array' : typeof result
+        final_result_type: Array.isArray(result) ? 'array' : typeof result,
       });
-      
+
       return result;
     },
     enabled: !!recipeId && visible,
@@ -217,39 +234,54 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
   // ENHANCED REAL-TIME COMMENT COUNT SYNC - Immediate updates across the app
   React.useEffect(() => {
     if (!visible || !comments || !Array.isArray(comments)) return;
-    
+
     const currentCount = comments.length;
-    console.log(`[CommentsModal] 🔄 REAL-TIME SYNC: Updating comment count to ${currentCount} for recipe ${recipeId}`);
-    
+    console.log(
+      `[CommentsModal] 🔄 REAL-TIME SYNC: Updating comment count to ${currentCount} for recipe ${recipeId}`,
+    );
+
     // Immediate sync (no delay for better UX)
-    const currentDetails = queryClient.getQueryData<RecipeDetailsData>(['recipeDetails', recipeId, user?.id]);
-    
+    const currentDetails = queryClient.getQueryData<RecipeDetailsData>([
+      'recipeDetails',
+      recipeId,
+      user?.id,
+    ]);
+
     if (currentDetails && currentDetails.comments_count !== currentCount) {
-      console.log(`[CommentsModal] 📊 Recipe details count: ${currentDetails.comments_count} → ${currentCount}`);
-      
+      console.log(
+        `[CommentsModal] 📊 Recipe details count: ${currentDetails.comments_count} → ${currentCount}`,
+      );
+
       // Update recipe details cache immediately
-      queryClient.setQueryData<RecipeDetailsData>(['recipeDetails', recipeId, user?.id], {
-        ...currentDetails,
-        comments_count: currentCount
-      });
-      
+      queryClient.setQueryData<RecipeDetailsData>(
+        ['recipeDetails', recipeId, user?.id],
+        {
+          ...currentDetails,
+          comments_count: currentCount,
+        },
+      );
+
       // Also update feed cache to keep counts in sync immediately
       queryClient.setQueryData(['feed'], (oldFeedData: any) => {
         if (!oldFeedData || !Array.isArray(oldFeedData)) return oldFeedData;
-        
+
         return oldFeedData.map((item: any) => {
           if (item.id === recipeId || item.recipe_id === recipeId) {
-            console.log(`[CommentsModal] 📰 Feed count: ${item.commentsCount || 0} → ${currentCount}`);
+            console.log(
+              `[CommentsModal] 📰 Feed count: ${item.commentsCount || 0} → ${currentCount}`,
+            );
             return {
               ...item,
-              commentsCount: currentCount
+              commentsCount: currentCount,
             };
           }
           return item;
         });
       });
-      
-      console.log(`[CommentsModal] ✅ Real-time sync complete - all counts updated to ${currentCount}`);
+
+      console.log(
+        `[CommentsModal] ✅ Real-time sync complete - all counts updated to ${currentCount}`,
+      );
     }
   }, [comments?.length, visible, recipeId, queryClient, user?.id]);
 
@@ -257,47 +289,52 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
   const postCommentMutation = useMutation({
     mutationFn: async (text: string) => {
       if (!user?.id || !recipeId) throw new Error('User or recipe ID missing');
-      
+
       console.log('[CommentsModal] 🔧 POSTING COMMENT:', {
         recipe_id: recipeId,
         user_id: user.id,
         comment_text: text,
-        text_length: text.length
+        text_length: text.length,
       });
-      
+
       const { data, error } = await supabase
         .from('recipe_comments')
         .insert({
           recipe_id: recipeId,
           user_id: user.id,
-          comment_text: text
+          comment_text: text,
         })
         .select(); // Add .select() to get the inserted data back
-      
+
       if (error) {
         console.error('[CommentsModal] 🚨 SUPABASE INSERT ERROR:', {
           error_message: error.message,
           error_code: error.code,
           error_details: error.details,
           error_hint: error.hint,
-          full_error: error
+          full_error: error,
         });
         throw error;
       }
-      
+
       console.log('[CommentsModal] ✅ INSERT SUCCESSFUL:', {
         inserted_data: data,
-        data_length: data?.length
+        data_length: data?.length,
       });
-      
+
       return data;
     },
     onMutate: async (text: string) => {
       // Cancel only essential queries to avoid blocking UI
-      await queryClient.cancelQueries({ queryKey: ['recipe-comments', recipeId] });
-      
-      const previousComments = queryClient.getQueryData(['recipe-comments', recipeId]);
-      
+      await queryClient.cancelQueries({
+        queryKey: ['recipe-comments', recipeId],
+      });
+
+      const previousComments = queryClient.getQueryData([
+        'recipe-comments',
+        recipeId,
+      ]);
+
       // Create optimistic comment
       const optimisticComment = {
         id: `temp-${Date.now()}`,
@@ -306,29 +343,40 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
         username: user?.user_metadata?.username || user?.email || 'You',
         avatar_url: user?.user_metadata?.avatar_url || null,
       };
-      
+
       // Only update comments list optimistically - defer other cache updates
-      queryClient.setQueryData(['recipe-comments', recipeId], (oldComments: Comment[] | undefined) => {
-        // Safely handle undefined/null/non-array values
-        const safeOldComments = Array.isArray(oldComments) ? oldComments : [];
-        return [optimisticComment, ...safeOldComments];
-      });
-      
+      queryClient.setQueryData(
+        ['recipe-comments', recipeId],
+        (oldComments: Comment[] | undefined) => {
+          // Safely handle undefined/null/non-array values
+          const safeOldComments = Array.isArray(oldComments) ? oldComments : [];
+          return [optimisticComment, ...safeOldComments];
+        },
+      );
+
       return { previousComments };
     },
     onSuccess: () => {
       setCommentText('');
-      
-      console.log(`[CommentsModal] ✅ Comment posted successfully - triggering immediate cache refresh`);
-      
+
+      console.log(
+        `[CommentsModal] ✅ Comment posted successfully - triggering immediate cache refresh`,
+      );
+
       // More targeted cache strategy: invalidate to get fresh data but keep real-time sync working
-      queryClient.invalidateQueries({ queryKey: ['recipe-comments', recipeId] });
-      queryClient.invalidateQueries({ queryKey: ['recipeDetails', recipeId, user?.id] });
-      
+      queryClient.invalidateQueries({
+        queryKey: ['recipe-comments', recipeId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['recipeDetails', recipeId, user?.id],
+      });
+
       // Gentle feed refresh (don't remove, just invalidate to let real-time sync work)
       queryClient.invalidateQueries({ queryKey: ['feed'] });
-      
-      console.log(`[CommentsModal] ✅ Cache invalidated - real-time sync will handle count updates`);
+
+      console.log(
+        `[CommentsModal] ✅ Cache invalidated - real-time sync will handle count updates`,
+      );
     },
     onError: (error, variables, context) => {
       // Enhanced error logging
@@ -340,35 +388,45 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
         comment_text: variables,
         recipe_id: recipeId,
         user_id: user?.id,
-        context_available: !!context
+        context_available: !!context,
       });
-      
+
       // Simple rollback with safe type checking
       if (context?.previousComments !== undefined) {
         console.log('[CommentsModal] 🔄 Rolling back to previous comments');
-        queryClient.setQueryData(['recipe-comments', recipeId], context.previousComments);
+        queryClient.setQueryData(
+          ['recipe-comments', recipeId],
+          context.previousComments,
+        );
       }
-      
+
       // Also rollback any optimistic recipe details updates
-      queryClient.invalidateQueries({ queryKey: ['recipeDetails', recipeId, user?.id] });
-      
+      queryClient.invalidateQueries({
+        queryKey: ['recipeDetails', recipeId, user?.id],
+      });
+
       // Show user-friendly error
-      console.error('Failed to post comment:', error.message || 'Unknown error');
-    }
+      console.error(
+        'Failed to post comment:',
+        error.message || 'Unknown error',
+      );
+    },
   });
 
   const handlePostComment = useCallback(() => {
     if (!commentText.trim()) return;
-    
+
     try {
       console.log('[CommentsModal] Posting comment:', {
         recipeId,
         userId: user?.id,
         commentText: commentText.trim(),
-        currentCommentsCount: Array.isArray(comments) ? comments.length : 'NOT_ARRAY',
-        commentsType: typeof comments
+        currentCommentsCount: Array.isArray(comments)
+          ? comments.length
+          : 'NOT_ARRAY',
+        commentsType: typeof comments,
       });
-      
+
       postCommentMutation.mutate(commentText.trim());
     } catch (error) {
       console.error('[CommentsModal] Error in handlePostComment:', error);
@@ -378,7 +436,7 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
   const handleClose = useCallback(() => {
     // Dismiss keyboard first
     Keyboard.dismiss();
-    
+
     // Smooth parallel animation
     Animated.parallel([
       Animated.timing(slideAnim, {
@@ -390,7 +448,7 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
         toValue: 0,
         duration: 200,
         useNativeDriver: true,
-      })
+      }),
     ]).start(() => {
       onClose();
       // Reset animations after modal is closed
@@ -406,7 +464,7 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
       // Reset animations
       slideAnim.setValue(300);
       keyboardAnim.setValue(0);
-      
+
       // Fast, smooth spring animation
       Animated.spring(slideAnim, {
         toValue: 0,
@@ -420,12 +478,15 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
     }
   }, [visible, slideAnim, keyboardAnim]);
 
-  const renderComment = useCallback(({ item }: { item: Comment }) => (
-    <CommentItem comment={item} />
-  ), []);
+  const renderComment = useCallback(
+    ({ item }: { item: Comment }) => <CommentItem comment={item} />,
+    [],
+  );
 
   const keyExtractor = useCallback((item: Comment, index: number) => {
-    return item.id ? `comment-${item.id}` : `comment-${index}-${item.created_at}`;
+    return item.id
+      ? `comment-${item.id}`
+      : `comment-${index}-${item.created_at}`;
   }, []);
 
   if (!visible) return null;
@@ -435,15 +496,14 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
       visible={visible}
       transparent
       animationType="none"
-      onRequestClose={handleClose}
-    >
+      onRequestClose={handleClose}>
       <View style={styles.modalOverlay}>
-        <TouchableOpacity 
-          style={styles.backdrop} 
-          activeOpacity={1} 
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
           onPress={handleClose}
         />
-        
+
         <Animated.View
           style={[
             styles.modalContainer,
@@ -455,14 +515,15 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
               ],
             },
           ]}
-          {...panResponder.panHandlers}
-        >
+          {...panResponder.panHandlers}>
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.dragHandle} />
             <View style={styles.headerContent}>
               <Text style={styles.headerTitle}>Comments</Text>
-              <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+              <TouchableOpacity
+                onPress={handleClose}
+                style={styles.closeButton}>
                 <Feather name="x" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
@@ -487,7 +548,7 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={EmptyComments}
                 keyboardShouldPersistTaps="handled"
-                removeClippedSubviews={true}
+                removeClippedSubviews
                 maxToRenderPerBatch={10}
                 windowSize={10}
                 initialNumToRender={8}
@@ -509,11 +570,10 @@ export default function CommentsModal({ visible, onClose, recipeId }: CommentsMo
               <TouchableOpacity
                 style={[
                   styles.sendButton,
-                  !commentText.trim() && styles.sendButtonDisabled
+                  !commentText.trim() && styles.sendButtonDisabled,
                 ]}
                 onPress={handlePostComment}
-                disabled={!commentText.trim() || postCommentMutation.isPending}
-              >
+                disabled={!commentText.trim() || postCommentMutation.isPending}>
                 {postCommentMutation.isPending ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
@@ -698,4 +758,4 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.border,
     opacity: 0.6,
   },
-}); 
+});

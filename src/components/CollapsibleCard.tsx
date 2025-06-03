@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, LayoutAnimation, Platform, UIManager } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  LayoutAnimation,
+  Platform,
+  UIManager,
+} from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 interface CollapsibleCardProps {
@@ -14,7 +22,11 @@ if (Platform.OS === 'android') {
   }
 }
 
-const CollapsibleCard: React.FC<CollapsibleCardProps> = ({ title, children, defaultCollapsed = false }) => {
+const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
+  title,
+  children,
+  defaultCollapsed = false,
+}) => {
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
 
   const toggleCollapse = () => {
@@ -26,13 +38,13 @@ const CollapsibleCard: React.FC<CollapsibleCardProps> = ({ title, children, defa
     <View style={styles.cardContainer}>
       <TouchableOpacity onPress={toggleCollapse} style={styles.header}>
         <Text style={styles.headerText}>{title}</Text>
-        <Icon name={isCollapsed ? 'keyboard-arrow-down' : 'keyboard-arrow-up'} size={24} color="#333" />
+        <Icon
+          name={isCollapsed ? 'keyboard-arrow-down' : 'keyboard-arrow-up'}
+          size={24}
+          color="#333"
+        />
       </TouchableOpacity>
-      {!isCollapsed && (
-        <View style={styles.content}>
-          {children}
-        </View>
-      )}
+      {!isCollapsed && <View style={styles.content}>{children}</View>}
     </View>
   );
 };
@@ -63,4 +75,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CollapsibleCard; 
+export default CollapsibleCard;

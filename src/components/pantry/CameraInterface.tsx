@@ -19,80 +19,74 @@ interface CameraInterfaceProps {
   instructionText?: string;
 }
 
-const CameraInterface = forwardRef<CameraView, CameraInterfaceProps>(({
-  onCapturePress,
-  onSkipPress,
-  onExitPress,
-  isAnalyzing,
-  showSkipButton = false,
-  showExitButton = true,
-  instructionText = "Position your pantry items clearly in the frame.",
-}, ref) => {
-  return (
-    <View style={styles.container}>
-      {/* Camera View - No children allowed */}
-      <CameraView
-        ref={ref}
-        style={styles.camera}
-        facing="back"
-      />
-      
-      {/* Overlay with absolute positioning */}
-      <View style={styles.overlay}>
-        {/* Top Bar with Exit Button */}
-        <View style={styles.topBar}>
-          {showExitButton && (
-            <TouchableOpacity 
-              style={styles.exitButton} 
-              onPress={onExitPress}
-            >
-              <Ionicons name="close" size={28} color="#fff" />
-            </TouchableOpacity>
-          )}
-        </View>
+const CameraInterface = forwardRef<CameraView, CameraInterfaceProps>(
+  (
+    {
+      onCapturePress,
+      onSkipPress,
+      onExitPress,
+      isAnalyzing,
+      showSkipButton = false,
+      showExitButton = true,
+      instructionText = 'Position your pantry items clearly in the frame.',
+    },
+    ref,
+  ) => {
+    return (
+      <View style={styles.container}>
+        {/* Camera View - No children allowed */}
+        <CameraView ref={ref} style={styles.camera} facing="back" />
 
-        {/* Instructions */}
-        <View style={styles.instructionsContainer}>
-          <Text style={styles.instructions}>
-            {instructionText}
-          </Text>
-        </View>
+        {/* Overlay with absolute positioning */}
+        <View style={styles.overlay}>
+          {/* Top Bar with Exit Button */}
+          <View style={styles.topBar}>
+            {showExitButton && (
+              <TouchableOpacity style={styles.exitButton} onPress={onExitPress}>
+                <Ionicons name="close" size={28} color="#fff" />
+              </TouchableOpacity>
+            )}
+          </View>
 
-        {/* Bottom Controls */}
-        <View style={styles.bottomBar}>
-          {showSkipButton ? (
-            <TouchableOpacity 
-              style={styles.skipButtonTouch} 
-              onPress={onSkipPress}
-            >
-              <Text style={styles.skipButtonText}>Skip</Text>
+          {/* Instructions */}
+          <View style={styles.instructionsContainer}>
+            <Text style={styles.instructions}>{instructionText}</Text>
+          </View>
+
+          {/* Bottom Controls */}
+          <View style={styles.bottomBar}>
+            {showSkipButton ? (
+              <TouchableOpacity
+                style={styles.skipButtonTouch}
+                onPress={onSkipPress}>
+                <Text style={styles.skipButtonText}>Skip</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.spacer} />
+            )}
+
+            <TouchableOpacity
+              style={[
+                styles.captureButton,
+                isAnalyzing && styles.captureButtonDisabled,
+              ]}
+              onPress={onCapturePress}
+              disabled={isAnalyzing}>
+              <Ionicons
+                name="camera"
+                size={40}
+                color={isAnalyzing ? '#ccc' : '#22c55e'}
+              />
             </TouchableOpacity>
-          ) : (
+
+            {/* Placeholder for symmetry */}
             <View style={styles.spacer} />
-          )}
-
-          <TouchableOpacity 
-            style={[
-              styles.captureButton,
-              isAnalyzing && styles.captureButtonDisabled
-            ]} 
-            onPress={onCapturePress} 
-            disabled={isAnalyzing}
-          >
-            <Ionicons 
-              name="camera" 
-              size={40} 
-              color={isAnalyzing ? "#ccc" : "#22c55e"} 
-            />
-          </TouchableOpacity>
-
-          {/* Placeholder for symmetry */}
-          <View style={styles.spacer} />
+          </View>
         </View>
       </View>
-    </View>
-  );
-});
+    );
+  },
+);
 
 const styles = StyleSheet.create({
   container: {
@@ -209,4 +203,4 @@ const styles = StyleSheet.create({
 
 CameraInterface.displayName = 'CameraInterface';
 
-export default CameraInterface; 
+export default CameraInterface;

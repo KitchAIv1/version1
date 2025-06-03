@@ -14,12 +14,19 @@ import {
 } from 'react-native';
 import RNPickerSelect from 'react-native-picker-select';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { StockItem, UnitOption, DEFAULT_UNIT_OPTIONS } from '../../src/hooks/useStockManager'; // Adjust path
+import {
+  StockItem,
+  UnitOption,
+  DEFAULT_UNIT_OPTIONS,
+} from '../../src/hooks/useStockManager'; // Adjust path
 
 interface ManualAddModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (item: StockItem, originalItemName?: string) => Promise<boolean | void>; // Return promise to handle loading state
+  onSubmit: (
+    item: StockItem,
+    originalItemName?: string,
+  ) => Promise<boolean | void>; // Return promise to handle loading state
   initialItem?: StockItem | null; // For editing
   unitOptions?: UnitOption[];
   isSaving: boolean; // To disable form while saving
@@ -37,7 +44,9 @@ export const ManualAddModal: React.FC<ManualAddModalProps> = ({
   const [quantity, setQuantity] = useState('1');
   const [unit, setUnit] = useState<string>(unitOptions[0]?.value || 'units');
   const [description, setDescription] = useState('');
-  const [originalItemNameForEdit, setOriginalItemNameForEdit] = useState<string | undefined>(undefined);
+  const [originalItemNameForEdit, setOriginalItemNameForEdit] = useState<
+    string | undefined
+  >(undefined);
 
   const isEditMode = !!initialItem;
 
@@ -45,7 +54,7 @@ export const ManualAddModal: React.FC<ManualAddModalProps> = ({
     if (initialItem && visible) {
       setItemName(initialItem.item_name);
       setQuantity(initialItem.quantity.toString());
-      setUnit(initialItem.unit || (unitOptions[0]?.value || 'units'));
+      setUnit(initialItem.unit || unitOptions[0]?.value || 'units');
       setDescription(initialItem.description || '');
       setOriginalItemNameForEdit(initialItem.item_name); // Store original name for submit
     } else if (!visible) {
@@ -65,7 +74,10 @@ export const ManualAddModal: React.FC<ManualAddModalProps> = ({
     }
     const numQuantity = parseFloat(quantity);
     if (isNaN(numQuantity) || numQuantity <= 0) {
-      Alert.alert('Validation Error', 'Please enter a valid positive quantity.');
+      Alert.alert(
+        'Validation Error',
+        'Please enter a valid positive quantity.',
+      );
       return;
     }
 
@@ -73,13 +85,16 @@ export const ManualAddModal: React.FC<ManualAddModalProps> = ({
       id: initialItem?.id, // Include ID if editing
       item_name: itemName.trim(),
       quantity: numQuantity,
-      unit: unit,
+      unit,
       description: description.trim() || null,
     };
-    
+
     // If onSubmit returns a promise, we can await it to handle loading state if needed
     // but the isSaving prop is primary for disabling the form.
-    await onSubmit(itemToSubmit, isEditMode ? originalItemNameForEdit : undefined);
+    await onSubmit(
+      itemToSubmit,
+      isEditMode ? originalItemNameForEdit : undefined,
+    );
     // onClose(); // Typically, the parent component or hook closes after successful submission
   };
 
@@ -88,19 +103,19 @@ export const ManualAddModal: React.FC<ManualAddModalProps> = ({
   return (
     <Modal
       animationType="slide"
-      transparent={true}
+      transparent
       visible={visible}
-      onRequestClose={onClose}
-    >
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : "height"} 
-        style={styles.keyboardAvoidingView}
-      >
+      onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoidingView}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.headerContainer}>
-                <Text style={styles.headerTitle}>{isEditMode ? 'Edit Item' : 'Add New Item'}</Text>
+                <Text style={styles.headerTitle}>
+                  {isEditMode ? 'Edit Item' : 'Add New Item'}
+                </Text>
                 <TouchableOpacity onPress={onClose} disabled={isSaving}>
                   <Icon name="close" size={24} color="#666" />
                 </TouchableOpacity>
@@ -135,14 +150,23 @@ export const ManualAddModal: React.FC<ManualAddModalProps> = ({
                 <View style={[styles.formGroup, styles.unitPickerContainer]}>
                   <Text style={styles.label}>Unit*</Text>
                   <RNPickerSelect
-                    onValueChange={(value: string | null) => value && setUnit(value)}
+                    onValueChange={(value: string | null) =>
+                      value && setUnit(value)
+                    }
                     items={unitOptions}
                     style={pickerSelectStyles}
                     value={unit}
                     disabled={isSaving}
-                    placeholder={{ label: "Select unit...", value: null }}
+                    placeholder={{ label: 'Select unit...', value: null }}
                     useNativeAndroidPickerStyle={false} // Recommended for custom styling
-                    Icon={() => <Icon name="arrow-drop-down" size={24} color="#888" style={styles.pickerIcon} />}
+                    Icon={() => (
+                      <Icon
+                        name="arrow-drop-down"
+                        size={24}
+                        color="#888"
+                        style={styles.pickerIcon}
+                      />
+                    )}
                   />
                 </View>
               </View>
@@ -161,15 +185,19 @@ export const ManualAddModal: React.FC<ManualAddModalProps> = ({
                 />
               </View>
 
-              <TouchableOpacity 
-                style={[styles.submitButton, isSaving && styles.submitButtonDisabled]}
+              <TouchableOpacity
+                style={[
+                  styles.submitButton,
+                  isSaving && styles.submitButtonDisabled,
+                ]}
                 onPress={handleSubmit}
-                disabled={isSaving}
-              >
+                disabled={isSaving}>
                 {isSaving ? (
                   <ActivityIndicator color="#FFF" />
                 ) : (
-                  <Text style={styles.submitButtonText}>{isEditMode ? 'Save Changes' : 'Add Item'}</Text>
+                  <Text style={styles.submitButtonText}>
+                    {isEditMode ? 'Save Changes' : 'Add Item'}
+                  </Text>
                 )}
               </TouchableOpacity>
             </ScrollView>
@@ -267,7 +295,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 10,
     top: Platform.OS === 'ios' ? 10 : 12, // Adjust for RNPickerSelect internal padding
-  }
+  },
 });
 
 const pickerSelectStyles = StyleSheet.create({
@@ -296,10 +324,11 @@ const pickerSelectStyles = StyleSheet.create({
   placeholder: {
     color: '#bbb',
   },
-  iconContainer: { // This is for the default icon, we hide it with our custom icon
+  iconContainer: {
+    // This is for the default icon, we hide it with our custom icon
     top: Platform.OS === 'ios' ? 10 : 12,
     right: 12,
   },
 });
 
-export default ManualAddModal; 
+export default ManualAddModal;

@@ -19,21 +19,30 @@ interface CacheDebugPanelProps {
   onClose: () => void;
 }
 
-export const CacheDebugPanel: React.FC<CacheDebugPanelProps> = ({ visible, onClose }) => {
+export const CacheDebugPanel: React.FC<CacheDebugPanelProps> = ({
+  visible,
+  onClose,
+}) => {
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [storageKeys, setStorageKeys] = useState<string[]>([]);
 
   const cacheManager = createCacheManager(queryClient);
 
-  const handleAction = async (action: () => Promise<void>, actionName: string) => {
+  const handleAction = async (
+    action: () => Promise<void>,
+    actionName: string,
+  ) => {
     setIsLoading(true);
     try {
       await action();
       Alert.alert('Success', `${actionName} completed successfully!`);
     } catch (error) {
       console.error(`Error during ${actionName}:`, error);
-      Alert.alert('Error', `Failed to ${actionName.toLowerCase()}. Check console for details.`);
+      Alert.alert(
+        'Error',
+        `Failed to ${actionName.toLowerCase()}. Check console for details.`,
+      );
     } finally {
       setIsLoading(false);
     }
@@ -46,7 +55,7 @@ export const CacheDebugPanel: React.FC<CacheDebugPanelProps> = ({ visible, onClo
       Alert.alert(
         'AsyncStorage Keys',
         keys.length > 0 ? keys.join('\n') : 'No keys found',
-        [{ text: 'OK', style: 'default' }]
+        [{ text: 'OK', style: 'default' }],
       );
     } catch (error) {
       Alert.alert('Error', 'Failed to retrieve storage keys');
@@ -56,7 +65,7 @@ export const CacheDebugPanel: React.FC<CacheDebugPanelProps> = ({ visible, onClo
   const showQueryCacheInfo = () => {
     const cache = queryClient.getQueryCache();
     const queries = cache.getAll();
-    
+
     const queryInfo = queries.map(query => ({
       key: JSON.stringify(query.queryKey),
       state: query.state.status,
@@ -69,7 +78,7 @@ export const CacheDebugPanel: React.FC<CacheDebugPanelProps> = ({ visible, onClo
         .slice(0, 5)
         .map(q => `• ${q.key} (${q.state})`)
         .join('\n')}`,
-      [{ text: 'OK', style: 'default' }]
+      [{ text: 'OK', style: 'default' }],
     );
   };
 
@@ -79,42 +88,60 @@ export const CacheDebugPanel: React.FC<CacheDebugPanelProps> = ({ visible, onClo
       subtitle: 'Clears React Query + AsyncStorage',
       icon: 'trash-outline',
       color: '#ef4444',
-      action: () => handleAction(() => cacheManager.clearAllCaches(), 'Clear All Caches'),
+      action: () =>
+        handleAction(() => cacheManager.clearAllCaches(), 'Clear All Caches'),
     },
     {
       title: 'Clear Data Only',
       subtitle: 'Preserves auth, clears app data',
       icon: 'refresh-outline',
       color: '#f59e0b',
-      action: () => handleAction(() => cacheManager.clearDataCachesOnly(), 'Clear Data Caches'),
+      action: () =>
+        handleAction(
+          () => cacheManager.clearDataCachesOnly(),
+          'Clear Data Caches',
+        ),
     },
     {
       title: 'Clear Profile Cache',
       subtitle: 'Clears user profile data',
       icon: 'person-outline',
       color: '#8b5cf6',
-      action: () => handleAction(() => cacheManager.clearProfileCache(), 'Clear Profile Cache'),
+      action: () =>
+        handleAction(
+          () => cacheManager.clearProfileCache(),
+          'Clear Profile Cache',
+        ),
     },
     {
       title: 'Clear Feed Cache',
       subtitle: 'Clears recipe feed data',
       icon: 'grid-outline',
       color: '#06b6d4',
-      action: () => handleAction(() => cacheManager.clearFeedCache(), 'Clear Feed Cache'),
+      action: () =>
+        handleAction(() => cacheManager.clearFeedCache(), 'Clear Feed Cache'),
     },
     {
       title: 'Clear Pantry Cache',
       subtitle: 'Clears pantry/stock data',
       icon: 'basket-outline',
       color: '#10b981',
-      action: () => handleAction(() => cacheManager.clearPantryCache(), 'Clear Pantry Cache'),
+      action: () =>
+        handleAction(
+          () => cacheManager.clearPantryCache(),
+          'Clear Pantry Cache',
+        ),
     },
     {
       title: 'Force Refresh',
       subtitle: 'Refetch all active queries',
       icon: 'reload-outline',
       color: '#22c55e',
-      action: () => handleAction(() => cacheManager.forceRefreshAllQueries(), 'Force Refresh'),
+      action: () =>
+        handleAction(
+          () => cacheManager.forceRefreshAllQueries(),
+          'Force Refresh',
+        ),
     },
   ];
 
@@ -138,8 +165,7 @@ export const CacheDebugPanel: React.FC<CacheDebugPanelProps> = ({ visible, onClo
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
+      onRequestClose={onClose}>
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Cache Debug Panel</Text>
@@ -158,13 +184,23 @@ export const CacheDebugPanel: React.FC<CacheDebugPanelProps> = ({ visible, onClo
             {actionButtons.map((button, index) => (
               <TouchableOpacity
                 key={index}
-                style={[styles.actionButton, isLoading && styles.disabledButton]}
+                style={[
+                  styles.actionButton,
+                  isLoading && styles.disabledButton,
+                ]}
                 onPress={button.action}
-                disabled={isLoading}
-              >
+                disabled={isLoading}>
                 <View style={styles.buttonContent}>
-                  <View style={[styles.iconContainer, { backgroundColor: button.color + '20' }]}>
-                    <Ionicons name={button.icon as any} size={20} color={button.color} />
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      { backgroundColor: `${button.color}20` },
+                    ]}>
+                    <Ionicons
+                      name={button.icon as any}
+                      size={20}
+                      color={button.color}
+                    />
                   </View>
                   <View style={styles.buttonText}>
                     <Text style={styles.buttonTitle}>{button.title}</Text>
@@ -186,11 +222,14 @@ export const CacheDebugPanel: React.FC<CacheDebugPanelProps> = ({ visible, onClo
               <TouchableOpacity
                 key={index}
                 style={styles.infoButton}
-                onPress={button.action}
-              >
+                onPress={button.action}>
                 <View style={styles.buttonContent}>
                   <View style={styles.iconContainer}>
-                    <Ionicons name={button.icon as any} size={20} color="#666" />
+                    <Ionicons
+                      name={button.icon as any}
+                      size={20}
+                      color="#666"
+                    />
                   </View>
                   <View style={styles.buttonText}>
                     <Text style={styles.buttonTitle}>{button.title}</Text>
@@ -205,7 +244,8 @@ export const CacheDebugPanel: React.FC<CacheDebugPanelProps> = ({ visible, onClo
           <View style={styles.warningSection}>
             <Ionicons name="warning-outline" size={20} color="#f59e0b" />
             <Text style={styles.warningText}>
-              This panel is for development/debugging only. Clearing caches may require users to log in again.
+              This panel is for development/debugging only. Clearing caches may
+              require users to log in again.
             </Text>
           </View>
         </ScrollView>
@@ -317,4 +357,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CacheDebugPanel; 
+export default CacheDebugPanel;

@@ -1,14 +1,14 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  Animated, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Animated,
   Dimensions,
   Platform,
   StatusBar,
-  LayoutChangeEvent
+  LayoutChangeEvent,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../constants/theme';
@@ -21,12 +21,12 @@ interface FloatingTabBarProps {
   offsetTop?: number; // Prop for top offset (e.g., height of video header)
 }
 
-const FloatingTabBar: React.FC<FloatingTabBarProps> = ({ 
-  tabs, 
-  activeTab, 
+const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
+  tabs,
+  activeTab,
   onTabChange,
   visible,
-  offsetTop
+  offsetTop,
 }) => {
   // Memoize interpolated values to prevent reading during render
   const animatedStyles = useMemo(() => {
@@ -34,13 +34,13 @@ const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
       inputRange: [0, 0.2, 0.8, 1],
       outputRange: [0, 0.4, 0.9, 1], // More gradual opacity change
     });
-    
+
     // Transform for slight slide-in effect with subtle bounce
     const translateY = visible.interpolate({
       inputRange: [0, 0.5, 0.8, 1],
       outputRange: [-15, -8, -2, 0], // More gradual movement with slight bounce
     });
-    
+
     // Scale effect for more dimensionality
     const scale = visible.interpolate({
       inputRange: [0, 0.5, 1],
@@ -49,37 +49,41 @@ const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
 
     return {
       opacity,
-      transform: [
-        { translateY },
-        { scale }
-      ]
+      transform: [{ translateY }, { scale }],
     };
   }, [visible]);
 
   // Get the status bar height
-  const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 0;
-  
+  const STATUS_BAR_HEIGHT =
+    Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 0;
+
   // Use provided offsetTop or default to STATUS_BAR_HEIGHT
-  const finalOffsetTop = offsetTop !== undefined ? offsetTop : STATUS_BAR_HEIGHT;
+  const finalOffsetTop =
+    offsetTop !== undefined ? offsetTop : STATUS_BAR_HEIGHT;
 
   return (
-    <Animated.View 
+    <Animated.View
       style={[
         styles.container,
         {
           top: finalOffsetTop,
-          ...animatedStyles
-        }
-      ]}
-    >
+          ...animatedStyles,
+        },
+      ]}>
       <View style={styles.tabBarContainer}>
         {tabs.map(tab => (
-          <TouchableOpacity 
+          <TouchableOpacity
             key={`floating-tab-${tab}`}
-            style={[styles.tabButton, activeTab === tab && styles.activeTabButton]} 
-            onPress={() => onTabChange(tab)}
-          >
-            <Text style={[styles.tabButtonText, activeTab === tab && styles.activeTabButtonText]}>
+            style={[
+              styles.tabButton,
+              activeTab === tab && styles.activeTabButton,
+            ]}
+            onPress={() => onTabChange(tab)}>
+            <Text
+              style={[
+                styles.tabButtonText,
+                activeTab === tab && styles.activeTabButtonText,
+              ]}>
               {tab}
             </Text>
           </TouchableOpacity>
@@ -101,7 +105,7 @@ const styles = StyleSheet.create({
   },
   tabBarContainer: {
     flexDirection: 'row',
-    paddingVertical: 4, 
+    paddingVertical: 4,
     backgroundColor: COLORS.primary || '#00796b', // Solid metallic green background
     // Potentially add some horizontal padding if needed, or rounded corners for a more refined bar look
     // e.g., paddingHorizontal: 10, borderRadius: 8,
@@ -129,4 +133,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default FloatingTabBar; 
+export default FloatingTabBar;

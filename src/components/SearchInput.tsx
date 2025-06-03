@@ -9,19 +9,22 @@ interface SearchInputProps {
   style?: any;
 }
 
-export default function SearchInput({ 
-  placeholder = "Search...", 
-  onSearchChange, 
+export default function SearchInput({
+  placeholder = 'Search...',
+  onSearchChange,
   onClear,
-  style 
+  style,
 }: SearchInputProps) {
   const [localQuery, setLocalQuery] = useState('');
   const inputRef = useRef<TextInput>(null);
 
-  const handleTextChange = useCallback((text: string) => {
-    setLocalQuery(text);
-    onSearchChange(text);
-  }, [onSearchChange]);
+  const handleTextChange = useCallback(
+    (text: string) => {
+      setLocalQuery(text);
+      onSearchChange(text);
+    },
+    [onSearchChange],
+  );
 
   const handleClear = useCallback(() => {
     setLocalQuery('');
@@ -32,7 +35,12 @@ export default function SearchInput({
 
   return (
     <View style={[styles.container, style]}>
-      <Ionicons name="search" size={20} color="#9ca3af" style={styles.searchIcon} />
+      <Ionicons
+        name="search"
+        size={20}
+        color="#9ca3af"
+        style={styles.searchIcon}
+      />
       <TextInput
         ref={inputRef}
         style={styles.input}
@@ -85,4 +93,4 @@ const styles = StyleSheet.create({
   clearButton: {
     padding: 4,
   },
-}); 
+});

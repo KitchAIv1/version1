@@ -14,14 +14,22 @@ export interface RecognitionResult {
  * @param base64Image - Base64 encoded image data
  * @returns Promise with recognized items
  */
-export const processImageWithAI = async (base64Image: string): Promise<RecognitionResult> => {
+export const processImageWithAI = async (
+  base64Image: string,
+): Promise<RecognitionResult> => {
   try {
-    const { data, error: functionError } = await supabase.functions.invoke('recognize-stock', {
-      body: { image: base64Image }
-    });
+    const { data, error: functionError } = await supabase.functions.invoke(
+      'recognize-stock',
+      {
+        body: { image: base64Image },
+      },
+    );
 
     if (functionError) {
-      console.error('[imageProcessing] Supabase function error:', functionError);
+      console.error(
+        '[imageProcessing] Supabase function error:',
+        functionError,
+      );
       throw new Error(`Function error: ${functionError.message}`);
     }
 
@@ -42,10 +50,13 @@ export const processImageWithAI = async (base64Image: string): Promise<Recogniti
  * @param startTime - Timestamp when analysis started
  * @param minimumDisplayTime - Minimum time to show loading (default 4000ms)
  */
-export const enforceMinimumDisplayTime = async (startTime: number, minTime: number): Promise<void> => {
+export const enforceMinimumDisplayTime = async (
+  startTime: number,
+  minTime: number,
+): Promise<void> => {
   const elapsed = Date.now() - startTime;
   const remainingTime = Math.max(0, minTime - elapsed);
-  
+
   if (remainingTime > 0) {
     await new Promise(resolve => setTimeout(resolve, remainingTime));
   }
@@ -56,13 +67,18 @@ export const enforceMinimumDisplayTime = async (startTime: number, minTime: numb
  * @param data - Recognition result to validate
  * @returns boolean indicating if data is valid
  */
-export const validateRecognitionResult = (data: any): data is RecognitionResult => {
-  return data && 
-         data.items && 
-         Array.isArray(data.items) && 
-         data.items.every((item: any) => 
-           typeof item === 'object' && 
-           typeof item.name === 'string' && 
-           typeof item.quantity === 'string'
-         );
-}; 
+export const validateRecognitionResult = (
+  data: any,
+): data is RecognitionResult => {
+  return (
+    data &&
+    data.items &&
+    Array.isArray(data.items) &&
+    data.items.every(
+      (item: any) =>
+        typeof item === 'object' &&
+        typeof item.name === 'string' &&
+        typeof item.quantity === 'string',
+    )
+  );
+};

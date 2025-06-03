@@ -29,43 +29,52 @@ interface AIRecipeData {
   ai_confidence_score?: number;
 }
 
-export default function AIRecipeGenerationScreen({ navigation, route }: AIRecipeGenerationScreenProps) {
+export default function AIRecipeGenerationScreen({
+  navigation,
+  route,
+}: AIRecipeGenerationScreenProps) {
   const { selectedIngredients, recipeData } = route.params;
   const { user } = useAuth();
-  
+
   // Access control integration with proper user tier detection
   const {
     generateAIRecipe,
     canGenerateAIRecipe,
     isProcessing,
     getUsageDisplay,
-    FREEMIUM_AI_RECIPE_LIMIT
+    FREEMIUM_AI_RECIPE_LIMIT,
   } = useAccessControl();
 
   // State management - Updated for multiple recipes
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedRecipes, setGeneratedRecipes] = useState<AIRecipeData[]>(() => {
-    if (recipeData) {
-      // Transform old format to new format if needed
-      if ('recipe_name' in recipeData) {
-        const oldFormat = recipeData as any;
-        return [{
-          name: oldFormat.recipe_name,
-          ingredients: oldFormat.ingredients,
-          optional_additions: [],
-          steps: oldFormat.preparation_steps,
-          estimated_time: (oldFormat.prep_time_minutes || 0) + (oldFormat.cook_time_minutes || 0),
-          servings: oldFormat.servings,
-          difficulty: oldFormat.difficulty,
-          estimated_cost: oldFormat.estimated_cost,
-          nutrition_notes: oldFormat.nutrition_notes,
-          ai_confidence_score: oldFormat.ai_confidence_score,
-        }];
+  const [generatedRecipes, setGeneratedRecipes] = useState<AIRecipeData[]>(
+    () => {
+      if (recipeData) {
+        // Transform old format to new format if needed
+        if ('recipe_name' in recipeData) {
+          const oldFormat = recipeData as any;
+          return [
+            {
+              name: oldFormat.recipe_name,
+              ingredients: oldFormat.ingredients,
+              optional_additions: [],
+              steps: oldFormat.preparation_steps,
+              estimated_time:
+                (oldFormat.prep_time_minutes || 0) +
+                (oldFormat.cook_time_minutes || 0),
+              servings: oldFormat.servings,
+              difficulty: oldFormat.difficulty,
+              estimated_cost: oldFormat.estimated_cost,
+              nutrition_notes: oldFormat.nutrition_notes,
+              ai_confidence_score: oldFormat.ai_confidence_score,
+            },
+          ];
+        }
+        return [recipeData];
       }
-      return [recipeData];
-    }
-    return [];
-  });
+      return [];
+    },
+  );
   const [currentRecipeIndex, setCurrentRecipeIndex] = useState(0);
   const [generationStep, setGenerationStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +89,7 @@ export default function AIRecipeGenerationScreen({ navigation, route }: AIRecipe
     'Finding perfect flavor combinations...',
     'Creating multiple recipe options...',
     'Ranking recipes by confidence...',
-    'Your top 3 recipes are ready!'
+    'Your top 3 recipes are ready!',
   ];
 
   // Get user tier information for display
@@ -111,7 +120,7 @@ export default function AIRecipeGenerationScreen({ navigation, route }: AIRecipe
           duration: 1000,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     );
 
     if (isGenerating) {
@@ -152,59 +161,73 @@ export default function AIRecipeGenerationScreen({ navigation, route }: AIRecipe
   }, [isGenerating]);
 
   // Validation function to ensure recipes only use selected ingredients
-  const validateRecipeIngredients = useCallback((recipe: AIRecipeData, selectedIngredients: string[]) => {
-    const selectedSet = new Set(selectedIngredients.map(ing => ing.toLowerCase().trim()));
-    
-    console.log('[AIRecipeGeneration] Validating recipe ingredients:', {
-      recipeName: recipe.name,
-      recipeIngredients: recipe.ingredients,
-      selectedIngredients: selectedIngredients,
-      selectedSet: Array.from(selectedSet)
-    });
-    
-    // Filter out ingredients not in user's selection
-    const validIngredients: string[] = [];
-    const invalidIngredients: string[] = [];
-    
-    recipe.ingredients.forEach(ingredient => {
-      const cleanIngredient = ingredient.toLowerCase().trim();
-      // Check if any selected ingredient is contained in this recipe ingredient
-      const isValid = Array.from(selectedSet).some(selected => {
-        // More flexible matching - check both directions
-        return cleanIngredient.includes(selected) || 
-               selected.includes(cleanIngredient) ||
-               // Handle common variations (e.g., "chicken breast" vs "chicken")
-               (cleanIngredient.includes('chicken') && selected.includes('chicken')) ||
-               (cleanIngredient.includes('tomato') && selected.includes('tomato')) ||
-               // Basic seasonings are always allowed
-               ['salt', 'pepper', 'oil', 'water'].some(basic => cleanIngredient.includes(basic));
+  const validateRecipeIngredients = useCallback(
+    (recipe: AIRecipeData, selectedIngredients: string[]) => {
+      const selectedSet = new Set(
+        selectedIngredients.map(ing => ing.toLowerCase().trim()),
+      );
+
+      console.log('[AIRecipeGeneration] Validating recipe ingredients:', {
+        recipeName: recipe.name,
+        recipeIngredients: recipe.ingredients,
+        selectedIngredients,
+        selectedSet: Array.from(selectedSet),
       });
-      
-      if (isValid) {
-        validIngredients.push(ingredient);
-      } else {
-        invalidIngredients.push(ingredient);
-        console.log('[AIRecipeGeneration] Invalid ingredient found:', ingredient);
-      }
-    });
-    
-    console.log('[AIRecipeGeneration] Validation results:', {
-      validIngredients,
-      invalidIngredients,
-      originalCount: recipe.ingredients.length,
-      validCount: validIngredients.length
-    });
-    
-    return {
-      ...recipe,
-      ingredients: validIngredients,
-      // Move invalid ingredients to optional additions
-      optional_additions: [
-        ...(recipe.optional_additions || []),
-        ...invalidIngredients.map(ing => `${ing} (not in pantry)`)
-      ]
-    };
-  }, []);
+
+      // Filter out ingredients not in user's selection
+      const validIngredients: string[] = [];
+      const invalidIngredients: string[] = [];
+
+      recipe.ingredients.forEach(ingredient => {
+        const cleanIngredient = ingredient.toLowerCase().trim();
+        // Check if any selected ingredient is contained in this recipe ingredient
+        const isValid = Array.from(selectedSet).some(selected => {
+          // More flexible matching - check both directions
+          return (
+            cleanIngredient.includes(selected) ||
+            selected.includes(cleanIngredient) ||
+            // Handle common variations (e.g., "chicken breast" vs "chicken")
+            (cleanIngredient.includes('chicken') &&
+              selected.includes('chicken')) ||
+            (cleanIngredient.includes('tomato') &&
+              selected.includes('tomato')) ||
+            // Basic seasonings are always allowed
+            ['salt', 'pepper', 'oil', 'water'].some(basic =>
+              cleanIngredient.includes(basic),
+            )
+          );
+        });
+
+        if (isValid) {
+          validIngredients.push(ingredient);
+        } else {
+          invalidIngredients.push(ingredient);
+          console.log(
+            '[AIRecipeGeneration] Invalid ingredient found:',
+            ingredient,
+          );
+        }
+      });
+
+      console.log('[AIRecipeGeneration] Validation results:', {
+        validIngredients,
+        invalidIngredients,
+        originalCount: recipe.ingredients.length,
+        validCount: validIngredients.length,
+      });
+
+      return {
+        ...recipe,
+        ingredients: validIngredients,
+        // Move invalid ingredients to optional additions
+        optional_additions: [
+          ...(recipe.optional_additions || []),
+          ...invalidIngredients.map(ing => `${ing} (not in pantry)`),
+        ],
+      };
+    },
+    [],
+  );
 
   const handleGenerateRecipe = async () => {
     // Check access control with proper user tier detection
@@ -230,7 +253,10 @@ export default function AIRecipeGenerationScreen({ navigation, route }: AIRecipe
         request_multiple: true, // Request top 3 recipes
       };
 
-      console.log('[AIRecipeGeneration] Generating recipe with ingredients:', selectedIngredients);
+      console.log(
+        '[AIRecipeGeneration] Generating recipe with ingredients:',
+        selectedIngredients,
+      );
 
       // Use the access control's generateAIRecipe function
       // This handles user tier detection and usage tracking automatically
@@ -239,9 +265,9 @@ export default function AIRecipeGenerationScreen({ navigation, route }: AIRecipe
       if (result) {
         // Simulate minimum generation time for better UX
         await new Promise(resolve => setTimeout(resolve, 3000));
-        
+
         let recipes: AIRecipeData[] = [];
-        
+
         // Handle both single recipe and multiple recipes response
         if (Array.isArray(result)) {
           // Backend returned multiple recipes (top 3)
@@ -250,14 +276,17 @@ export default function AIRecipeGenerationScreen({ navigation, route }: AIRecipe
           // Backend returned single recipe, create array
           recipes = [result];
         }
-        
+
         // Validate each recipe to ensure it only uses selected ingredients
-        const validatedRecipes = recipes.map(recipe => 
-          validateRecipeIngredients(recipe, selectedIngredients)
+        const validatedRecipes = recipes.map(recipe =>
+          validateRecipeIngredients(recipe, selectedIngredients),
         );
-        
-        console.log('[AIRecipeGeneration] Validated recipes:', validatedRecipes);
-        
+
+        console.log(
+          '[AIRecipeGeneration] Validated recipes:',
+          validatedRecipes,
+        );
+
         setGeneratedRecipes(validatedRecipes);
         setCurrentRecipeIndex(0); // Start with first recipe
         setIsGenerating(false);
@@ -276,7 +305,7 @@ export default function AIRecipeGenerationScreen({ navigation, route }: AIRecipe
 
     try {
       console.log('[AIRecipeGeneration] Saving AI recipe:', currentRecipe);
-      
+
       // Helper function to parse time strings like "45 minutes" into just the number
       const parseTimeToMinutes = (timeValue: any): number => {
         if (typeof timeValue === 'number') {
@@ -298,10 +327,10 @@ export default function AIRecipeGenerationScreen({ navigation, route }: AIRecipe
         ingredients: currentRecipe.ingredients.map(ingredient => ({
           name: ingredient,
           quantity: null,
-          unit: null
+          unit: null,
         })),
         // Ensure AI flag is set
-        is_ai_generated: true
+        is_ai_generated: true,
       };
 
       console.log('[AIRecipeGeneration] Processed recipe data before save:', {
@@ -309,14 +338,14 @@ export default function AIRecipeGenerationScreen({ navigation, route }: AIRecipe
         ingredientsFormat: processedRecipeData.ingredients.slice(0, 3),
         ingredientsCount: processedRecipeData.ingredients.length,
         estimated_time: processedRecipeData.estimated_time,
-        is_ai_generated: processedRecipeData.is_ai_generated
+        is_ai_generated: processedRecipeData.is_ai_generated,
       });
-      
+
       // Call the backend RPC to save the AI recipe
       const { data, error } = await supabase.rpc('save_ai_generated_recipe', {
         p_user_id: user.id,
         p_recipe_data: processedRecipeData,
-        p_selected_ingredients: selectedIngredients
+        p_selected_ingredients: selectedIngredients,
       });
 
       if (error) {
@@ -326,29 +355,29 @@ export default function AIRecipeGenerationScreen({ navigation, route }: AIRecipe
       }
 
       console.log('[AIRecipeGeneration] Recipe saved successfully:', data);
-      
+
       Alert.alert(
         'Recipe Saved!',
         'Your AI-generated recipe has been saved to your collection.',
         [
-          { 
-            text: 'View Recipe', 
+          {
+            text: 'View Recipe',
             onPress: () => {
               // Navigate to the saved recipe detail
               if (data?.recipe_id) {
                 navigation.navigate('RecipeDetail', { id: data.recipe_id });
               }
-            }
+            },
           },
-          { 
-            text: 'Create Another', 
+          {
+            text: 'Create Another',
             onPress: () => {
               setGeneratedRecipes([]);
               setCurrentRecipeIndex(0);
               setError(null);
-            }
+            },
           },
-        ]
+        ],
       );
     } catch (error: any) {
       console.error('[AIRecipeGeneration] Save error:', error);
@@ -398,30 +427,40 @@ export default function AIRecipeGenerationScreen({ navigation, route }: AIRecipe
         </View>
 
         <View style={styles.generationContainer}>
-          <Animated.View style={[styles.aiIconContainer, { transform: [{ scale: pulseAnim }] }]}>
+          <Animated.View
+            style={[
+              styles.aiIconContainer,
+              { transform: [{ scale: pulseAnim }] },
+            ]}>
             <Feather name="zap" size={48} color="#10b981" />
           </Animated.View>
-          
+
           <Text style={styles.generationTitle}>Creating Your Recipe</Text>
-          <Text style={styles.generationStep}>{generationSteps[generationStep]}</Text>
-          
+          <Text style={styles.generationStep}>
+            {generationSteps[generationStep]}
+          </Text>
+
           <View style={styles.ingredientsPreview}>
             <Text style={styles.ingredientsTitle}>Using your ingredients:</Text>
             <Text style={styles.ingredientsList}>
               {selectedIngredients.slice(0, 5).join(', ')}
-              {selectedIngredients.length > 5 && ` +${selectedIngredients.length - 5} more`}
+              {selectedIngredients.length > 5 &&
+                ` +${selectedIngredients.length - 5} more`}
             </Text>
           </View>
 
-          <ActivityIndicator size="large" color="#10b981" style={styles.loadingIndicator} />
-          
+          <ActivityIndicator
+            size="large"
+            color="#10b981"
+            style={styles.loadingIndicator}
+          />
+
           {/* User tier display */}
           <View style={styles.tierInfo}>
             <Text style={styles.tierText}>
-              {isUnlimitedUser 
+              {isUnlimitedUser
                 ? `${usageData.tierDisplay} • Unlimited AI Recipes`
-                : `${usageData.tierDisplay} • ${usageData.aiRecipeUsage} AI Recipes Used`
-              }
+                : `${usageData.tierDisplay} • ${usageData.aiRecipeUsage} AI Recipes Used`}
             </Text>
           </View>
         </View>
@@ -444,12 +483,14 @@ export default function AIRecipeGenerationScreen({ navigation, route }: AIRecipe
           <Feather name="alert-circle" size={48} color="#ef4444" />
           <Text style={styles.errorTitle}>Generation Failed</Text>
           <Text style={styles.errorMessage}>{error}</Text>
-          
+
           <View style={styles.errorActions}>
             <TouchableOpacity onPress={handleRetry} style={styles.retryButton}>
               <Text style={styles.retryButtonText}>Try Again</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleGoBack} style={styles.backToResultsButton}>
+            <TouchableOpacity
+              onPress={handleGoBack}
+              style={styles.backToResultsButton}>
               <Text style={styles.backToResultsText}>Back to Results</Text>
             </TouchableOpacity>
           </View>
@@ -473,18 +514,24 @@ export default function AIRecipeGenerationScreen({ navigation, route }: AIRecipe
               <Text style={styles.aiGeneratedText}>AI Generated</Text>
             </View>
           </View>
-          
+
           {/* Recipe Navigation - Show if multiple recipes */}
           {generatedRecipes.length > 1 && (
             <View style={styles.recipeNavigation}>
-              <TouchableOpacity 
-                onPress={handlePreviousRecipe} 
-                style={[styles.navButton, currentRecipeIndex === 0 && styles.navButtonDisabled]}
-                disabled={currentRecipeIndex === 0}
-              >
-                <Feather name="chevron-left" size={20} color={currentRecipeIndex === 0 ? "#9ca3af" : "#10b981"} />
+              <TouchableOpacity
+                onPress={handlePreviousRecipe}
+                style={[
+                  styles.navButton,
+                  currentRecipeIndex === 0 && styles.navButtonDisabled,
+                ]}
+                disabled={currentRecipeIndex === 0}>
+                <Feather
+                  name="chevron-left"
+                  size={20}
+                  color={currentRecipeIndex === 0 ? '#9ca3af' : '#10b981'}
+                />
               </TouchableOpacity>
-              
+
               <View style={styles.recipeIndicator}>
                 <Text style={styles.recipeNumber}>
                   Recipe {currentRecipeIndex + 1} of {generatedRecipes.length}
@@ -493,31 +540,42 @@ export default function AIRecipeGenerationScreen({ navigation, route }: AIRecipe
                   <View style={styles.confidenceScore}>
                     <Feather name="star" size={12} color="#f59e0b" />
                     <Text style={styles.confidenceText}>
-                      {Math.round(currentRecipe.ai_confidence_score * 100)}% confidence
+                      {Math.round(currentRecipe.ai_confidence_score * 100)}%
+                      confidence
                     </Text>
                   </View>
                 )}
               </View>
-              
-              <TouchableOpacity 
-                onPress={handleNextRecipe} 
-                style={[styles.navButton, currentRecipeIndex === generatedRecipes.length - 1 && styles.navButtonDisabled]}
-                disabled={currentRecipeIndex === generatedRecipes.length - 1}
-              >
-                <Feather name="chevron-right" size={20} color={currentRecipeIndex === generatedRecipes.length - 1 ? "#9ca3af" : "#10b981"} />
+
+              <TouchableOpacity
+                onPress={handleNextRecipe}
+                style={[
+                  styles.navButton,
+                  currentRecipeIndex === generatedRecipes.length - 1 &&
+                    styles.navButtonDisabled,
+                ]}
+                disabled={currentRecipeIndex === generatedRecipes.length - 1}>
+                <Feather
+                  name="chevron-right"
+                  size={20}
+                  color={
+                    currentRecipeIndex === generatedRecipes.length - 1
+                      ? '#9ca3af'
+                      : '#10b981'
+                  }
+                />
               </TouchableOpacity>
             </View>
           )}
         </View>
 
-        <Animated.ScrollView 
-          style={[styles.content, { opacity: fadeAnim }]} 
-          showsVerticalScrollIndicator={false}
-        >
+        <Animated.ScrollView
+          style={[styles.content, { opacity: fadeAnim }]}
+          showsVerticalScrollIndicator={false}>
           {/* Recipe Header */}
           <View style={styles.recipeHeader}>
             <Text style={styles.recipeTitle}>{currentRecipe.name}</Text>
-            
+
             <View style={styles.recipeMetrics}>
               <View style={styles.metricItem}>
                 <Feather name="clock" size={16} color="#6b7280" />
@@ -527,11 +585,15 @@ export default function AIRecipeGenerationScreen({ navigation, route }: AIRecipe
               </View>
               <View style={styles.metricItem}>
                 <Feather name="users" size={16} color="#6b7280" />
-                <Text style={styles.metricText}>{currentRecipe.servings} servings</Text>
+                <Text style={styles.metricText}>
+                  {currentRecipe.servings} servings
+                </Text>
               </View>
               <View style={styles.metricItem}>
                 <Feather name="trending-up" size={16} color="#6b7280" />
-                <Text style={styles.metricText}>{currentRecipe.difficulty}</Text>
+                <Text style={styles.metricText}>
+                  {currentRecipe.difficulty}
+                </Text>
               </View>
             </View>
           </View>
@@ -548,20 +610,21 @@ export default function AIRecipeGenerationScreen({ navigation, route }: AIRecipe
           </View>
 
           {/* Optional Additions Section */}
-          {currentRecipe.optional_additions && currentRecipe.optional_additions.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Optional Additions</Text>
-              <Text style={styles.sectionSubtitle}>
-                These ingredients can enhance your recipe but aren't required
-              </Text>
-              {currentRecipe.optional_additions.map((addition, index) => (
-                <View key={index} style={styles.optionalItem}>
-                  <View style={styles.optionalBullet} />
-                  <Text style={styles.optionalText}>{addition}</Text>
-                </View>
-              ))}
-            </View>
-          )}
+          {currentRecipe.optional_additions &&
+            currentRecipe.optional_additions.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Optional Additions</Text>
+                <Text style={styles.sectionSubtitle}>
+                  These ingredients can enhance your recipe but aren't required
+                </Text>
+                {currentRecipe.optional_additions.map((addition, index) => (
+                  <View key={index} style={styles.optionalItem}>
+                    <View style={styles.optionalBullet} />
+                    <Text style={styles.optionalText}>{addition}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
 
           {/* Instructions Section */}
           <View style={styles.section}>
@@ -583,21 +646,24 @@ export default function AIRecipeGenerationScreen({ navigation, route }: AIRecipe
               <Text style={styles.disclaimerTitle}>AI-Generated Recipe</Text>
             </View>
             <Text style={styles.disclaimerText}>
-              This recipe was created by AI based on your selected ingredients. Please review ingredients for allergies and adjust cooking times as needed.
+              This recipe was created by AI based on your selected ingredients.
+              Please review ingredients for allergies and adjust cooking times
+              as needed.
             </Text>
           </View>
 
           {/* Action Buttons */}
           <View style={styles.actionButtons}>
-            <TouchableOpacity onPress={handleSaveRecipe} style={styles.saveButton}>
+            <TouchableOpacity
+              onPress={handleSaveRecipe}
+              style={styles.saveButton}>
               <Feather name="bookmark" size={20} color="#fff" />
               <Text style={styles.saveButtonText}>Save Recipe</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              onPress={handleGenerateMore} 
-              style={styles.generateAnotherButton}
-            >
+
+            <TouchableOpacity
+              onPress={handleGenerateMore}
+              style={styles.generateAnotherButton}>
               <Feather name="refresh-cw" size={20} color="#10b981" />
               <Text style={styles.generateAnotherText}>Generate Another</Text>
             </TouchableOpacity>
@@ -606,10 +672,9 @@ export default function AIRecipeGenerationScreen({ navigation, route }: AIRecipe
           {/* User tier info */}
           <View style={styles.tierInfoBottom}>
             <Text style={styles.tierTextBottom}>
-              {isUnlimitedUser 
+              {isUnlimitedUser
                 ? `${usageData.tierDisplay} • Unlimited AI Recipes`
-                : `${usageData.tierDisplay} • ${usageData.aiRecipeUsage} AI Recipes Used`
-              }
+                : `${usageData.tierDisplay} • ${usageData.aiRecipeUsage} AI Recipes Used`}
             </Text>
           </View>
         </Animated.ScrollView>

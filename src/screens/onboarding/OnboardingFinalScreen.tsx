@@ -7,8 +7,11 @@ import { MainStackParamList } from '../../navigation/types';
 // TODO: Define navigation props
 // type OnboardingFinalScreenNavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'OnboardingFinal'>;
 
-const OnboardingFinalScreen = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList, 'OnboardingFinal'>>();
+function OnboardingFinalScreen() {
+  const navigation =
+    useNavigation<
+      NativeStackNavigationProp<MainStackParamList, 'OnboardingFinal'>
+    >();
 
   const handleProceedToApp = () => {
     console.log('Proceeding to app (MainTabs) by resetting navigation stack.');
@@ -22,22 +25,23 @@ const OnboardingFinalScreen = () => {
     <View style={styles.container}>
       <Text style={styles.title}>You're All Set!</Text>
       <Text style={styles.text}>
-        A quick note on AI generations: As a new user, you get complimentary AI meal plans and pantry scans to get you started.
+        A quick note on AI generations: As a new user, you get complimentary AI
+        meal plans and pantry scans to get you started.
       </Text>
       <Text style={styles.text}>
-        Users receive <Text style={styles.highlight}>10 free AI meal plan generations</Text> and <Text style={styles.highlight}>3 free pantry scans</Text> per month.
+        Users receive{' '}
+        <Text style={styles.highlight}>10 free AI meal plan generations</Text>{' '}
+        and <Text style={styles.highlight}>3 free pantry scans</Text> per month.
         Creators receive enhanced limits upon meeting engagement milestones.
       </Text>
-      <Text style={styles.text}>
-        Enjoy exploring Kitch Hub!
-      </Text>
-      
+      <Text style={styles.text}>Enjoy exploring Kitch Hub!</Text>
+
       <TouchableOpacity style={styles.button} onPress={handleProceedToApp}>
         <Text style={styles.buttonText}>Let's Go!</Text>
       </TouchableOpacity>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -80,4 +84,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default OnboardingFinalScreen; 
+export default OnboardingFinalScreen;

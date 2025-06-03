@@ -14,14 +14,20 @@ interface ActivityListProps {
 }
 
 // Separator component function
-const ItemSeparator = () => <View style={styles.separator} />;
+function ItemSeparator() {
+  return <View style={styles.separator} />;
+}
 
 export const ActivityList: React.FC<ActivityListProps> = ({ data }) => {
   const renderItem = ({ item }: { item: ActivityItem }) => (
     <View style={styles.itemContainer}>
       {/* TODO: Replace with actual content (e.g., Icon, formatted text) */}
       <Text style={styles.itemText}>{item.text || `Activity: ${item.id}`}</Text>
-      {item.timestamp && <Text style={styles.timestamp}>{new Date(item.timestamp).toLocaleDateString()}</Text>}
+      {item.timestamp && (
+        <Text style={styles.timestamp}>
+          {new Date(item.timestamp).toLocaleDateString()}
+        </Text>
+      )}
     </View>
   );
 
@@ -37,7 +43,7 @@ export const ActivityList: React.FC<ActivityListProps> = ({ data }) => {
     <FlatList
       data={data}
       renderItem={renderItem}
-      keyExtractor={(item) => item.id}
+      keyExtractor={item => item.id}
       contentContainerStyle={styles.listContainer}
       ItemSeparatorComponent={ItemSeparator}
     />
@@ -56,8 +62,13 @@ const styles = StyleSheet.create({
   itemText: { fontSize: 14, color: '#333' },
   timestamp: { fontSize: 10, color: '#888', marginTop: 4 },
   separator: { height: 1, backgroundColor: '#eee' },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
   emptyText: { color: '#666' },
 });
 
-export default ActivityList; 
+export default ActivityList;

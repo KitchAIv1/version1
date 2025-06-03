@@ -9,12 +9,14 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON;
 console.log('[SupabaseClient] Initializing with URL:', supabaseUrl);
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('[SupabaseClient] Supabase URL or Anon Key is missing. Check environment variables.');
+  console.error(
+    '[SupabaseClient] Supabase URL or Anon Key is missing. Check environment variables.',
+  );
   // You might want to throw an error here or handle it in a way that alerts the developer
 }
 
 // The createClient function expects the URL and key to be strings.
-// If they are undefined (because they are not set in .env), 
+// If they are undefined (because they are not set in .env),
 // Supabase client creation will fail at runtime, which is expected.
 // Adding non-null assertion operator (!) as we are warning above if they are not set.
 export const supabase = createClient(supabaseUrl!, supabaseAnonKey!, {
@@ -24,4 +26,4 @@ export const supabase = createClient(supabaseUrl!, supabaseAnonKey!, {
     persistSession: true,
     detectSessionInUrl: false,
   },
-}); 
+});

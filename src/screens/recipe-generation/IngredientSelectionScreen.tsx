@@ -167,7 +167,7 @@ export default function IngredientSelectionScreen() {
 
   // State for selected ingredients (start with all selected)
   const [selectedItems, setSelectedItems] = useState<Set<string>>(
-    new Set(pantryItems.map(item => item.id))
+    new Set(pantryItems.map(item => item.id)),
   );
 
   const handleGoBack = () => {
@@ -192,9 +192,18 @@ export default function IngredientSelectionScreen() {
       .filter(item => selectedItems.has(item.id))
       .map(item => item.item_name);
 
-    console.log('[IngredientSelection] Navigating to RecipeResults with ingredients:', selectedIngredients);
-    console.log('[IngredientSelection] Total selected items:', selectedIngredients.length);
-    console.log('[IngredientSelection] Selected ingredients:', selectedIngredients.slice(0, 10));
+    console.log(
+      '[IngredientSelection] Navigating to RecipeResults with ingredients:',
+      selectedIngredients,
+    );
+    console.log(
+      '[IngredientSelection] Total selected items:',
+      selectedIngredients.length,
+    );
+    console.log(
+      '[IngredientSelection] Selected ingredients:',
+      selectedIngredients.slice(0, 10),
+    );
 
     navigation.navigate('RecipeResults', {
       selectedIngredients,
@@ -203,34 +212,37 @@ export default function IngredientSelectionScreen() {
 
   const renderPantryItem = ({ item }: { item: PantryItem }) => {
     const isSelected = selectedItems.has(item.id);
-    
+
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[
           styles.itemCard,
-          isSelected ? styles.selectedItemCard : styles.unselectedItemCard
+          isSelected ? styles.selectedItemCard : styles.unselectedItemCard,
         ]}
         onPress={() => handleToggleItem(item.id)}
-        activeOpacity={0.7}
-      >
+        activeOpacity={0.7}>
         <View style={styles.itemInfo}>
-          <Text style={[
-            styles.itemName,
-            isSelected ? styles.selectedItemName : styles.unselectedItemName
-          ]}>
+          <Text
+            style={[
+              styles.itemName,
+              isSelected ? styles.selectedItemName : styles.unselectedItemName,
+            ]}>
             {item.item_name}
           </Text>
-          <Text style={[
-            styles.itemQuantity,
-            isSelected ? styles.selectedItemQuantity : styles.unselectedItemQuantity
-          ]}>
+          <Text
+            style={[
+              styles.itemQuantity,
+              isSelected
+                ? styles.selectedItemQuantity
+                : styles.unselectedItemQuantity,
+            ]}>
             {item.quantity} {item.unit}
           </Text>
         </View>
-        <Ionicons 
-          name={isSelected ? "checkmark-circle" : "ellipse-outline"} 
-          size={24} 
-          color={isSelected ? "#10b981" : "#9ca3af"} 
+        <Ionicons
+          name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
+          size={24}
+          color={isSelected ? '#10b981' : '#9ca3af'}
         />
       </TouchableOpacity>
     );
@@ -256,10 +268,8 @@ export default function IngredientSelectionScreen() {
           Tap ingredients to select or deselect them for recipe matching.
         </Text>
 
-        <Text style={[
-          styles.itemCount,
-          !canContinue && styles.itemCountWarning
-        ]}>
+        <Text
+          style={[styles.itemCount, !canContinue && styles.itemCountWarning]}>
           {selectedCount} ingredients selected
         </Text>
 
@@ -275,10 +285,7 @@ export default function IngredientSelectionScreen() {
       {/* Footer */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[
-            styles.continueButton,
-            !canContinue && styles.disabledButton,
-          ]}
+          style={[styles.continueButton, !canContinue && styles.disabledButton]}
           onPress={handleContinue}
           disabled={!canContinue}>
           <Text

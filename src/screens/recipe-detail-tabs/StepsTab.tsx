@@ -10,7 +10,9 @@ export default function StepsTab({ steps }: StepsTabProps) {
   if (!steps || steps.length === 0) {
     return (
       <View style={[styles.container, styles.centeredFeedback]}>
-        <Text style={styles.infoText}>No preparation steps available for this recipe.</Text>
+        <Text style={styles.infoText}>
+          No preparation steps available for this recipe.
+        </Text>
       </View>
     );
   }
@@ -19,7 +21,9 @@ export default function StepsTab({ steps }: StepsTabProps) {
     <View style={styles.container}>
       <View style={styles.stepsListContainer}>
         {steps.map((step, idx) => (
-          <View key={`step-${idx}-${step.substring(0, 10)}`} style={styles.stepContainer}>
+          <View
+            key={`step-${idx}-${step.substring(0, 10)}`}
+            style={styles.stepContainer}>
             <Text style={styles.stepNumber}>{`${idx + 1}.`}</Text>
             <Text style={styles.stepText}>{step}</Text>
           </View>
@@ -38,7 +42,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stepsListContainer: {
-    paddingBottom: 24, 
+    paddingBottom: 24,
   },
   stepContainer: {
     flexDirection: 'row',
@@ -69,4 +73,4 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary || '#666',
     textAlign: 'center',
   },
-}); 
+});

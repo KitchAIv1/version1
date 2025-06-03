@@ -6,7 +6,10 @@ interface OnboardingProgressProps {
   totalSteps: number;
 }
 
-const OnboardingProgress: React.FC<OnboardingProgressProps> = ({ currentStep, totalSteps }) => {
+const OnboardingProgress: React.FC<OnboardingProgressProps> = ({
+  currentStep,
+  totalSteps,
+}) => {
   return (
     <View style={styles.container}>
       {[...Array(totalSteps)].map((_, index) => {
@@ -15,20 +18,18 @@ const OnboardingProgress: React.FC<OnboardingProgressProps> = ({ currentStep, to
         const isCompleted = stepNumber < currentStep;
         return (
           <React.Fragment key={stepNumber}>
-            <View 
+            <View
               style={[
                 styles.stepDot,
                 isActive && styles.activeStepDot,
                 isCompleted && styles.completedStepDot,
-              ]}
-            >
-              <Text 
+              ]}>
+              <Text
                 style={[
                   styles.stepText,
                   isActive && styles.activeStepText,
                   isCompleted && styles.completedStepText,
-                ]}
-              >
+                ]}>
                 {/* Optional: show step number or checkmark */}
                 {/* {isCompleted ? '✓' : stepNumber} */}
               </Text>
@@ -84,4 +85,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default OnboardingProgress; 
+export default OnboardingProgress;

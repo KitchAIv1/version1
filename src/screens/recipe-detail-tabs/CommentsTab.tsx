@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
-import { 
-  View, 
-  Text, 
+import {
+  View,
+  Text,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -17,15 +17,14 @@ import {
   KeyboardEvent,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRoute } from '@react-navigation/native';
-import { useNavigation } from '@react-navigation/native';
-import { useAuth } from '../../providers/AuthProvider';
+import { useRoute, useNavigation } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { formatDistance } from 'date-fns';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '../../providers/AuthProvider';
 import { supabase } from '../../services/supabase';
 import { COLORS } from '../../constants/theme';
-import { formatDistance } from 'date-fns';
 import { RecipeDetailsData } from '../../hooks/useRecipeDetails';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Comment {
   id: string;
@@ -36,38 +35,46 @@ interface Comment {
 }
 
 // Memoized Comment component for better performance
-const CommentItem = memo(({ comment, formatCommentDate }: { 
-  comment: Comment, 
-  formatCommentDate: (date: string) => string 
-}) => {
-  return (
-    <View style={styles.commentItem}>
-      <View style={styles.commentHeader}>
-        {comment.avatar_url ? (
-          <Image 
-            source={{ uri: comment.avatar_url }} 
-            style={styles.avatar}
-          />
-        ) : (
-          <View style={styles.avatarPlaceholder}>
-            <Feather name="user" size={16} color={COLORS.primary} />
+const CommentItem = memo(
+  ({
+    comment,
+    formatCommentDate,
+  }: {
+    comment: Comment;
+    formatCommentDate: (date: string) => string;
+  }) => {
+    return (
+      <View style={styles.commentItem}>
+        <View style={styles.commentHeader}>
+          {comment.avatar_url ? (
+            <Image source={{ uri: comment.avatar_url }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Feather name="user" size={16} color={COLORS.primary} />
+            </View>
+          )}
+          <View style={styles.commentInfo}>
+            <Text style={styles.username}>
+              {comment.username || 'Anonymous'}
+            </Text>
+            <Text style={styles.timestamp}>
+              {formatCommentDate(comment.created_at)}
+            </Text>
           </View>
-        )}
-        <View style={styles.commentInfo}>
-          <Text style={styles.username}>{comment.username || 'Anonymous'}</Text>
-          <Text style={styles.timestamp}>{formatCommentDate(comment.created_at)}</Text>
         </View>
+        <Text style={styles.commentText}>{comment.comment_text}</Text>
       </View>
-      <Text style={styles.commentText}>{comment.comment_text}</Text>
-    </View>
-  );
-});
+    );
+  },
+);
 
 // Empty state component
 const EmptyComments = memo(() => (
   <View style={styles.emptyState}>
     <Feather name="message-circle" size={24} color={COLORS.textSecondary} />
-    <Text style={styles.emptyText}>No comments yet. Be the first to comment!</Text>
+    <Text style={styles.emptyText}>
+      No comments yet. Be the first to comment!
+    </Text>
   </View>
 ));
 
@@ -84,24 +91,23 @@ export default function CommentsTab() {
   const [showAllComments, setShowAllComments] = useState(false);
   const { bottom } = useSafeAreaInsets();
   const [inputHeight, setInputHeight] = useState(60);
-  
+
   const VISIBLE_COMMENTS_COUNT = 3; // Number of comments to show initially
-  
+
   // Use React Query to fetch comments with optimized caching
   const {
     data: comments = [],
     isLoading,
-    error
+    error,
   } = useQuery<Comment[]>({
     queryKey: ['recipe-comments', recipeId],
     queryFn: async () => {
       if (!recipeId) return [];
-      
-      const { data, error } = await supabase
-        .rpc('get_recipe_comments', {
-          p_recipe_id: recipeId
-        });
-      
+
+      const { data, error } = await supabase.rpc('get_recipe_comments', {
+        p_recipe_id: recipeId,
+      });
+
       if (error) throw error;
       return data || [];
     },
@@ -109,50 +115,56 @@ export default function CommentsTab() {
     staleTime: 2 * 60 * 1000, // 2 minutes stale time
     gcTime: 10 * 60 * 1000, // 10 minutes cache time
   });
-  
+
   // Update the comment count whenever comments change
   useEffect(() => {
     if (comments && Array.isArray(comments)) {
       // Get the current recipe details with correct typing
-      const currentDetails = queryClient.getQueryData<RecipeDetailsData>(['recipeDetails', recipeId]);
-      
+      const currentDetails = queryClient.getQueryData<RecipeDetailsData>([
+        'recipeDetails',
+        recipeId,
+      ]);
+
       // If we have recipe details and the comment count doesn't match
       if (currentDetails && currentDetails.comments_count !== comments.length) {
         // Update the comment count in the recipe details
-        queryClient.setQueryData<RecipeDetailsData>(['recipeDetails', recipeId], {
-          ...currentDetails,
-          comments_count: comments.length
-        });
+        queryClient.setQueryData<RecipeDetailsData>(
+          ['recipeDetails', recipeId],
+          {
+            ...currentDetails,
+            comments_count: comments.length,
+          },
+        );
       }
     }
   }, [comments, recipeId, queryClient]);
-  
+
   // Mutation for posting comments
   const postCommentMutation = useMutation({
     mutationFn: async (text: string) => {
       if (!user?.id || !recipeId) throw new Error('User or recipe ID missing');
-      
-      const { error } = await supabase
-        .from('recipe_comments')
-        .insert({
-          recipe_id: recipeId,
-          user_id: user.id,
-          comment_text: text
-        });
-      
+
+      const { error } = await supabase.from('recipe_comments').insert({
+        recipe_id: recipeId,
+        user_id: user.id,
+        comment_text: text,
+      });
+
       if (error) throw error;
     },
     onSuccess: () => {
       // Clear input and refetch comments
       setCommentText('');
-      
+
       // Invalidate both queries to ensure count is updated everywhere
-      queryClient.invalidateQueries({ queryKey: ['recipe-comments', recipeId] });
+      queryClient.invalidateQueries({
+        queryKey: ['recipe-comments', recipeId],
+      });
       queryClient.invalidateQueries({ queryKey: ['recipeDetails', recipeId] });
-      
+
       // After posting, show all comments to see the new one
       setShowAllComments(true);
-    }
+    },
   });
 
   // Handle post comment
@@ -160,7 +172,7 @@ export default function CommentsTab() {
     if (!commentText.trim()) return;
     postCommentMutation.mutate(commentText.trim());
   }, [commentText, postCommentMutation]);
-  
+
   // Enhanced keyboard monitoring to track both visibility and height
   useEffect(() => {
     const keyboardWillShowListener = Keyboard.addListener(
@@ -168,17 +180,20 @@ export default function CommentsTab() {
       (e: KeyboardEvent) => {
         setIsKeyboardVisible(true);
         setKeyboardHeight(e.endCoordinates.height);
-        console.log('[CommentsTab] Keyboard shown, height:', e.endCoordinates.height);
-      }
+        console.log(
+          '[CommentsTab] Keyboard shown, height:',
+          e.endCoordinates.height,
+        );
+      },
     );
-    
+
     const keyboardWillHideListener = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
       () => {
         setIsKeyboardVisible(false);
         setKeyboardHeight(0);
         console.log('[CommentsTab] Keyboard hidden');
-      }
+      },
     );
 
     return () => {
@@ -206,44 +221,44 @@ export default function CommentsTab() {
   };
 
   // Get the comments to display based on showAllComments state
-  const visibleComments = showAllComments 
-    ? comments 
+  const visibleComments = showAllComments
+    ? comments
     : comments.slice(0, VISIBLE_COMMENTS_COUNT);
-  
+
   // Memoize this function to prevent re-renders
   const formatCommentDate = useCallback((dateString: string) => {
     try {
-      return formatDistance(new Date(dateString), new Date(), { addSuffix: true });
+      return formatDistance(new Date(dateString), new Date(), {
+        addSuffix: true,
+      });
     } catch (e) {
       return 'recently';
     }
   }, []);
 
   if (isLoading) {
-    return <View style={styles.centered}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
   }
 
   if (error) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.errorText}>
-          Could not load comments.
-        </Text>
+        <Text style={styles.errorText}>Could not load comments.</Text>
       </View>
     );
   }
 
   // Create a clickable comment item that focuses the input on press
   const renderCommentItem = (comment: Comment) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       key={`comment-${recipeId}-${comment.id || Math.random().toString()}`}
       onPress={handleCommentPress}
-      activeOpacity={0.8}
-    >
-      <CommentItem
-        comment={comment}
-        formatCommentDate={formatCommentDate}
-      />
+      activeOpacity={0.8}>
+      <CommentItem comment={comment} formatCommentDate={formatCommentDate} />
     </TouchableOpacity>
   );
 
@@ -256,12 +271,11 @@ export default function CommentsTab() {
         ) : (
           <>
             {visibleComments.map(renderCommentItem)}
-            
+
             {comments.length > VISIBLE_COMMENTS_COUNT && !showAllComments && (
-              <TouchableOpacity 
-                style={styles.viewAllButton} 
-                onPress={handleViewAllComments}
-              >
+              <TouchableOpacity
+                style={styles.viewAllButton}
+                onPress={handleViewAllComments}>
                 <Text style={styles.viewAllText}>
                   View all {comments.length} comments
                 </Text>
@@ -280,23 +294,24 @@ export default function CommentsTab() {
             placeholder="Add a comment..."
             value={commentText}
             onChangeText={setCommentText}
-            multiline={true}
+            multiline
             maxLength={500}
             onFocus={() => {
               console.log('[CommentsTab] Input focused');
             }}
-            onContentSizeChange={(event) => {
-              setInputHeight(Math.max(40, event.nativeEvent.contentSize.height + 20));
+            onContentSizeChange={event => {
+              setInputHeight(
+                Math.max(40, event.nativeEvent.contentSize.height + 20),
+              );
             }}
           />
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
-              styles.postButton, 
-              !commentText.trim() && styles.disabledButton
+              styles.postButton,
+              !commentText.trim() && styles.disabledButton,
             ]}
             onPress={handlePostComment}
-            disabled={!commentText.trim() || postCommentMutation.isPending}
-          >
+            disabled={!commentText.trim() || postCommentMutation.isPending}>
             {postCommentMutation.isPending ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
@@ -446,4 +461,4 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.border || '#ddd',
     opacity: 0.8,
   },
-}); 
+});

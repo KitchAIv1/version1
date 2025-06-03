@@ -38,20 +38,20 @@ const itemIconMap: { [key: string]: string } = {
   mozzarella: 'ellipse-outline',
   yogurt: 'ice-cream-outline',
   butter: 'layers-outline',
-  "almond milk": 'pint-outline',
-  "soy milk": 'pint-outline',
-  
+  'almond milk': 'pint-outline',
+  'soy milk': 'pint-outline',
+
   // Bakery
   bread: 'restaurant-outline',
-  "white bread": 'restaurant-outline',
-  "whole wheat bread": 'restaurant-outline',
+  'white bread': 'restaurant-outline',
+  'whole wheat bread': 'restaurant-outline',
   bagel: 'ellipse-outline',
   croissant: 'restaurant-outline',
 
   // Proteins
   eggs: 'egg-outline',
   chicken: 'logo-twitter',
-  "chicken breast": 'logo-twitter',
+  'chicken breast': 'logo-twitter',
   beef: 'restaurant-outline',
   steak: 'restaurant-outline',
   pork: 'restaurant-outline',
@@ -68,17 +68,17 @@ const itemIconMap: { [key: string]: string } = {
   sugar: 'cube-outline',
   salt: 'cube-outline',
   pepper: 'ellipse-outline',
-  "olive oil": 'water-outline',
+  'olive oil': 'water-outline',
   vinegar: 'water-outline',
   cereal: 'apps-outline',
   oats: 'apps-outline',
   coffee: 'cafe-outline',
   tea: 'cafe-outline',
-  
+
   // Drinks
   juice: 'water-outline',
-  "apple juice": 'water-outline',
-  "orange juice": 'water-outline',
+  'apple juice': 'water-outline',
+  'orange juice': 'water-outline',
   soda: 'beer-outline',
   water: 'water-outline',
 
@@ -87,7 +87,9 @@ const itemIconMap: { [key: string]: string } = {
 };
 
 // Pre-sorted keys for performance (longest first)
-const sortedIconKeys = Object.keys(itemIconMap).sort((a, b) => b.length - a.length);
+const sortedIconKeys = Object.keys(itemIconMap).sort(
+  (a, b) => b.length - a.length,
+);
 
 // Memoized icon getter function
 const getIconForItem = (itemName: string): string => {
@@ -97,7 +99,7 @@ const getIconForItem = (itemName: string): string => {
       return itemIconMap[key];
     }
   }
-  return itemIconMap['default'];
+  return itemIconMap.default;
 };
 
 interface PantryItemComponentProps {
@@ -106,72 +108,78 @@ interface PantryItemComponentProps {
   onDelete: (item: PantryItem) => void;
 }
 
-export const PantryItemComponent = memo<PantryItemComponentProps>(({ 
-  item, 
-  onEdit, 
-  onDelete 
-}) => {
-  // Memoize icon calculation
-  const itemIconName = useMemo(() => getIconForItem(item.item_name), [item.item_name]);
-  
-  // Memoize event handlers
-  const handleEdit = useCallback(() => onEdit(item), [onEdit, item]);
-  const handleDelete = useCallback(() => onDelete(item), [onDelete, item]);
-  
-  const handleEditPress = useCallback((e: any) => {
-    e.stopPropagation();
-    handleEdit();
-  }, [handleEdit]);
-  
-  const handleDeletePress = useCallback((e: any) => {
-    e.stopPropagation();
-    handleDelete();
-  }, [handleDelete]);
+export const PantryItemComponent = memo<PantryItemComponentProps>(
+  ({ item, onEdit, onDelete }) => {
+    // Memoize icon calculation
+    const itemIconName = useMemo(
+      () => getIconForItem(item.item_name),
+      [item.item_name],
+    );
 
-  return (
-    <TouchableOpacity 
-      style={styles.itemContainer}
-      onPress={handleEdit}
-      activeOpacity={0.7}
-    >
-      <View style={styles.itemIcon}>
-        <Ionicons name={itemIconName as any} size={24} color={ACTIVE_COLOR} />
-      </View>
-      <View style={styles.itemTextContainer}>
-        <Text style={styles.itemText} numberOfLines={1} ellipsizeMode="tail">
-          {item.item_name.charAt(0).toUpperCase() + item.item_name.slice(1)}
-        </Text>
-        <View style={styles.metaDataContainer}>
-          <Text style={styles.metaText}>
-            <Ionicons name="cube-outline" size={12} /> {item.quantity} {item.unit}
+    // Memoize event handlers
+    const handleEdit = useCallback(() => onEdit(item), [onEdit, item]);
+    const handleDelete = useCallback(() => onDelete(item), [onDelete, item]);
+
+    const handleEditPress = useCallback(
+      (e: any) => {
+        e.stopPropagation();
+        handleEdit();
+      },
+      [handleEdit],
+    );
+
+    const handleDeletePress = useCallback(
+      (e: any) => {
+        e.stopPropagation();
+        handleDelete();
+      },
+      [handleDelete],
+    );
+
+    return (
+      <TouchableOpacity
+        style={styles.itemContainer}
+        onPress={handleEdit}
+        activeOpacity={0.7}>
+        <View style={styles.itemIcon}>
+          <Ionicons name={itemIconName as any} size={24} color={ACTIVE_COLOR} />
+        </View>
+        <View style={styles.itemTextContainer}>
+          <Text style={styles.itemText} numberOfLines={1} ellipsizeMode="tail">
+            {item.item_name.charAt(0).toUpperCase() + item.item_name.slice(1)}
           </Text>
-          {item.created_at && (
+          <View style={styles.metaDataContainer}>
             <Text style={styles.metaText}>
-              <Ionicons name="time-outline" size={12} /> {getShortRelativeTime(item.created_at)}
+              <Ionicons name="cube-outline" size={12} /> {item.quantity}{' '}
+              {item.unit}
+            </Text>
+            {item.created_at && (
+              <Text style={styles.metaText}>
+                <Ionicons name="time-outline" size={12} />{' '}
+                {getShortRelativeTime(item.created_at)}
+              </Text>
+            )}
+          </View>
+          {item.description && (
+            <Text style={styles.itemDescription} numberOfLines={1}>
+              {item.description}
             </Text>
           )}
         </View>
-        {item.description && (
-          <Text style={styles.itemDescription} numberOfLines={1}>
-            {item.description}
-          </Text>
-        )}
-      </View>
-      <TouchableOpacity
-        style={styles.itemActionButton}
-        onPress={handleEditPress}
-      >
-        <Ionicons name="create-outline" size={22} color="#757575" />
+        <TouchableOpacity
+          style={styles.itemActionButton}
+          onPress={handleEditPress}>
+          <Ionicons name="create-outline" size={22} color="#757575" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.itemActionButton}
+          onPress={handleDeletePress}>
+          <Ionicons name="trash-outline" size={22} color="#ef4444" />
+        </TouchableOpacity>
       </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.itemActionButton}
-        onPress={handleDeletePress}
-      >
-        <Ionicons name="trash-outline" size={22} color="#ef4444" />
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
-});
+    );
+  },
+);
 
 PantryItemComponent.displayName = 'PantryItemComponent';
 
@@ -238,4 +246,4 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e9ecef',
   },
-}); 
+});

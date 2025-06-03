@@ -23,7 +23,11 @@ interface ActivityFeedProps {
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
-const ActivityFeed: React.FC<ActivityFeedProps> = ({ data, isLoading, error }) => {
+const ActivityFeed: React.FC<ActivityFeedProps> = ({
+  data,
+  isLoading,
+  error,
+}) => {
   const navigation = useNavigation<NavigationProp>();
 
   // Helper function to get relative time
@@ -31,13 +35,13 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ data, isLoading, error }) =
     try {
       const now = new Date();
       const activityTime = new Date(timestamp);
-      
+
       // Check if date is valid
       if (isNaN(activityTime.getTime())) {
         console.warn('[ActivityFeed] Invalid timestamp:', timestamp);
         return 'Recently';
       }
-      
+
       const diffInMs = now.getTime() - activityTime.getTime();
       const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
       const diffInDays = Math.floor(diffInHours / 24);
@@ -45,15 +49,23 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ data, isLoading, error }) =
       if (diffInHours < 1) {
         const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
         return diffInMinutes < 1 ? 'Just now' : `${diffInMinutes}m`;
-      } else if (diffInHours < 24) {
-        return `${diffInHours}h`;
-      } else if (diffInDays < 7) {
-        return `${diffInDays}d`;
-      } else {
-        return activityTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       }
+      if (diffInHours < 24) {
+        return `${diffInHours}h`;
+      }
+      if (diffInDays < 7) {
+        return `${diffInDays}d`;
+      }
+      return activityTime.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      });
     } catch (error) {
-      console.error('[ActivityFeed] Error parsing timestamp:', timestamp, error);
+      console.error(
+        '[ActivityFeed] Error parsing timestamp:',
+        timestamp,
+        error,
+      );
       return 'Recently';
     }
   };
@@ -109,7 +121,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ data, isLoading, error }) =
   // Helper function to get activity description
   const getActivityDescription = (item: ActivityItem): string => {
     const { activity_type, metadata } = item;
-    
+
     switch (activity_type) {
       case 'saved_recipe':
         return `You saved a recipe: ${metadata?.recipe_title || metadata?.recipe_name || 'Unknown Recipe'}`;
@@ -131,21 +143,19 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ data, isLoading, error }) =
         const groupedActivitiesManual = metadata?.grouped_activities;
         const totalItemsManual = metadata?.total_items;
         const itemNamesManual = metadata?.item_names;
-        
+
         // Handle grouped manual pantry activities
         if (groupedActivitiesManual && totalItemsManual > 1) {
           if (itemNamesManual && itemNamesManual.length > 0) {
             const displayNames = itemNamesManual.slice(0, 3);
             if (totalItemsManual <= 3) {
               return `You added ${displayNames.join(', ')} to your pantry`;
-            } else {
-              return `You added ${displayNames.join(', ')} and ${totalItemsManual - 3} more items to your pantry`;
             }
-          } else {
-            return `You added ${totalItemsManual} items to your pantry`;
+            return `You added ${displayNames.join(', ')} and ${totalItemsManual - 3} more items to your pantry`;
           }
+          return `You added ${totalItemsManual} items to your pantry`;
         }
-        
+
         // Handle single manual add (existing logic)
         return `You added "${metadata?.item_name || 'Unknown Item'}" to your pantry`;
       case 'successful_scan':
@@ -155,27 +165,33 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ data, isLoading, error }) =
         const groupedActivities = metadata?.grouped_activities;
         const totalItems = metadata?.total_items;
         const itemNames = metadata?.item_names;
-        
+
         // Handle grouped scanning activities
         if (groupedActivities && totalItems > 1) {
           if (itemNames && itemNames.length > 0) {
             const displayNames = itemNames.slice(0, 3);
             if (totalItems <= 3) {
               return `You added ${displayNames.join(', ')} to your pantry`;
-            } else {
-              return `You added ${displayNames.join(', ')} and ${totalItems - 3} more items to your pantry`;
             }
-          } else {
-            return `You added ${totalItems} items to your pantry`;
+            return `You added ${displayNames.join(', ')} and ${totalItems - 3} more items to your pantry`;
           }
+          return `You added ${totalItems} items to your pantry`;
         }
-        
+
         // Handle single scanning activity (existing logic)
         let scanDescription = '';
-        if (scannedItems && Array.isArray(scannedItems) && scannedItems.length > 0) {
-          const itemNames = scannedItems.slice(0, 3).map(item => 
-            typeof item === 'string' ? item : item?.name || item?.item_name || 'Unknown'
-          );
+        if (
+          scannedItems &&
+          Array.isArray(scannedItems) &&
+          scannedItems.length > 0
+        ) {
+          const itemNames = scannedItems
+            .slice(0, 3)
+            .map(item =>
+              typeof item === 'string'
+                ? item
+                : item?.name || item?.item_name || 'Unknown',
+            );
           if (scannedItems.length <= 3) {
             scanDescription = `You scanned: ${itemNames.join(', ')}`;
           } else {
@@ -186,12 +202,12 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ data, isLoading, error }) =
         } else {
           scanDescription = `You successfully scanned pantry items`;
         }
-        
+
         // Add scan type if available
         if (scanType) {
           scanDescription += ` via ${scanType}`;
         }
-        
+
         return scanDescription;
       case 'pantry_update':
         const itemName = metadata?.item_name || 'Unknown Item';
@@ -210,7 +226,13 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ data, isLoading, error }) =
   // Handle activity item press
   const handleActivityPress = (item: ActivityItem) => {
     const recipeId = item.metadata?.recipe_id || item.metadata?.recipe_id;
-    if (recipeId && (item.activity_type === 'saved_recipe' || item.activity_type === 'planned_meal' || item.activity_type === 'generated_recipe' || item.activity_type === 'cooked_recipe')) {
+    if (
+      recipeId &&
+      (item.activity_type === 'saved_recipe' ||
+        item.activity_type === 'planned_meal' ||
+        item.activity_type === 'generated_recipe' ||
+        item.activity_type === 'cooked_recipe')
+    ) {
       navigation.navigate('RecipeDetail', { id: recipeId });
     }
   };
@@ -220,21 +242,40 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ data, isLoading, error }) =
     const description = getActivityDescription(item);
     const relativeTime = getRelativeTime(item.created_at);
     const recipeId = item.metadata?.recipe_id || item.metadata?.recipe_id;
-    const isClickable = ['saved_recipe', 'planned_meal', 'generated_recipe', 'cooked_recipe'].includes(item.activity_type) && 
-                        (item.metadata?.recipe_id || item.metadata?.recipe_title || item.metadata?.recipe_name);
+    const isClickable =
+      [
+        'saved_recipe',
+        'planned_meal',
+        'generated_recipe',
+        'cooked_recipe',
+      ].includes(item.activity_type) &&
+      (item.metadata?.recipe_id ||
+        item.metadata?.recipe_title ||
+        item.metadata?.recipe_name);
 
     const content = (
       <View style={styles.activityItem}>
-        <View style={[styles.iconContainer, { backgroundColor: `${getActivityColor(item.activity_type)}15` }]}>
-          <Ionicons name={icon as any} size={20} color={getActivityColor(item.activity_type)} />
+        <View
+          style={[
+            styles.iconContainer,
+            { backgroundColor: `${getActivityColor(item.activity_type)}15` },
+          ]}>
+          <Ionicons
+            name={icon as any}
+            size={20}
+            color={getActivityColor(item.activity_type)}
+          />
         </View>
         <View style={styles.activityContent}>
           <Text style={styles.activityDescription}>{description}</Text>
           <Text style={styles.activityTime}>{relativeTime}</Text>
         </View>
         {(item.metadata?.recipe_thumbnail || item.metadata?.thumbnail_url) && (
-          <Image 
-            source={{ uri: item.metadata.recipe_thumbnail || item.metadata.thumbnail_url }} 
+          <Image
+            source={{
+              uri:
+                item.metadata.recipe_thumbnail || item.metadata.thumbnail_url,
+            }}
             style={styles.recipeThumbnail}
           />
         )}
@@ -289,12 +330,13 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ data, isLoading, error }) =
         // Always generate a unique key with index to avoid backend ID duplicates
         const uniqueKey = `activity-${index}-${item.activity_type}-${item.created_at?.replace(/[:.]/g, '')}-${Math.random().toString(36).substr(2, 9)}`;
         console.log('[ActivityFeed] Generated key:', uniqueKey);
-        console.log('[ActivityFeed] Item details:', { id: item.id, activity_type: item.activity_type, created_at: item.created_at, index });
-        return (
-          <View key={uniqueKey}>
-            {renderActivityItem({ item })}
-          </View>
-        );
+        console.log('[ActivityFeed] Item details:', {
+          id: item.id,
+          activity_type: item.activity_type,
+          created_at: item.created_at,
+          index,
+        });
+        return <View key={uniqueKey}>{renderActivityItem({ item })}</View>;
       })}
     </View>
   );

@@ -14,13 +14,20 @@ import {
 } from 'react-native';
 import RNPickerSelect from 'react-native-picker-select';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { StockItem, UnitOption, DEFAULT_UNIT_OPTIONS } from '../../hooks/useStockManager'; // Adjust path
+import {
+  StockItem,
+  UnitOption,
+  DEFAULT_UNIT_OPTIONS,
+} from '../../hooks/useStockManager'; // Adjust path
 import { formatDetailedTimestamp } from '../../utils/dateUtils';
 
 interface ManualAddModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (item: StockItem, originalItemName?: string) => Promise<boolean | void>; // Return promise to handle loading state
+  onSubmit: (
+    item: StockItem,
+    originalItemName?: string,
+  ) => Promise<boolean | void>; // Return promise to handle loading state
   initialItem?: StockItem | null; // For editing
   unitOptions?: UnitOption[];
   isSaving: boolean; // To disable form while saving
@@ -38,7 +45,9 @@ export const ManualAddModal: React.FC<ManualAddModalProps> = ({
   const [quantity, setQuantity] = useState('1');
   const [unit, setUnit] = useState<string>(unitOptions[0]?.value || 'units');
   const [description, setDescription] = useState('');
-  const [originalItemNameForEdit, setOriginalItemNameForEdit] = useState<string | undefined>(undefined);
+  const [originalItemNameForEdit, setOriginalItemNameForEdit] = useState<
+    string | undefined
+  >(undefined);
 
   const isEditMode = !!initialItem;
 
@@ -46,7 +55,7 @@ export const ManualAddModal: React.FC<ManualAddModalProps> = ({
     if (initialItem && visible) {
       setItemName(initialItem.item_name);
       setQuantity(initialItem.quantity.toString());
-      setUnit(initialItem.unit || (unitOptions[0]?.value || 'units'));
+      setUnit(initialItem.unit || unitOptions[0]?.value || 'units');
       setDescription(initialItem.description || '');
       setOriginalItemNameForEdit(initialItem.item_name); // Store original name for submit
     } else if (!visible) {
@@ -66,7 +75,10 @@ export const ManualAddModal: React.FC<ManualAddModalProps> = ({
     }
     const numQuantity = parseFloat(quantity);
     if (isNaN(numQuantity) || numQuantity <= 0) {
-      Alert.alert('Validation Error', 'Please enter a valid positive quantity.');
+      Alert.alert(
+        'Validation Error',
+        'Please enter a valid positive quantity.',
+      );
       return;
     }
 
@@ -74,29 +86,32 @@ export const ManualAddModal: React.FC<ManualAddModalProps> = ({
       id: initialItem?.id, // Include ID if editing
       item_name: itemName.trim(),
       quantity: numQuantity,
-      unit: unit,
+      unit,
       description: description.trim() || null,
     };
-    
-    await onSubmit(itemToSubmit, isEditMode ? originalItemNameForEdit : undefined);
+
+    await onSubmit(
+      itemToSubmit,
+      isEditMode ? originalItemNameForEdit : undefined,
+    );
   };
 
   return (
     <Modal
       animationType="slide"
-      transparent={true}
+      transparent
       visible={visible}
-      onRequestClose={onClose}
-    >
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : "height"} 
-        style={styles.keyboardAvoidingView}
-      >
+      onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoidingView}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.headerContainer}>
-                <Text style={styles.headerTitle}>{isEditMode ? 'Edit Item' : 'Add New Item'}</Text>
+                <Text style={styles.headerTitle}>
+                  {isEditMode ? 'Edit Item' : 'Add New Item'}
+                </Text>
                 <TouchableOpacity onPress={onClose} disabled={isSaving}>
                   <Icon name="close" size={24} color="#666" />
                 </TouchableOpacity>
@@ -108,7 +123,9 @@ export const ManualAddModal: React.FC<ManualAddModalProps> = ({
                   <View style={styles.timestampRow}>
                     <Icon name="add-circle-outline" size={16} color="#666" />
                     <Text style={styles.timestampLabel}>Added: </Text>
-                    <Text style={styles.timestampValue}>{formatDetailedTimestamp(initialItem.created_at)}</Text>
+                    <Text style={styles.timestampValue}>
+                      {formatDetailedTimestamp(initialItem.created_at)}
+                    </Text>
                   </View>
                 </View>
               )}
@@ -142,14 +159,23 @@ export const ManualAddModal: React.FC<ManualAddModalProps> = ({
                 <View style={[styles.formGroup, styles.unitPickerContainer]}>
                   <Text style={styles.label}>Unit*</Text>
                   <RNPickerSelect
-                    onValueChange={(value: string | null) => value && setUnit(value)} 
+                    onValueChange={(value: string | null) =>
+                      value && setUnit(value)
+                    }
                     items={unitOptions}
                     style={pickerSelectStyles}
                     value={unit}
                     disabled={isSaving}
-                    placeholder={{ label: "Select unit...", value: null }}
-                    useNativeAndroidPickerStyle={false} 
-                    Icon={() => <Icon name="arrow-drop-down" size={24} color="#888" style={styles.pickerIcon} />}
+                    placeholder={{ label: 'Select unit...', value: null }}
+                    useNativeAndroidPickerStyle={false}
+                    Icon={() => (
+                      <Icon
+                        name="arrow-drop-down"
+                        size={24}
+                        color="#888"
+                        style={styles.pickerIcon}
+                      />
+                    )}
                   />
                 </View>
               </View>
@@ -168,15 +194,19 @@ export const ManualAddModal: React.FC<ManualAddModalProps> = ({
                 />
               </View>
 
-              <TouchableOpacity 
-                style={[styles.submitButton, isSaving && styles.submitButtonDisabled]}
+              <TouchableOpacity
+                style={[
+                  styles.submitButton,
+                  isSaving && styles.submitButtonDisabled,
+                ]}
                 onPress={handleSubmit}
-                disabled={isSaving}
-              >
+                disabled={isSaving}>
                 {isSaving ? (
                   <ActivityIndicator color="#FFF" />
                 ) : (
-                  <Text style={styles.submitButtonText}>{isEditMode ? 'Save Changes' : 'Add Item'}</Text>
+                  <Text style={styles.submitButtonText}>
+                    {isEditMode ? 'Save Changes' : 'Add Item'}
+                  </Text>
                 )}
               </TouchableOpacity>
             </ScrollView>
@@ -201,7 +231,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
-    maxHeight: '85%', 
+    maxHeight: '85%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -3 },
     shadowOpacity: 0.1,
@@ -250,20 +280,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   quantityInputContainer: {
-    flex: 0.48, 
+    flex: 0.48,
   },
   unitPickerContainer: {
-    flex: 0.48, 
+    flex: 0.48,
   },
   submitButton: {
-    backgroundColor: '#22c55e', 
+    backgroundColor: '#22c55e',
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
     marginTop: 10,
   },
   submitButtonDisabled: {
-    backgroundColor: '#a5d6a7', 
+    backgroundColor: '#a5d6a7',
   },
   submitButtonText: {
     color: '#FFF',
@@ -273,7 +303,7 @@ const styles = StyleSheet.create({
   pickerIcon: {
     position: 'absolute',
     right: 10,
-    top: Platform.OS === 'ios' ? 10 : 12, 
+    top: Platform.OS === 'ios' ? 10 : 12,
   },
   timestampContainer: {
     marginBottom: 20,
@@ -303,7 +333,7 @@ const pickerSelectStyles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 8,
     color: '#333',
-    paddingRight: 30, 
+    paddingRight: 30,
     backgroundColor: '#f9f9f9',
   },
   inputAndroid: {
@@ -314,13 +344,13 @@ const pickerSelectStyles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 8,
     color: '#333',
-    paddingRight: 30, 
+    paddingRight: 30,
     backgroundColor: '#f9f9f9',
   },
   placeholder: {
     color: '#bbb',
   },
-  iconContainer: { 
+  iconContainer: {
     top: Platform.OS === 'ios' ? 10 : 12,
     right: 12,
   },

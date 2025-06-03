@@ -1,5 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MainStackParamList } from '../../navigation/types';
@@ -8,14 +14,35 @@ import { MainStackParamList } from '../../navigation/types';
 // type OnboardingStep2UserScreenNavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'OnboardingStep2User'>;
 
 const features = [
-  { title: '📸 Pantry Scan', description: 'Quickly add ingredients by scanning them. Get 3 free scans to start!', icon: 'camera-outline' },
-  { title: '🧠 AI Meal Plan', description: 'Let our AI generate personalized meal plans. Enjoy 10 free AI generations!', icon: 'bulb-outline' },
-  { title: '🛒 Pantry to Grocery', description: 'Easily convert missing pantry items into your grocery list.', icon: 'cart-outline' },
-  { title: '🍽 Discover Recipes', description: 'Explore a world of recipes from talented creators.', icon: 'search-outline' },
+  {
+    title: '📸 Pantry Scan',
+    description:
+      'Quickly add ingredients by scanning them. Get 3 free scans to start!',
+    icon: 'camera-outline',
+  },
+  {
+    title: '🧠 AI Meal Plan',
+    description:
+      'Let our AI generate personalized meal plans. Enjoy 10 free AI generations!',
+    icon: 'bulb-outline',
+  },
+  {
+    title: '🛒 Pantry to Grocery',
+    description: 'Easily convert missing pantry items into your grocery list.',
+    icon: 'cart-outline',
+  },
+  {
+    title: '🍽 Discover Recipes',
+    description: 'Explore a world of recipes from talented creators.',
+    icon: 'search-outline',
+  },
 ];
 
-const OnboardingStep2UserScreen = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList, 'OnboardingStep2User'>>();
+function OnboardingStep2UserScreen() {
+  const navigation =
+    useNavigation<
+      NativeStackNavigationProp<MainStackParamList, 'OnboardingStep2User'>
+    >();
 
   const handleNext = () => {
     console.log('Proceeding to OnboardingFinalScreen from User flow');
@@ -25,7 +52,9 @@ const OnboardingStep2UserScreen = () => {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.header}>For Your Inner Chef!</Text>
-      <Text style={styles.subHeader}>Discover amazing features tailored for you:</Text>
+      <Text style={styles.subHeader}>
+        Discover amazing features tailored for you:
+      </Text>
 
       {features.map((feature, index) => (
         <View key={index} style={styles.featureCard}>
@@ -40,7 +69,7 @@ const OnboardingStep2UserScreen = () => {
       </TouchableOpacity>
     </ScrollView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -101,4 +130,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default OnboardingStep2UserScreen; 
+export default OnboardingStep2UserScreen;

@@ -104,22 +104,55 @@ export type MainStackParamList = {
 // Combine if needed, or define screen prop types directly
 
 // Example: Prop types for screens within AuthStack
-export type SplashScreenProps = NativeStackScreenProps<AuthStackParamList, 'Splash'>;
-export type LoginScreenProps = NativeStackScreenProps<AuthStackParamList, 'Login'>;
-export type SignupScreenProps = NativeStackScreenProps<AuthStackParamList, 'Signup'>;
+export type SplashScreenProps = NativeStackScreenProps<
+  AuthStackParamList,
+  'Splash'
+>;
+export type LoginScreenProps = NativeStackScreenProps<
+  AuthStackParamList,
+  'Login'
+>;
+export type SignupScreenProps = NativeStackScreenProps<
+  AuthStackParamList,
+  'Signup'
+>;
 
 // Example: Prop types for screens within MainTabs (if needed for options/listeners)
 export type FeedScreenProps = BottomTabScreenProps<MainTabsParamList, 'Feed'>;
-export type DiscoverScreenProps = BottomTabScreenProps<MainTabsParamList, 'Discover'>;
+export type DiscoverScreenProps = BottomTabScreenProps<
+  MainTabsParamList,
+  'Discover'
+>;
 // ... define other tab screen props similarly
 
 // Prop types for screens within MainStack
-export type SearchResultsProps = NativeStackScreenProps<MainStackParamList, 'SearchResults'>;
-export type RecipeDetailProps = NativeStackScreenProps<MainStackParamList, 'RecipeDetail'>;
-export type PantryScanProps = NativeStackScreenProps<MainStackParamList, 'PantryScan'>; // Add prop type for PantryScan
-export type UpgradeScreenProps = NativeStackScreenProps<MainStackParamList, 'UpgradeScreen'>; // Add prop type for UpgradeScreen 
+export type SearchResultsProps = NativeStackScreenProps<
+  MainStackParamList,
+  'SearchResults'
+>;
+export type RecipeDetailProps = NativeStackScreenProps<
+  MainStackParamList,
+  'RecipeDetail'
+>;
+export type PantryScanProps = NativeStackScreenProps<
+  MainStackParamList,
+  'PantryScan'
+>; // Add prop type for PantryScan
+export type UpgradeScreenProps = NativeStackScreenProps<
+  MainStackParamList,
+  'UpgradeScreen'
+>; // Add prop type for UpgradeScreen
 
 // "What Can I Cook?" feature screen prop types
-export type IngredientSelectionScreenProps = NativeStackScreenProps<MainStackParamList, 'IngredientSelection'>;
-export type RecipeResultsScreenProps = NativeStackScreenProps<MainStackParamList, 'RecipeResults'>;
-export type AIRecipeGenerationScreenProps = NativeStackScreenProps<MainStackParamList, 'AIRecipeGeneration'>; 
+export type IngredientSelectionScreenProps = NativeStackScreenProps<
+  MainStackParamList,
+  'IngredientSelection'
+>;
+export type RecipeResultsScreenProps = NativeStackScreenProps<
+  MainStackParamList,
+  'RecipeResults'
+>;
+export type AIRecipeGenerationScreenProps = NativeStackScreenProps<
+  MainStackParamList,
+  'AIRecipeGeneration'
+>;

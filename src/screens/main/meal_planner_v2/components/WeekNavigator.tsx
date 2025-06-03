@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+} from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import DayItem from './DayItem';
 import { COLORS } from '../../../../constants/theme'; // Assuming COLORS is here for potential use in styles
@@ -41,132 +47,157 @@ interface WeekNavigatorProps {
   onTargetWeekChange?: (targetWeekStartDate: Date) => void;
 }
 
-const WeekNavigator: React.FC<WeekNavigatorProps> = React.memo(({ selectedDate, onDateSelect, onTargetWeekChange }) => {
-  const currentActualWeekStartDate = useMemo(() => getWeekStartDate(new Date()), []);
-  const maxTargetWeekStartDate = useMemo(() => {
-    const maxDate = getWeekStartDate(new Date());
-    maxDate.setDate(maxDate.getDate() + 3 * 7); // Current week + 3 weeks
-    return maxDate;
-  }, []);
+const WeekNavigator: React.FC<WeekNavigatorProps> = React.memo(
+  ({ selectedDate, onDateSelect, onTargetWeekChange }) => {
+    const currentActualWeekStartDate = useMemo(
+      () => getWeekStartDate(new Date()),
+      [],
+    );
+    const maxTargetWeekStartDate = useMemo(() => {
+      const maxDate = getWeekStartDate(new Date());
+      maxDate.setDate(maxDate.getDate() + 3 * 7); // Current week + 3 weeks
+      return maxDate;
+    }, []);
 
-  const [targetWeekStartDate, setTargetWeekStartDate] = useState(() => getWeekStartDate(selectedDate));
+    const [targetWeekStartDate, setTargetWeekStartDate] = useState(() =>
+      getWeekStartDate(selectedDate),
+    );
 
-  // Memoize week dates to prevent recalculation and blinking
-  const weekDatesForDisplay = useMemo(() => {
-    return getWeekDates(targetWeekStartDate);
-  }, [targetWeekStartDate]);
+    // Memoize week dates to prevent recalculation and blinking
+    const weekDatesForDisplay = useMemo(() => {
+      return getWeekDates(targetWeekStartDate);
+    }, [targetWeekStartDate]);
 
-  // Synchronize with parent's selectedDate changes
-  useEffect(() => {
-    const newWeekStart = getWeekStartDate(selectedDate);
-    if (!isSameDay(newWeekStart, targetWeekStartDate)) {
-      setTargetWeekStartDate(newWeekStart);
-    }
-  }, [selectedDate]);
+    // Synchronize with parent's selectedDate changes
+    useEffect(() => {
+      const newWeekStart = getWeekStartDate(selectedDate);
+      if (!isSameDay(newWeekStart, targetWeekStartDate)) {
+        setTargetWeekStartDate(newWeekStart);
+      }
+    }, [selectedDate]);
 
-  const canNavigatePrev = useMemo(() => 
-    !isSameDay(targetWeekStartDate, currentActualWeekStartDate) && targetWeekStartDate > currentActualWeekStartDate,
-    [targetWeekStartDate, currentActualWeekStartDate]
-  );
+    const canNavigatePrev = useMemo(
+      () =>
+        !isSameDay(targetWeekStartDate, currentActualWeekStartDate) &&
+        targetWeekStartDate > currentActualWeekStartDate,
+      [targetWeekStartDate, currentActualWeekStartDate],
+    );
 
-  const canNavigateNext = useMemo(() => 
-    !isSameDay(targetWeekStartDate, maxTargetWeekStartDate) && targetWeekStartDate < maxTargetWeekStartDate,
-    [targetWeekStartDate, maxTargetWeekStartDate]
-  );
+    const canNavigateNext = useMemo(
+      () =>
+        !isSameDay(targetWeekStartDate, maxTargetWeekStartDate) &&
+        targetWeekStartDate < maxTargetWeekStartDate,
+      [targetWeekStartDate, maxTargetWeekStartDate],
+    );
 
-  const handlePrevWeekArrow = useCallback(() => {
-    if (!canNavigatePrev) return;
+    const handlePrevWeekArrow = useCallback(() => {
+      if (!canNavigatePrev) return;
 
-    const prevTargetWeekStart = new Date(targetWeekStartDate);
-    prevTargetWeekStart.setDate(targetWeekStartDate.getDate() - 7);
-    
-    // Update state immediately to prevent blinking
-    setTargetWeekStartDate(prevTargetWeekStart);
-    
-    // Notify parent after a brief delay to ensure smooth transition
-    if (onTargetWeekChange) {
-      requestAnimationFrame(() => {
-        onTargetWeekChange(prevTargetWeekStart);
-      });
-    }
-  }, [canNavigatePrev, targetWeekStartDate, onTargetWeekChange]);
+      const prevTargetWeekStart = new Date(targetWeekStartDate);
+      prevTargetWeekStart.setDate(targetWeekStartDate.getDate() - 7);
 
-  const handleNextWeekArrow = useCallback(() => {
-    if (!canNavigateNext) return;
+      // Update state immediately to prevent blinking
+      setTargetWeekStartDate(prevTargetWeekStart);
 
-    const nextTargetWeekStart = new Date(targetWeekStartDate);
-    nextTargetWeekStart.setDate(targetWeekStartDate.getDate() + 7);
-    
-    // Update state immediately to prevent blinking
-    setTargetWeekStartDate(nextTargetWeekStart);
-    
-    // Notify parent after a brief delay to ensure smooth transition
-    if (onTargetWeekChange) {
-      requestAnimationFrame(() => {
-        onTargetWeekChange(nextTargetWeekStart);
-      });
-    }
-  }, [canNavigateNext, targetWeekStartDate, onTargetWeekChange]);
+      // Notify parent after a brief delay to ensure smooth transition
+      if (onTargetWeekChange) {
+        requestAnimationFrame(() => {
+          onTargetWeekChange(prevTargetWeekStart);
+        });
+      }
+    }, [canNavigatePrev, targetWeekStartDate, onTargetWeekChange]);
 
-  const handleDayItemPress = useCallback((dayIndexInDisplayedWeek: number) => {
-    const newSelectedDate = new Date(targetWeekStartDate);
-    newSelectedDate.setDate(targetWeekStartDate.getDate() + dayIndexInDisplayedWeek);
-    
-    // Prevent unnecessary calls if selecting the same date
-    if (!isSameDay(newSelectedDate, selectedDate)) {
-      onDateSelect(newSelectedDate);
-    }
-  }, [targetWeekStartDate, onDateSelect, selectedDate]);
+    const handleNextWeekArrow = useCallback(() => {
+      if (!canNavigateNext) return;
 
-  const renderDayItem = useCallback(({ item, index }: { item: Date; index: number }) => (
-    <DayItem 
-      date={item} 
-      isSelected={isSameDay(item, selectedDate)}
-      onPress={() => handleDayItemPress(index)} 
-    />
-  ), [selectedDate, handleDayItemPress]);
+      const nextTargetWeekStart = new Date(targetWeekStartDate);
+      nextTargetWeekStart.setDate(targetWeekStartDate.getDate() + 7);
 
-  const keyExtractor = useCallback((item: Date) => item.toISOString(), []);
+      // Update state immediately to prevent blinking
+      setTargetWeekStartDate(nextTargetWeekStart);
 
-  return (
-    <View style={styles.daySelectorRow}>
-      <TouchableOpacity 
-        onPress={handlePrevWeekArrow} 
-        style={[styles.arrowButton, !canNavigatePrev && styles.disabledArrow]}
-        disabled={!canNavigatePrev}
-      >
-        <Icon name="chevron-left" size={28} color={canNavigatePrev ? '#10b981' : '#ccc'} />
-      </TouchableOpacity>
-      <FlatList
-        data={weekDatesForDisplay}
-        renderItem={renderDayItem}
-        keyExtractor={keyExtractor}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.daySelectorList}
-        removeClippedSubviews={false} // Prevent clipping issues
-        initialNumToRender={7}
-        maxToRenderPerBatch={7}
-        windowSize={1}
-      />
-      <TouchableOpacity 
-        onPress={handleNextWeekArrow} 
-        style={[styles.arrowButton, !canNavigateNext && styles.disabledArrow]}
-        disabled={!canNavigateNext}
-      >
-        <Icon name="chevron-right" size={28} color={canNavigateNext ? '#10b981' : '#ccc'} />
-      </TouchableOpacity>
-    </View>
-  );
-});
+      // Notify parent after a brief delay to ensure smooth transition
+      if (onTargetWeekChange) {
+        requestAnimationFrame(() => {
+          onTargetWeekChange(nextTargetWeekStart);
+        });
+      }
+    }, [canNavigateNext, targetWeekStartDate, onTargetWeekChange]);
+
+    const handleDayItemPress = useCallback(
+      (dayIndexInDisplayedWeek: number) => {
+        const newSelectedDate = new Date(targetWeekStartDate);
+        newSelectedDate.setDate(
+          targetWeekStartDate.getDate() + dayIndexInDisplayedWeek,
+        );
+
+        // Prevent unnecessary calls if selecting the same date
+        if (!isSameDay(newSelectedDate, selectedDate)) {
+          onDateSelect(newSelectedDate);
+        }
+      },
+      [targetWeekStartDate, onDateSelect, selectedDate],
+    );
+
+    const renderDayItem = useCallback(
+      ({ item, index }: { item: Date; index: number }) => (
+        <DayItem
+          date={item}
+          isSelected={isSameDay(item, selectedDate)}
+          onPress={() => handleDayItemPress(index)}
+        />
+      ),
+      [selectedDate, handleDayItemPress],
+    );
+
+    const keyExtractor = useCallback((item: Date) => item.toISOString(), []);
+
+    return (
+      <View style={styles.daySelectorRow}>
+        <TouchableOpacity
+          onPress={handlePrevWeekArrow}
+          style={[styles.arrowButton, !canNavigatePrev && styles.disabledArrow]}
+          disabled={!canNavigatePrev}>
+          <Icon
+            name="chevron-left"
+            size={28}
+            color={canNavigatePrev ? '#10b981' : '#ccc'}
+          />
+        </TouchableOpacity>
+        <FlatList
+          data={weekDatesForDisplay}
+          renderItem={renderDayItem}
+          keyExtractor={keyExtractor}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.daySelectorList}
+          removeClippedSubviews={false} // Prevent clipping issues
+          initialNumToRender={7}
+          maxToRenderPerBatch={7}
+          windowSize={1}
+        />
+        <TouchableOpacity
+          onPress={handleNextWeekArrow}
+          style={[styles.arrowButton, !canNavigateNext && styles.disabledArrow]}
+          disabled={!canNavigateNext}>
+          <Icon
+            name="chevron-right"
+            size={28}
+            color={canNavigateNext ? '#10b981' : '#ccc'}
+          />
+        </TouchableOpacity>
+      </View>
+    );
+  },
+);
 
 const styles = StyleSheet.create({
-  daySelectorRow: { 
+  daySelectorRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 12,
-    paddingHorizontal: 8, 
+    paddingHorizontal: 8,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
@@ -184,10 +215,10 @@ const styles = StyleSheet.create({
   disabledArrow: {
     backgroundColor: 'rgba(204, 204, 204, 0.1)',
   },
-  daySelectorList: { 
-    paddingHorizontal: 8, 
+  daySelectorList: {
+    paddingHorizontal: 8,
     alignItems: 'center',
   },
 });
 
-export default WeekNavigator; 
+export default WeekNavigator;

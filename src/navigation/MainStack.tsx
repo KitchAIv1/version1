@@ -29,41 +29,46 @@ interface MainStackProps {
 }
 
 const MainStack: React.FC<MainStackProps> = ({ userOnboarded }) => {
-  const initialRoute = userOnboarded ? "MainTabs" : "OnboardingStep1";
+  const initialRoute = userOnboarded ? 'MainTabs' : 'OnboardingStep1';
 
   return (
-    <Stack.Navigator 
-      initialRouteName={initialRoute} 
-      screenOptions={{ headerShown: false }}
-    >
+    <Stack.Navigator
+      initialRouteName={initialRoute}
+      screenOptions={{ headerShown: false }}>
       {/* Onboarding Screens - Placed before MainTabs for potential initial routing */}
       <Stack.Screen name="OnboardingStep1" component={OnboardingStep1Screen} />
-      <Stack.Screen name="OnboardingStep2User" component={OnboardingStep2UserScreen} />
-      <Stack.Screen name="OnboardingStep2Creator" component={OnboardingStep2CreatorScreen} />
+      <Stack.Screen
+        name="OnboardingStep2User"
+        component={OnboardingStep2UserScreen}
+      />
+      <Stack.Screen
+        name="OnboardingStep2Creator"
+        component={OnboardingStep2CreatorScreen}
+      />
       <Stack.Screen name="OnboardingFinal" component={OnboardingFinalScreen} />
 
       <Stack.Screen name="MainTabs" component={MainTabs} />
       {/* <Stack.Screen name="SearchResults" component={SearchResultsScreen} /> */}
       <Stack.Screen name="RecipeDetail" component={RecipeDetailScreen} />
-      <Stack.Screen 
-        name="PantryScan" 
-        component={PantryScanningScreen} 
-        options={{ 
+      <Stack.Screen
+        name="PantryScan"
+        component={PantryScanningScreen}
+        options={{
           presentation: 'fullScreenModal',
           headerShown: false,
           gestureEnabled: false, // Disable swipe to dismiss
-        }} 
+        }}
       />
-      <Stack.Screen 
+      <Stack.Screen
         name="EditProfile" // Changed from EditProfileScreen to EditProfile for brevity
-        component={EditProfileScreen} 
-        options={{ 
+        component={EditProfileScreen}
+        options={{
           headerShown: true, // Show header for this screen
           title: 'Edit Profile', // Set a title
           // Add back button customization if needed
-        }} 
+        }}
       />
-      <Stack.Screen 
+      <Stack.Screen
         name="VideoRecipeUploader"
         component={VideoRecipeUploaderScreen}
         options={{
@@ -71,52 +76,52 @@ const MainStack: React.FC<MainStackProps> = ({ userOnboarded }) => {
           title: 'Upload Recipe',
         }}
       />
-      <Stack.Screen 
-        name="EditRecipe" 
-        component={EditRecipeScreen} 
-        options={{ 
-          headerShown: true, 
-          title: 'Edit Recipe' // Default title, screen will override
-        }} 
+      <Stack.Screen
+        name="EditRecipe"
+        component={EditRecipeScreen}
+        options={{
+          headerShown: true,
+          title: 'Edit Recipe', // Default title, screen will override
+        }}
       />
-      <Stack.Screen 
-        name="UpgradeScreen" 
-        component={UpgradeScreen} 
-        options={{ 
+      <Stack.Screen
+        name="UpgradeScreen"
+        component={UpgradeScreen}
+        options={{
           headerShown: false, // UpgradeScreen has its own header
           presentation: 'modal', // Present as modal for better UX
-        }} 
+        }}
       />
-      
+
       {/* "What Can I Cook?" Feature Screens */}
-      <Stack.Screen 
-        name="IngredientSelection" 
-        component={IngredientSelectionScreen} 
-        options={{ 
+      <Stack.Screen
+        name="IngredientSelection"
+        component={IngredientSelectionScreen}
+        options={{
           headerShown: false, // Screen has its own header
           presentation: 'card', // Standard card presentation
-        }} 
+        }}
       />
-      <Stack.Screen 
-        name="RecipeResults" 
-        component={RecipeResultsScreen} 
-        options={{ 
+      <Stack.Screen
+        name="RecipeResults"
+        component={RecipeResultsScreen}
+        options={{
           headerShown: false, // Screen has its own header
           presentation: 'card', // Standard card presentation
-        }} 
+        }}
       />
-      <Stack.Screen 
-        name="AIRecipeGeneration" 
-        component={AIRecipeGenerationScreen} 
-        options={{ 
+      <Stack.Screen
+        name="AIRecipeGeneration"
+        component={AIRecipeGenerationScreen}
+        options={{
           headerShown: false, // Screen has its own header
           presentation: 'card', // Standard card presentation
-        }} 
+        }}
       />
-      
+
       {/* Add other stack screens like Settings here */}
     </Stack.Navigator>
   );
 };
 
-export default MainStack; 
+export default MainStack;

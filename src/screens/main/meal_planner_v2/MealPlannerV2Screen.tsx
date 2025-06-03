@@ -1,13 +1,26 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
-import WeekNavigator from './components/WeekNavigator';
-import { useDailyMealPlan, PlannedRecipe } from '../../../hooks/useDailyMealPlan';
-import { useUserRecipes } from '../../../hooks/useUserRecipes';
-import SelectFromMyRecipesModal, { RecipeForModal } from '../../../components/modals/SelectFromMyRecipesModal';
-import { RecipeItem } from '../../../types';
 import { format } from 'date-fns';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import WeekNavigator from './components/WeekNavigator';
+import {
+  useDailyMealPlan,
+  PlannedRecipe,
+} from '../../../hooks/useDailyMealPlan';
+import { useUserRecipes } from '../../../hooks/useUserRecipes';
+import SelectFromMyRecipesModal, {
+  RecipeForModal,
+} from '../../../components/modals/SelectFromMyRecipesModal';
+import { RecipeItem } from '../../../types';
 
 // Helper function to get the start of the week (Monday)
 const getWeekStartDate = (date: Date): Date => {
@@ -46,33 +59,43 @@ const isSameDay = (date1: Date, date2: Date): boolean => {
 const formatWeekRangeText = (startDate: Date): string => {
   const endDate = new Date(startDate);
   endDate.setDate(startDate.getDate() + 6);
-  const monthDayFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
-  
+  const monthDayFormat = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+
   return `${monthDayFormat.format(startDate)} - ${monthDayFormat.format(endDate)}`;
 };
 
 // This helper should be available or imported if used like this
 function getWeekStartDateHelper(date: Date): Date {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    return new Date(d.setDate(diff));
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.setDate(diff));
 }
 
 const MealPlannerV2Screen = React.memo(() => {
   const navigation = useNavigation();
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [weekIndicatorText, setWeekIndicatorText] = useState(() => 
-    formatWeekRangeText(getWeekStartDateHelper(new Date()))
+  const [weekIndicatorText, setWeekIndicatorText] = useState(() =>
+    formatWeekRangeText(getWeekStartDateHelper(new Date())),
   );
   const [isRecipeModalVisible, setIsRecipeModalVisible] = useState(false);
-  const [currentSelectedSlot, setCurrentSelectedSlot] = useState<'breakfast' | 'lunch' | 'dinner' | null>(null);
+  const [currentSelectedSlot, setCurrentSelectedSlot] = useState<
+    'breakfast' | 'lunch' | 'dinner' | null
+  >(null);
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
   const [displayedMealPlan, setDisplayedMealPlan] = useState<any>(null);
 
   // Format selectedDate for the hook - memoized to prevent unnecessary recalculations
-  const formattedDateForHook = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
-  console.log(`[[MEAL_PLANNER_V2_SCREEN]] Requesting data for date: ${formattedDateForHook}`);
+  const formattedDateForHook = useMemo(
+    () => format(selectedDate, 'yyyy-MM-dd'),
+    [selectedDate],
+  );
+  console.log(
+    `[[MEAL_PLANNER_V2_SCREEN]] Requesting data for date: ${formattedDateForHook}`,
+  );
 
   const {
     dailyMealPlan,
@@ -100,15 +123,17 @@ const MealPlannerV2Screen = React.memo(() => {
 
   console.log(
     `[[MEAL_PLANNER_V2_SCREEN]] Received for date ${formattedDateForHook}:`,
-    'isLoading:', isLoadingDailyMealPlan,
-    'plan:', JSON.stringify(dailyMealPlan, null, 2)
+    'isLoading:',
+    isLoadingDailyMealPlan,
+    'plan:',
+    JSON.stringify(dailyMealPlan, null, 2),
   );
 
   // Fetch user's recipes for the modal
-  const { 
-    data: userRecipesData, 
-    isLoading: isLoadingUserRecipes, 
-    error: userRecipesError 
+  const {
+    data: userRecipesData,
+    isLoading: isLoadingUserRecipes,
+    error: userRecipesError,
   } = useUserRecipes();
 
   // Map RecipeItem[] to RecipeForModal[] for the modal - memoized for performance
@@ -117,9 +142,9 @@ const MealPlannerV2Screen = React.memo(() => {
     // console.log('[[MEAL_PLANNER_V2_SCREEN]] Mapping userRecipesData to recipesForModal. Input userRecipesData:', JSON.stringify(userRecipesData, null, 2));
     const mapped = userRecipesData.map(recipe => ({
       recipe_id: recipe.recipe_id, // Use recipe.recipe_id from input
-      recipe_name: recipe.title,   // Use recipe.title from input
+      recipe_name: recipe.title, // Use recipe.title from input
       // Use recipe.thumbnail_url as primary, fallback to recipe.video_url if needed, then null
-      thumbnail_url: recipe.thumbnail_url || recipe.video_url || null, 
+      thumbnail_url: recipe.thumbnail_url || recipe.video_url || null,
     }));
     // console.log('[[MEAL_PLANNER_V2_SCREEN]] Output recipesForModal:', JSON.stringify(mapped, null, 2));
     return mapped;
@@ -127,23 +152,32 @@ const MealPlannerV2Screen = React.memo(() => {
 
   // Memoized date formatting to prevent recalculation
   const selectedDayInfoText = useMemo(() => {
-    const longDateFormat = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    const longDateFormat = new Intl.DateTimeFormat('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+    });
     return `Displaying for: ${longDateFormat.format(selectedDate)}`;
   }, [selectedDate]);
 
-  const handleDayPress = useCallback((date: Date) => {
-    // Prevent unnecessary updates if selecting the same date
-    if (isSameDay(date, selectedDate)) {
-      return;
-    }
-    
-    // Batch state updates to prevent blinking
-    const newWeekIndicatorText = formatWeekRangeText(getWeekStartDateHelper(date));
-    
-    // Use immediate state update for better responsiveness
-    setSelectedDate(date);
-    setWeekIndicatorText(newWeekIndicatorText);
-  }, [selectedDate]);
+  const handleDayPress = useCallback(
+    (date: Date) => {
+      // Prevent unnecessary updates if selecting the same date
+      if (isSameDay(date, selectedDate)) {
+        return;
+      }
+
+      // Batch state updates to prevent blinking
+      const newWeekIndicatorText = formatWeekRangeText(
+        getWeekStartDateHelper(date),
+      );
+
+      // Use immediate state update for better responsiveness
+      setSelectedDate(date);
+      setWeekIndicatorText(newWeekIndicatorText);
+    },
+    [selectedDate],
+  );
 
   const handleTargetWeekChange = useCallback((newTargetWeekStart: Date) => {
     // Only update week indicator text, don't change selected date to prevent blinking
@@ -151,76 +185,105 @@ const MealPlannerV2Screen = React.memo(() => {
     setWeekIndicatorText(newWeekIndicatorText);
   }, []);
 
-  const handleOpenRecipeSelectionModal = useCallback((slot: 'breakfast' | 'lunch' | 'dinner') => {
-    setCurrentSelectedSlot(slot);
-    setIsRecipeModalVisible(true);
-  }, []);
+  const handleOpenRecipeSelectionModal = useCallback(
+    (slot: 'breakfast' | 'lunch' | 'dinner') => {
+      setCurrentSelectedSlot(slot);
+      setIsRecipeModalVisible(true);
+    },
+    [],
+  );
 
-  const handleRemoveRecipe = useCallback((slot: 'breakfast' | 'lunch' | 'dinner') => {
-    // Use current dailyMealPlan for alert, but displayedMealPlan for UI consistency
-    const recipeTitle = (dailyMealPlan || displayedMealPlan)?.[slot]?.recipe_title || 'this recipe';
-    Alert.alert(
-      'Confirm Removal',
-      `Are you sure you want to remove ${recipeTitle} from ${slot} for ${formattedDateForHook}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await removeRecipeFromSlot({ slot });
-              Alert.alert('Success', `${recipeTitle} removed from ${slot}.`);
-            } catch (e: any) {
-              Alert.alert('Error', `Failed to remove recipe: ${e.message}`);
-            }
+  const handleRemoveRecipe = useCallback(
+    (slot: 'breakfast' | 'lunch' | 'dinner') => {
+      // Use current dailyMealPlan for alert, but displayedMealPlan for UI consistency
+      const recipeTitle =
+        (dailyMealPlan || displayedMealPlan)?.[slot]?.recipe_title ||
+        'this recipe';
+      Alert.alert(
+        'Confirm Removal',
+        `Are you sure you want to remove ${recipeTitle} from ${slot} for ${formattedDateForHook}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Remove',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await removeRecipeFromSlot({ slot });
+                Alert.alert('Success', `${recipeTitle} removed from ${slot}.`);
+              } catch (e: any) {
+                Alert.alert('Error', `Failed to remove recipe: ${e.message}`);
+              }
+            },
           },
-        },
-      ]
-    );
-  }, [dailyMealPlan, displayedMealPlan, formattedDateForHook, removeRecipeFromSlot]);
+        ],
+      );
+    },
+    [
+      dailyMealPlan,
+      displayedMealPlan,
+      formattedDateForHook,
+      removeRecipeFromSlot,
+    ],
+  );
 
   // Handler for when a recipe is selected from the modal
-  const handleRecipeSelectedFromModal = useCallback(async (recipe: RecipeForModal) => {
-    if (currentSelectedSlot) {
-      try {
-        await addRecipeToSlot({ 
-          slot: currentSelectedSlot, 
-          recipeId: recipe.recipe_id,
-          recipeTitle: recipe.recipe_name,
-          recipeThumbnailUrl: recipe.thumbnail_url || undefined,
-          planDate: formattedDateForHook,
-        });
-        Alert.alert('Success', `${recipe.recipe_name} added to ${currentSelectedSlot} for ${formattedDateForHook}`);
-      } catch (e: any) {
-        Alert.alert('Error', `Failed to add recipe: ${e.message}`);
-        console.error('Failed to add recipe to slot from modal:', e);
+  const handleRecipeSelectedFromModal = useCallback(
+    async (recipe: RecipeForModal) => {
+      if (currentSelectedSlot) {
+        try {
+          await addRecipeToSlot({
+            slot: currentSelectedSlot,
+            recipeId: recipe.recipe_id,
+            recipeTitle: recipe.recipe_name,
+            recipeThumbnailUrl: recipe.thumbnail_url || undefined,
+            planDate: formattedDateForHook,
+          });
+          Alert.alert(
+            'Success',
+            `${recipe.recipe_name} added to ${currentSelectedSlot} for ${formattedDateForHook}`,
+          );
+        } catch (e: any) {
+          Alert.alert('Error', `Failed to add recipe: ${e.message}`);
+          console.error('Failed to add recipe to slot from modal:', e);
+        }
       }
-    }
-    setIsRecipeModalVisible(false);
-    setCurrentSelectedSlot(null);
-  }, [currentSelectedSlot, addRecipeToSlot, formattedDateForHook]);
+      setIsRecipeModalVisible(false);
+      setCurrentSelectedSlot(null);
+    },
+    [currentSelectedSlot, addRecipeToSlot, formattedDateForHook],
+  );
 
-  const handleCookRecipe = useCallback((recipeId: string) => {
-    if (!recipeId) {
-      console.warn('Attempted to navigate to recipe detail without a recipeId.');
-      return;
-    }
-    // Use the correct screen name from MainStack.tsx which is "RecipeDetail"
-    // Pass "id" as the parameter name, with the value of recipeId
-    // @ts-ignore 
-    navigation.navigate('RecipeDetail', { id: recipeId });
-  }, [navigation]);
+  const handleCookRecipe = useCallback(
+    (recipeId: string) => {
+      if (!recipeId) {
+        console.warn(
+          'Attempted to navigate to recipe detail without a recipeId.',
+        );
+        return;
+      }
+      // Use the correct screen name from MainStack.tsx which is "RecipeDetail"
+      // Pass "id" as the parameter name, with the value of recipeId
+      // @ts-ignore
+      navigation.navigate('RecipeDetail', { id: recipeId });
+    },
+    [navigation],
+  );
 
   // Show main loading spinner if adding a recipe (covers interaction)
   if (isAddingRecipe) {
     return (
-        <View style={[styles.container, styles.centeredFeedback, styles.loadingOverlay]}>
-            <ActivityIndicator size="large" color="#FFFFFF" />
-            <Text style={[styles.feedbackText, { color: '#FFFFFF'}]}>
-              Saving meal...
-            </Text>
-        </View>
+      <View
+        style={[
+          styles.container,
+          styles.centeredFeedback,
+          styles.loadingOverlay,
+        ]}>
+        <ActivityIndicator size="large" color="#FFFFFF" />
+        <Text style={[styles.feedbackText, { color: '#FFFFFF' }]}>
+          Saving meal...
+        </Text>
+      </View>
     );
   }
 
@@ -237,7 +300,9 @@ const MealPlannerV2Screen = React.memo(() => {
   if (dailyMealPlanError) {
     return (
       <View style={[styles.container, styles.centeredFeedback]}>
-        <Text style={styles.errorText}>Error loading meal plan: {dailyMealPlanError.message}</Text>
+        <Text style={styles.errorText}>
+          Error loading meal plan: {dailyMealPlanError.message}
+        </Text>
       </View>
     );
   }
@@ -245,30 +310,32 @@ const MealPlannerV2Screen = React.memo(() => {
   if (userRecipesError) {
     return (
       <View style={styles.centeredFeedback}>
-        <Text style={styles.errorText}>Error loading your recipes: {userRecipesError.message}</Text>
+        <Text style={styles.errorText}>
+          Error loading your recipes: {userRecipesError.message}
+        </Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}> 
+    <View style={styles.container}>
       <View style={styles.titleContainer}>
         <Text style={styles.titleText}>Meal Plan This Week</Text>
         <Text style={styles.weekIndicator}>{weekIndicatorText}</Text>
       </View>
 
-      <WeekNavigator 
-        selectedDate={selectedDate} 
-        onDateSelect={handleDayPress} 
+      <WeekNavigator
+        selectedDate={selectedDate}
+        onDateSelect={handleDayPress}
         onTargetWeekChange={handleTargetWeekChange}
       />
 
       <View style={styles.selectedDayInfoContainer}>
-        <Text style={styles.selectedDayInfoText}>{selectedDayInfoText}</Text> 
+        <Text style={styles.selectedDayInfoText}>{selectedDayInfoText}</Text>
       </View>
 
       <View style={styles.mealSlotsContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.mealSlotCard]}
           onPress={() => {
             if (displayedMealPlan?.breakfast?.recipe_id) {
@@ -277,24 +344,33 @@ const MealPlannerV2Screen = React.memo(() => {
               handleOpenRecipeSelectionModal('breakfast');
             }
           }}
-          activeOpacity={0.7}
-        >
+          activeOpacity={0.7}>
           <View style={styles.mealSlotHeader}>
             <Icon name="coffee" size={18} color="#10b981" />
-            <Text style={styles.mealSlotTitle} numberOfLines={1}>Breakfast</Text>
+            <Text style={styles.mealSlotTitle} numberOfLines={1}>
+              Breakfast
+            </Text>
           </View>
           {displayedMealPlan?.breakfast ? (
             <View style={styles.recipeInfoContainer}>
               {displayedMealPlan.breakfast.recipe_thumbnail_url && (
-                <Image 
-                  source={{ uri: displayedMealPlan.breakfast.recipe_thumbnail_url }} 
-                  style={styles.recipeImage} 
+                <Image
+                  source={{
+                    uri: displayedMealPlan.breakfast.recipe_thumbnail_url,
+                  }}
+                  style={styles.recipeImage}
                 />
               )}
               <Text style={styles.recipeTitle} numberOfLines={2}>
-                {displayedMealPlan.breakfast.recipe_title || 'Recipe Title Missing'}
+                {displayedMealPlan.breakfast.recipe_title ||
+                  'Recipe Title Missing'}
               </Text>
-              <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleRemoveRecipe('breakfast'); }} style={styles.removeButton}>
+              <TouchableOpacity
+                onPress={e => {
+                  e.stopPropagation();
+                  handleRemoveRecipe('breakfast');
+                }}
+                style={styles.removeButton}>
                 <Icon name="close" size={24} color="#ef4444" />
               </TouchableOpacity>
             </View>
@@ -306,7 +382,7 @@ const MealPlannerV2Screen = React.memo(() => {
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.mealSlotCard]}
           onPress={() => {
             if (displayedMealPlan?.lunch?.recipe_id) {
@@ -315,24 +391,30 @@ const MealPlannerV2Screen = React.memo(() => {
               handleOpenRecipeSelectionModal('lunch');
             }
           }}
-          activeOpacity={0.7}
-        >
+          activeOpacity={0.7}>
           <View style={styles.mealSlotHeader}>
             <Icon name="fastfood" size={18} color="#10b981" />
-            <Text style={styles.mealSlotTitle} numberOfLines={1}>Lunch</Text>
+            <Text style={styles.mealSlotTitle} numberOfLines={1}>
+              Lunch
+            </Text>
           </View>
           {displayedMealPlan?.lunch ? (
             <View style={styles.recipeInfoContainer}>
               {displayedMealPlan.lunch.recipe_thumbnail_url && (
-                <Image 
-                  source={{ uri: displayedMealPlan.lunch.recipe_thumbnail_url }} 
-                  style={styles.recipeImage} 
+                <Image
+                  source={{ uri: displayedMealPlan.lunch.recipe_thumbnail_url }}
+                  style={styles.recipeImage}
                 />
               )}
               <Text style={styles.recipeTitle} numberOfLines={2}>
                 {displayedMealPlan.lunch.recipe_title || 'Recipe Title Missing'}
               </Text>
-              <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleRemoveRecipe('lunch'); }} style={styles.removeButton}>
+              <TouchableOpacity
+                onPress={e => {
+                  e.stopPropagation();
+                  handleRemoveRecipe('lunch');
+                }}
+                style={styles.removeButton}>
                 <Icon name="close" size={24} color="#ef4444" />
               </TouchableOpacity>
             </View>
@@ -344,7 +426,7 @@ const MealPlannerV2Screen = React.memo(() => {
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.mealSlotCard]}
           onPress={() => {
             if (displayedMealPlan?.dinner?.recipe_id) {
@@ -353,24 +435,33 @@ const MealPlannerV2Screen = React.memo(() => {
               handleOpenRecipeSelectionModal('dinner');
             }
           }}
-          activeOpacity={0.7}
-        >
+          activeOpacity={0.7}>
           <View style={styles.mealSlotHeader}>
             <Icon name="restaurant" size={18} color="#10b981" />
-            <Text style={styles.mealSlotTitle} numberOfLines={1}>Dinner</Text>
+            <Text style={styles.mealSlotTitle} numberOfLines={1}>
+              Dinner
+            </Text>
           </View>
           {displayedMealPlan?.dinner ? (
             <View style={styles.recipeInfoContainer}>
               {displayedMealPlan.dinner.recipe_thumbnail_url && (
-                <Image 
-                  source={{ uri: displayedMealPlan.dinner.recipe_thumbnail_url }} 
-                  style={styles.recipeImage} 
+                <Image
+                  source={{
+                    uri: displayedMealPlan.dinner.recipe_thumbnail_url,
+                  }}
+                  style={styles.recipeImage}
                 />
               )}
               <Text style={styles.recipeTitle} numberOfLines={2}>
-                {displayedMealPlan.dinner.recipe_title || 'Recipe Title Missing'}
+                {displayedMealPlan.dinner.recipe_title ||
+                  'Recipe Title Missing'}
               </Text>
-              <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleRemoveRecipe('dinner'); }} style={styles.removeButton}>
+              <TouchableOpacity
+                onPress={e => {
+                  e.stopPropagation();
+                  handleRemoveRecipe('dinner');
+                }}
+                style={styles.removeButton}>
                 <Icon name="close" size={24} color="#ef4444" />
               </TouchableOpacity>
             </View>
@@ -512,7 +603,7 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#ef4444', 
+    color: '#ef4444',
     textAlign: 'center',
     paddingHorizontal: 20,
     fontWeight: '500',
@@ -538,7 +629,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.7)',
     zIndex: 10,
-  }
+  },
 });
 
-export default MealPlannerV2Screen; 
+export default MealPlannerV2Screen;

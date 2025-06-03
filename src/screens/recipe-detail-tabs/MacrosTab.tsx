@@ -1,96 +1,165 @@
 import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRoute } from '@react-navigation/native';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRecipeDetails } from '../../hooks/useRecipeDetails';
 import { COLORS } from '../../constants/theme';
-import { Feather, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../providers/AuthProvider';
 
 // Circular progress component for visually showing macro percentages
-const CircularProgress = ({ percentage, color, size = 60, label, value }: 
-  { percentage: number; color: string; size?: number; label: string; value: string }) => {
+function CircularProgress({
+  percentage,
+  color,
+  size = 60,
+  label,
+  value,
+}: {
+  percentage: number;
+  color: string;
+  size?: number;
+  label: string;
+  value: string;
+}) {
   // Calculate the stroke dash
   const strokeWidth = size * 0.1;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (percentage / 100) * circumference;
-  
+
   return (
     <View style={styles.circularProgressContainer}>
       <View style={[styles.progressContainer, { width: size, height: size }]}>
-        <View style={[styles.backgroundCircle, { width: size, height: size, borderRadius: size / 2, borderWidth: strokeWidth }]} />
-        <View style={[styles.progressCircle, { 
-          width: size, 
-          height: size, 
-          borderRadius: size / 2, 
-          borderWidth: strokeWidth,
-          borderColor: color,
-          borderTopColor: 'transparent',
-          borderRightColor: percentage > 75 ? color : 'transparent',
-          borderBottomColor: percentage > 50 ? color : 'transparent',
-          borderLeftColor: percentage > 25 ? color : 'transparent',
-          transform: [{ rotateZ: `-${percentage * 3.6}deg` }]
-        }]} />
-        <View style={[styles.progressLabel, { width: size - strokeWidth * 2, height: size - strokeWidth * 2 }]}>
+        <View
+          style={[
+            styles.backgroundCircle,
+            {
+              width: size,
+              height: size,
+              borderRadius: size / 2,
+              borderWidth: strokeWidth,
+            },
+          ]}
+        />
+        <View
+          style={[
+            styles.progressCircle,
+            {
+              width: size,
+              height: size,
+              borderRadius: size / 2,
+              borderWidth: strokeWidth,
+              borderColor: color,
+              borderTopColor: 'transparent',
+              borderRightColor: percentage > 75 ? color : 'transparent',
+              borderBottomColor: percentage > 50 ? color : 'transparent',
+              borderLeftColor: percentage > 25 ? color : 'transparent',
+              transform: [{ rotateZ: `-${percentage * 3.6}deg` }],
+            },
+          ]}
+        />
+        <View
+          style={[
+            styles.progressLabel,
+            { width: size - strokeWidth * 2, height: size - strokeWidth * 2 },
+          ]}>
           <Text style={[styles.progressValue, { color }]}>{value}</Text>
         </View>
       </View>
       <Text style={styles.progressText}>{label}</Text>
     </View>
   );
-};
+}
 
 // Bar progress component for visually showing nutrient percentages
-const NutrientBar = ({ label, amount, percentage, color }: 
-  { label: string; amount: string; percentage: number; color: string }) => (
-  <View style={styles.nutrientBarContainer}>
-    <View style={styles.nutrientLabelContainer}>
-      <Text style={styles.nutrientLabel}>{label}</Text>
-      <Text style={styles.nutrientAmount}>{amount}</Text>
-    </View>
-    <View style={styles.barContainer}>
-      <View style={[styles.barBackground, { backgroundColor: `${color}20` }]}>
-        <View 
-          style={[
-            styles.barFill, 
-            { 
-              width: `${Math.min(percentage, 100)}%`,
-              backgroundColor: color 
-            }
-          ]} 
-        />
+function NutrientBar({
+  label,
+  amount,
+  percentage,
+  color,
+}: {
+  label: string;
+  amount: string;
+  percentage: number;
+  color: string;
+}) {
+  return (
+    <View style={styles.nutrientBarContainer}>
+      <View style={styles.nutrientLabelContainer}>
+        <Text style={styles.nutrientLabel}>{label}</Text>
+        <Text style={styles.nutrientAmount}>{amount}</Text>
       </View>
-      <Text style={styles.percentText}>{percentage}%</Text>
+      <View style={styles.barContainer}>
+        <View style={[styles.barBackground, { backgroundColor: `${color}20` }]}>
+          <View
+            style={[
+              styles.barFill,
+              {
+                width: `${Math.min(percentage, 100)}%`,
+                backgroundColor: color,
+              },
+            ]}
+          />
+        </View>
+        <Text style={styles.percentText}>{percentage}%</Text>
+      </View>
     </View>
-  </View>
-);
+  );
+}
 
 export default function MacrosTab() {
   const route = useRoute<any>();
   const { user } = useAuth();
   const recipeId = route.params?.id;
-  console.log('[MacrosTab] recipeId from route.params:', recipeId, 'userId:', user?.id);
+  console.log(
+    '[MacrosTab] recipeId from route.params:',
+    recipeId,
+    'userId:',
+    user?.id,
+  );
 
-  const { data: recipeDetails, isLoading, error } = useRecipeDetails(recipeId, user?.id);
-  console.log('[MacrosTab] useRecipeDetails results - recipeDetails:', JSON.stringify(recipeDetails, null, 2), 'isLoading:', isLoading, 'error:', JSON.stringify(error, null, 2));
+  const {
+    data: recipeDetails,
+    isLoading,
+    error,
+  } = useRecipeDetails(recipeId, user?.id);
+  console.log(
+    '[MacrosTab] useRecipeDetails results - recipeDetails:',
+    JSON.stringify(recipeDetails, null, 2),
+    'isLoading:',
+    isLoading,
+    'error:',
+    JSON.stringify(error, null, 2),
+  );
 
   if (isLoading) {
-    return <View style={styles.centered}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
   }
 
   if (error || !recipeDetails) {
-    return <View style={styles.centered}><Text style={styles.errorText}>Could not load nutritional information.</Text></View>;
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>
+          Could not load nutritional information.
+        </Text>
+      </View>
+    );
   }
 
   // The mock data will now always be shown if recipeDetails are loaded.
   const servings = recipeDetails.servings || 1; // Default to 1 if servings is null/undefined, used for display string.
-  
+
   const totalCalories = 240;
-  const caloriesFromProtein = 56; 
-  const caloriesFromCarbs = 24; 
-  const caloriesFromFat = 160; 
-  
-  const proteinPercentage = Math.round((caloriesFromProtein / totalCalories) * 100);
+  const caloriesFromProtein = 56;
+  const caloriesFromCarbs = 24;
+  const caloriesFromFat = 160;
+
+  const proteinPercentage = Math.round(
+    (caloriesFromProtein / totalCalories) * 100,
+  );
   const carbsPercentage = Math.round((caloriesFromCarbs / totalCalories) * 100);
   const fatPercentage = Math.round((caloriesFromFat / totalCalories) * 100);
 
@@ -99,69 +168,105 @@ export default function MacrosTab() {
       {/* The content below will now always be rendered as hasNutritionData logic is removed */}
       <View style={styles.headerContainer}>
         <View style={styles.headerRow}>
-          <Ionicons name="nutrition-outline" size={24} color={COLORS.primary} style={styles.headerIcon} />
+          <Ionicons
+            name="nutrition-outline"
+            size={24}
+            color={COLORS.primary}
+            style={styles.headerIcon}
+          />
           <Text style={styles.headerTitle}>Nutrition Facts</Text>
         </View>
         <Text style={styles.servingInfo}>
           Based on {servings} serving{servings > 1 ? 's' : ''}
         </Text>
       </View>
-      
+
       <View style={styles.caloriesCard}>
         <Text style={styles.caloriesLabel}>Total Calories</Text>
-        <Text style={styles.caloriesValue}>{totalCalories} <Text style={styles.caloriesUnit}>kcal</Text></Text>
+        <Text style={styles.caloriesValue}>
+          {totalCalories} <Text style={styles.caloriesUnit}>kcal</Text>
+        </Text>
       </View>
-      
+
       <View style={styles.sectionContainer}>
         <View style={styles.sectionTitleContainer}>
           <Ionicons name="pie-chart-outline" size={18} color={COLORS.primary} />
           <Text style={styles.sectionTitle}>Macronutrient Distribution</Text>
         </View>
-        
+
         <View style={styles.macrosCirclesContainer}>
-          <CircularProgress 
-            percentage={proteinPercentage} 
-            color="#2E7D32" 
-            label="Protein" 
+          <CircularProgress
+            percentage={proteinPercentage}
+            color="#2E7D32"
+            label="Protein"
             value="14g"
           />
-          <CircularProgress 
-            percentage={carbsPercentage} 
-            color="#1976D2" 
-            label="Carbs" 
+          <CircularProgress
+            percentage={carbsPercentage}
+            color="#1976D2"
+            label="Carbs"
             value="6g"
           />
-          <CircularProgress 
-            percentage={fatPercentage} 
-            color="#FF8F00" 
-            label="Fat" 
+          <CircularProgress
+            percentage={fatPercentage}
+            color="#FF8F00"
+            label="Fat"
             value="18g"
           />
         </View>
       </View>
-      
+
       <View style={styles.sectionContainer}>
         <View style={styles.sectionTitleContainer}>
           <Ionicons name="leaf-outline" size={18} color={COLORS.primary} />
           <Text style={styles.sectionTitle}>Vitamins & Minerals</Text>
           <Text style={styles.dailyValueText}>% Daily Value</Text>
         </View>
-        
+
         <View style={styles.vitaminsContainer}>
-          <NutrientBar label="Vitamin A" amount="750 IU" percentage={15} color="#43A047" />
-          <NutrientBar label="Vitamin C" amount="10.8 mg" percentage={12} color="#E53935" />
-          <NutrientBar label="Calcium" amount="80 mg" percentage={8} color="#1E88E5" />
-          <NutrientBar label="Iron" amount="1.8 mg" percentage={10} color="#FB8C00" />
-          <NutrientBar label="Potassium" amount="525 mg" percentage={15} color="#8E24AA" />
+          <NutrientBar
+            label="Vitamin A"
+            amount="750 IU"
+            percentage={15}
+            color="#43A047"
+          />
+          <NutrientBar
+            label="Vitamin C"
+            amount="10.8 mg"
+            percentage={12}
+            color="#E53935"
+          />
+          <NutrientBar
+            label="Calcium"
+            amount="80 mg"
+            percentage={8}
+            color="#1E88E5"
+          />
+          <NutrientBar
+            label="Iron"
+            amount="1.8 mg"
+            percentage={10}
+            color="#FB8C00"
+          />
+          <NutrientBar
+            label="Potassium"
+            amount="525 mg"
+            percentage={15}
+            color="#8E24AA"
+          />
         </View>
       </View>
-      
+
       <View style={styles.sectionContainer}>
         <View style={styles.sectionTitleContainer}>
-          <Ionicons name="information-circle-outline" size={18} color={COLORS.primary} />
+          <Ionicons
+            name="information-circle-outline"
+            size={18}
+            color={COLORS.primary}
+          />
           <Text style={styles.sectionTitle}>Additional Details</Text>
         </View>
-        
+
         <View style={styles.detailsGrid}>
           <DetailItem label="Saturated Fat" value="4g" />
           <DetailItem label="Trans Fat" value="0g" />
@@ -171,10 +276,11 @@ export default function MacrosTab() {
           <DetailItem label="Sugar" value="1g" />
         </View>
       </View>
-      
+
       <View style={styles.disclaimerContainer}>
         <Text style={styles.disclaimerText}>
-          Values are approximate based on recipe ingredients. Individual nutritional content may vary.
+          Values are approximate based on recipe ingredients. Individual
+          nutritional content may vary.
         </Text>
       </View>
     </View>
@@ -182,12 +288,14 @@ export default function MacrosTab() {
 }
 
 // Detail item component for additional nutritional details
-const DetailItem = ({ label, value }: { label: string, value: string }) => (
-  <View style={styles.detailItem}>
-    <Text style={styles.detailLabel}>{label}</Text>
-    <Text style={styles.detailValue}>{value}</Text>
-  </View>
-);
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.detailItem}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={styles.detailValue}>{value}</Text>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -419,5 +527,5 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary || '#666',
     textAlign: 'center',
     maxWidth: '80%',
-  }
-}); 
+  },
+});

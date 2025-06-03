@@ -19,26 +19,29 @@ export interface StockItem {
 
 // Type for raw item from Supabase before quantity conversion if needed
 interface RawStockItem extends Omit<StockItem, 'quantity'> {
-    quantity: string | number;
+  quantity: string | number;
 }
 
 export type UnitOption = { label: string; value: string };
 
 // Default unit options
 export const DEFAULT_UNIT_OPTIONS: UnitOption[] = [
-    { label: 'Units', value: 'units' },
-    { label: 'Grams (g)', value: 'g' },
-    { label: 'Kilograms (kg)', value: 'kg' },
-    { label: 'Milliliters (ml)', value: 'ml' },
-    { label: 'Liters (l)', value: 'l' },
-    { label: 'Ounces (oz)', value: 'oz' },
-    { label: 'Pounds (lbs)', value: 'lbs' },
-    { label: 'Cups', value: 'cups' },
+  { label: 'Units', value: 'units' },
+  { label: 'Grams (g)', value: 'g' },
+  { label: 'Kilograms (kg)', value: 'kg' },
+  { label: 'Milliliters (ml)', value: 'ml' },
+  { label: 'Liters (l)', value: 'l' },
+  { label: 'Ounces (oz)', value: 'oz' },
+  { label: 'Pounds (lbs)', value: 'lbs' },
+  { label: 'Cups', value: 'cups' },
 ];
 
 // Fetch user session
 const fetchUserSession = async () => {
-  const { data: { session }, error } = await supabase.auth.getSession();
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
   if (error) throw error;
   return session?.user?.id || null;
 };
@@ -53,10 +56,12 @@ const fetchStockData = async (userId: string): Promise<StockItem[]> => {
 
   if (error) throw error;
 
-  return data?.map((item: RawStockItem) => ({ 
-    ...item, 
-    quantity: Number(item.quantity) 
-  })) || [];
+  return (
+    data?.map((item: RawStockItem) => ({
+      ...item,
+      quantity: Number(item.quantity),
+    })) || []
+  );
 };
 
 export const useStockManager = () => {
@@ -76,11 +81,11 @@ export const useStockManager = () => {
   });
 
   // Fetch stock data with React Query
-  const { 
-    data: stockData = [], 
-    isLoading, 
+  const {
+    data: stockData = [],
+    isLoading,
     error: queryError,
-    refetch: fetchStock 
+    refetch: fetchStock,
   } = useQuery({
     queryKey: ['stock', userId],
     queryFn: () => fetchStockData(userId!),
@@ -93,9 +98,12 @@ export const useStockManager = () => {
 
   // Save item mutation
   const saveItemMutation = useMutation({
-    mutationFn: async ({ itemToSave, originalItemName }: { 
-      itemToSave: StockItem; 
-      originalItemName?: string 
+    mutationFn: async ({
+      itemToSave,
+      originalItemName,
+    }: {
+      itemToSave: StockItem;
+      originalItemName?: string;
     }) => {
       if (!userId) throw new Error('User not authenticated');
 
@@ -105,7 +113,7 @@ export const useStockManager = () => {
         quantity: itemToSave.quantity,
         unit: itemToSave.unit || 'units',
         description: itemToSave.description?.trim() || null,
-        ...(editingItem ? {} : { created_at: new Date().toISOString() })
+        ...(editingItem ? {} : { created_at: new Date().toISOString() }),
       };
 
       if (editingItem && originalItemName) {
@@ -126,14 +134,17 @@ export const useStockManager = () => {
       queryClient.invalidateQueries({ queryKey: ['stock', userId] });
       queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
       queryClient.invalidateQueries({ queryKey: ['feed'] });
-      
+
       // Refresh feed pantry matches specifically
       refreshFeedPantryMatches(queryClient);
-      
+
       closeManualModal();
     },
     onError: (error: any) => {
-      Alert.alert("Save Error", error.message || "Could not save the item. Please try again.");
+      Alert.alert(
+        'Save Error',
+        error.message || 'Could not save the item. Please try again.',
+      );
     },
   });
 
@@ -150,13 +161,13 @@ export const useStockManager = () => {
 
       if (error) throw error;
     },
-    onMutate: async (itemToDelete) => {
+    onMutate: async itemToDelete => {
       // Optimistic update
       await queryClient.cancelQueries({ queryKey: ['stock', userId] });
       const previousStock = queryClient.getQueryData(['stock', userId]);
-      
+
       queryClient.setQueryData(['stock', userId], (old: StockItem[] = []) =>
-        old.filter(item => item.item_name !== itemToDelete.item_name)
+        old.filter(item => item.item_name !== itemToDelete.item_name),
       );
 
       return { previousStock };
@@ -164,13 +175,16 @@ export const useStockManager = () => {
     onError: (error: any, itemToDelete, context) => {
       // Rollback on error
       queryClient.setQueryData(['stock', userId], context?.previousStock);
-      Alert.alert("Delete Error", error.message || "Could not delete the item. Please try again.");
+      Alert.alert(
+        'Delete Error',
+        error.message || 'Could not delete the item. Please try again.',
+      );
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['stock', userId] });
       queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
       queryClient.invalidateQueries({ queryKey: ['feed'] });
-      
+
       // Refresh feed pantry matches specifically
       refreshFeedPantryMatches(queryClient);
     },
@@ -187,37 +201,49 @@ export const useStockManager = () => {
     setEditingItem(null);
   }, []);
 
-  const prepareEditItem = useCallback((item: StockItem) => {
-    openManualModal(item);
-  }, [openManualModal]);
+  const prepareEditItem = useCallback(
+    (item: StockItem) => {
+      openManualModal(item);
+    },
+    [openManualModal],
+  );
 
-  const handleSaveItem = useCallback(async (itemToSave: StockItem, originalItemName?: string): Promise<boolean> => {
-    if (!itemToSave.item_name?.trim()) {
-      Alert.alert("Validation Error", "Item name is required.");
-      return false;
-    }
+  const handleSaveItem = useCallback(
+    async (
+      itemToSave: StockItem,
+      originalItemName?: string,
+    ): Promise<boolean> => {
+      if (!itemToSave.item_name?.trim()) {
+        Alert.alert('Validation Error', 'Item name is required.');
+        return false;
+      }
 
-    if (itemToSave.quantity <= 0) {
-      Alert.alert("Validation Error", "Quantity must be greater than 0.");
-      return false;
-    }
+      if (itemToSave.quantity <= 0) {
+        Alert.alert('Validation Error', 'Quantity must be greater than 0.');
+        return false;
+      }
 
-    try {
-      await saveItemMutation.mutateAsync({ itemToSave, originalItemName });
-      return true;
-    } catch {
-      return false;
-    }
-  }, [saveItemMutation]);
+      try {
+        await saveItemMutation.mutateAsync({ itemToSave, originalItemName });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [saveItemMutation],
+  );
 
-  const deleteStockItem = useCallback(async (itemToDelete: StockItem) => {
-    try {
-      await deleteItemMutation.mutateAsync(itemToDelete);
-      return true;
-    } catch {
-      return false;
-    }
-  }, [deleteItemMutation]);
+  const deleteStockItem = useCallback(
+    async (itemToDelete: StockItem) => {
+      try {
+        await deleteItemMutation.mutateAsync(itemToDelete);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [deleteItemMutation],
+  );
 
   return {
     stockData,
@@ -237,9 +263,8 @@ export const useStockManager = () => {
 
     // Item Operations
     deleteStockItem,
-    fetchStock, 
-    
+    fetchStock,
+
     unitOptions: DEFAULT_UNIT_OPTIONS,
   };
 };
-

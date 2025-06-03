@@ -18,10 +18,10 @@ import { useNavigation } from '@react-navigation/native';
 import { Button } from 'react-native-paper';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { 
-  ScanningLoadingOverlay, 
-  CameraInterface, 
-  ItemConfirmationModal 
+import {
+  ScanningLoadingOverlay,
+  CameraInterface,
+  ItemConfirmationModal,
 } from '../../components/pantry';
 import {
   processImageWithAI,
@@ -39,21 +39,23 @@ export default function PantryScanningScreen() {
   const [isCameraVisible, setIsCameraVisible] = useState(false);
   const nav = useNavigation();
   const queryClient = useQueryClient();
-  
+
   // Enhanced state management for V1 features
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [scannedItems, setScannedItems] = useState<ScannedItem[] | null>(null);
-  const [analysisMessage, setAnalysisMessage] = useState('Analyzing your pantry...');
-  
+  const [analysisMessage, setAnalysisMessage] = useState(
+    'Analyzing your pantry...',
+  );
+
   // Analysis message cycling
   const analysisPhrases = [
-    "Analyzing your pantry...",
-    "Identifying items...",
-    "Looking for ingredients...",
-    "Processing labels...",
-    "Almost done...",
-    "AI is working its magic..."
+    'Analyzing your pantry...',
+    'Identifying items...',
+    'Looking for ingredients...',
+    'Processing labels...',
+    'Almost done...',
+    'AI is working its magic...',
   ];
 
   // Camera management functions
@@ -62,20 +64,20 @@ export default function PantryScanningScreen() {
     setIsCameraVisible(false);
     nav.goBack(); // Navigate back to previous screen
   };
-  
+
   const ensureCameraPermission = async (): Promise<boolean> => {
     if (!permission) return false;
-    
+
     if (permission.granted) return true;
-    
+
     if (permission.status === 'denied' && !permission.canAskAgain) {
       Alert.alert(
         'Permission Required',
-        'Camera access was permanently denied. Please enable it in your device settings.'
+        'Camera access was permanently denied. Please enable it in your device settings.',
       );
       return false;
     }
-    
+
     const { granted } = await requestPermission();
     return granted;
   };
@@ -86,10 +88,12 @@ export default function PantryScanningScreen() {
       const hasPermission = await ensureCameraPermission();
       if (hasPermission) {
         openCamera();
-      } else {
-        if (permission && permission.status === 'denied' && !permission.canAskAgain) {
-          // Handle permanent denial if needed
-        }
+      } else if (
+        permission &&
+        permission.status === 'denied' &&
+        !permission.canAskAgain
+      ) {
+        // Handle permanent denial if needed
       }
     };
     manageCamera();
@@ -105,7 +109,7 @@ export default function PantryScanningScreen() {
           return analysisPhrases[nextIndex];
         });
       }, 2000);
-      
+
       return () => clearInterval(messageInterval);
     }
   }, [isAnalyzing]);
@@ -119,7 +123,7 @@ export default function PantryScanningScreen() {
     }
 
     if (!cameraRef.current) {
-      Alert.alert("Error", "Camera not ready.");
+      Alert.alert('Error', 'Camera not ready.');
       return;
     }
 
@@ -128,7 +132,7 @@ export default function PantryScanningScreen() {
 
     try {
       const analysisStartTime = Date.now();
-      
+
       // Take picture with enhanced quality settings
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.7,
@@ -137,21 +141,30 @@ export default function PantryScanningScreen() {
 
       // Process image with AI recognition
       const recognitionResult = await processImageWithAI(photo.base64!);
-      
+
       // Enforce minimum display time for better UX
       await enforceMinimumDisplayTime(analysisStartTime, 4000);
 
       if (recognitionResult.items.length === 0) {
         setIsAnalyzing(false);
-        Alert.alert('No Items Recognized', 'Could not detect items. Try a different angle or better lighting?');
+        Alert.alert(
+          'No Items Recognized',
+          'Could not detect items. Try a different angle or better lighting?',
+        );
       } else {
         setScannedItems(recognitionResult.items);
         setIsAnalyzing(false);
       }
     } catch (error) {
-      console.error('[PantryScanningScreen] Enhanced capture/analysis error:', error);
+      console.error(
+        '[PantryScanningScreen] Enhanced capture/analysis error:',
+        error,
+      );
       setIsAnalyzing(false);
-      Alert.alert('Error', `Failed to process image: ${(error as Error).message}`);
+      Alert.alert(
+        'Error',
+        `Failed to process image: ${(error as Error).message}`,
+      );
     }
   };
 
@@ -163,29 +176,33 @@ export default function PantryScanningScreen() {
     try {
       if (itemsToUpsert.length > 0) {
         // Use Supabase directly for upsert operation
-        const { error } = await supabase
-          .from('stock')
-          .upsert(itemsToUpsert, { 
-            onConflict: 'user_id, item_name'
-          });
-          
+        const { error } = await supabase.from('stock').upsert(itemsToUpsert, {
+          onConflict: 'user_id, item_name',
+        });
+
         if (error) {
           console.error('[PantryScanningScreen] Error saving items:', error);
           throw error;
         }
-        
+
         // Invalidate React Query cache to refresh all pantry-related data
         queryClient.invalidateQueries({ queryKey: ['stock'] });
         queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
         queryClient.invalidateQueries({ queryKey: ['feed'] });
-        
+
         // Refresh feed pantry matches specifically
         refreshFeedPantryMatches(queryClient);
-        
-        Alert.alert('Success', `${itemsToUpsert.length} items added to your pantry!`);
+
+        Alert.alert(
+          'Success',
+          `${itemsToUpsert.length} items added to your pantry!`,
+        );
       }
     } catch (error) {
-      console.error('[PantryScanningScreen] Error in handleConfirmItems:', error);
+      console.error(
+        '[PantryScanningScreen] Error in handleConfirmItems:',
+        error,
+      );
       Alert.alert('Error', `Failed to save items: ${(error as Error).message}`);
     } finally {
       setIsSaving(false);
@@ -219,9 +236,9 @@ export default function PantryScanningScreen() {
           Grant permission
         </Button>
         {permission.status === 'denied' && !permission.canAskAgain && (
-           <Text style={{textAlign: 'center', marginTop:10, color: 'grey'}}>
-             Permission was denied. Please enable it in settings.
-           </Text>
+          <Text style={{ textAlign: 'center', marginTop: 10, color: 'grey' }}>
+            Permission was denied. Please enable it in settings.
+          </Text>
         )}
       </Centered>
     );
@@ -229,13 +246,13 @@ export default function PantryScanningScreen() {
   return (
     <>
       {/* Status bar configuration */}
-      <StatusBar 
-        barStyle="light-content" 
-        backgroundColor="transparent" 
-        translucent={true}
-        hidden={isCameraVisible && !scannedItems} 
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="transparent"
+        translucent
+        hidden={isCameraVisible && !scannedItems}
       />
-      
+
       <View style={styles.container}>
         {/* Enhanced Camera Interface */}
         {isCameraVisible && !scannedItems && (
@@ -244,7 +261,7 @@ export default function PantryScanningScreen() {
             onCapturePress={handleCameraCapture}
             onExitPress={closeCamera}
             isAnalyzing={isAnalyzing}
-            showExitButton={true}
+            showExitButton
             instructionText="Position your pantry items clearly in the frame and tap to scan"
           />
         )}
@@ -273,27 +290,27 @@ export default function PantryScanningScreen() {
 }
 
 /* ---------- helper component ---------- */
-const Centered = ({ children }: { children: React.ReactNode }) => (
-  <View style={styles.center}>{children}</View>
-);
+function Centered({ children }: { children: React.ReactNode }) {
+  return <View style={styles.center}>{children}</View>;
+}
 
 /* ---------- styles ---------- */
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
+  container: {
+    flex: 1,
     backgroundColor: '#000',
   },
-  center: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    padding: 32, 
-    backgroundColor: '#fff' 
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+    backgroundColor: '#fff',
   },
-  centeredText: { 
-    textAlign: 'center', 
-    marginBottom: 16, 
-    color: '#000', 
-    fontSize: 16 
+  centeredText: {
+    textAlign: 'center',
+    marginBottom: 16,
+    color: '#000',
+    fontSize: 16,
   },
 });

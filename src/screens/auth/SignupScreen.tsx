@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  View, 
-  Alert, 
-  Text, 
-  KeyboardAvoidingView, 
-  Platform, 
-  ScrollView, 
-  TouchableOpacity, 
+import {
+  View,
+  Alert,
+  Text,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  TouchableOpacity,
   StyleSheet,
   Dimensions,
   StatusBar,
@@ -15,29 +15,29 @@ import {
 } from 'react-native';
 import { TextInput, ActivityIndicator } from 'react-native-paper';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
-import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { AuthStackParamList } from '../../navigation/AuthStack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { AuthStackParamList } from '../../navigation/AuthStack';
+import { supabase } from '../../services/supabase';
 
 type Nav = NativeStackNavigationProp<AuthStackParamList, 'Signup'>;
 
 // Color constants (matching LoginScreen)
 const COLORS = {
-  primary: '#22c55e',         // Kitch Green
-  primaryDark: '#16a34a',     // Darker green for gradients
-  background: '#FAF7F0',      // Light warm background
+  primary: '#22c55e', // Kitch Green
+  primaryDark: '#16a34a', // Darker green for gradients
+  background: '#FAF7F0', // Light warm background
   white: '#FFFFFF',
-  text: '#374151',            // Dark text
-  textLight: '#6b7280',       // Muted gray text
-  textMedium: '#556373',      // Medium gray text
-  border: '#d1d5db',          // Border gray
-  borderLight: '#E5E7EB',     // Lighter border
-  error: '#ef4444',           // Error red
-  success: '#10b981',         // Success green
-  warning: '#f59e0b',         // Warning orange
+  text: '#374151', // Dark text
+  textLight: '#6b7280', // Muted gray text
+  textMedium: '#556373', // Medium gray text
+  border: '#d1d5db', // Border gray
+  borderLight: '#E5E7EB', // Lighter border
+  error: '#ef4444', // Error red
+  success: '#10b981', // Success green
+  warning: '#f59e0b', // Warning orange
 };
 
 // Email validation regex
@@ -45,8 +45,10 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Password strength checker
 const getPasswordStrength = (password: string) => {
-  if (password.length < 6) return { strength: 'weak', color: COLORS.error, text: 'Too short' };
-  if (password.length < 8) return { strength: 'fair', color: COLORS.warning, text: 'Fair' };
+  if (password.length < 6)
+    return { strength: 'weak', color: COLORS.error, text: 'Too short' };
+  if (password.length < 8)
+    return { strength: 'fair', color: COLORS.warning, text: 'Fair' };
   if (password.match(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)) {
     return { strength: 'strong', color: COLORS.success, text: 'Strong' };
   }
@@ -62,12 +64,12 @@ export default function SignupScreen() {
   const [secureTextEntry, setSecureTextEntry] = useState(true);
   const [secureConfirmEntry, setSecureConfirmEntry] = useState(true);
   const [acceptTerms, setAcceptTerms] = useState(false);
-  
+
   // Validation states
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [confirmError, setConfirmError] = useState('');
-  
+
   const videoRef = useRef<Video>(null);
   const [videoStatus, setVideoStatus] = useState({
     isPlaying: false,
@@ -157,19 +159,22 @@ export default function SignupScreen() {
     const isEmailValid = validateEmail(email);
     const isPasswordValid = validatePassword(password);
     const isConfirmValid = validateConfirmPassword(confirmPassword);
-    
+
     if (!isEmailValid || !isPasswordValid || !isConfirmValid) {
       Vibration.vibrate(100);
       return;
     }
 
     if (!acceptTerms) {
-      Alert.alert('Terms Required', 'Please accept the Terms of Service to continue.');
+      Alert.alert(
+        'Terms Required',
+        'Please accept the Terms of Service to continue.',
+      );
       return;
     }
 
     setIsLoading(true);
-    
+
     // Button press animation
     Animated.sequence([
       Animated.timing(buttonScale, {
@@ -195,19 +200,23 @@ export default function SignupScreen() {
     if (data.user && !data.session) {
       Alert.alert(
         'Signup Successful!',
-        'Please check your email to confirm your account before logging in.'
+        'Please check your email to confirm your account before logging in.',
       );
       nav.replace('Login');
     } else if (data.user && data.session) {
       Alert.alert('Signup Successful!', 'You are now signed up.');
     } else {
-      Alert.alert('Sign-up Puzzling', 'An unexpected issue occurred. Please try again.');
+      Alert.alert(
+        'Sign-up Puzzling',
+        'An unexpected issue occurred. Please try again.',
+      );
       console.log('Unexpected Supabase signUp response:', data);
     }
   };
 
   const toggleSecureEntry = () => setSecureTextEntry(!secureTextEntry);
-  const toggleSecureConfirmEntry = () => setSecureConfirmEntry(!secureConfirmEntry);
+  const toggleSecureConfirmEntry = () =>
+    setSecureConfirmEntry(!secureConfirmEntry);
 
   const handleVideoLoad = (status: AVPlaybackStatus) => {
     if (status.isLoaded) {
@@ -263,31 +272,48 @@ export default function SignupScreen() {
   };
 
   const handleConfirmPasswordSubmit = () => {
-    if (validateConfirmPassword(confirmPassword) && validatePassword(password) && validateEmail(email)) {
+    if (
+      validateConfirmPassword(confirmPassword) &&
+      validatePassword(password) &&
+      validateEmail(email)
+    ) {
       onSignup();
     }
   };
 
-  const isFormValid = email && password && confirmPassword && !emailError && !passwordError && !confirmError && acceptTerms;
+  const isFormValid =
+    email &&
+    password &&
+    confirmPassword &&
+    !emailError &&
+    !passwordError &&
+    !confirmError &&
+    acceptTerms;
   const passwordStrength = getPasswordStrength(password);
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="transparent"
+        translucent
+      />
+
       {/* Background Video with Fallback */}
       <View style={styles.videoContainer}>
         {!videoStatus.error ? (
           <Video
             ref={videoRef}
-            source={{ uri: 'https://stream.mux.com/N02BoIP01zPNboqHJ6TuTDaQBVAkWoEL6aF4fLPk00EKNM.m3u8' }}
+            source={{
+              uri: 'https://stream.mux.com/N02BoIP01zPNboqHJ6TuTDaQBVAkWoEL6aF4fLPk00EKNM.m3u8',
+            }}
             style={styles.backgroundVideo}
             resizeMode={ResizeMode.COVER}
             shouldPlay={false}
             isLooping
             isMuted
             onLoad={handleVideoLoad}
-            onError={(error) => {
+            onError={error => {
               console.error('Video error event:', error);
               setVideoStatus({
                 isLoaded: false,
@@ -310,38 +336,37 @@ export default function SignupScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidView}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      >
-        <ScrollView 
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
+        <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <Animated.View 
+          showsVerticalScrollIndicator={false}>
+          <Animated.View
             style={[
               styles.cardContainer,
               {
                 opacity: fadeAnim,
                 transform: [{ translateY: slideAnim }],
               },
-            ]}
-          >
+            ]}>
             {/* Branding */}
             <View style={styles.brandingContainer}>
               <Text style={styles.welcomeText}>Join the</Text>
               <Text style={styles.brandText}>Kitch</Text>
-              <Text style={styles.taglineText}>Start your AI-powered cooking journey.</Text>
+              <Text style={styles.taglineText}>
+                Start your AI-powered cooking journey.
+              </Text>
             </View>
-            
+
             {/* Form Fields */}
             <View style={styles.formContainer}>
               {/* Email Input */}
               <View style={styles.inputContainer}>
-                <MaterialCommunityIcons 
-                  name="email-outline" 
-                  size={22} 
-                  color={emailError ? COLORS.error : COLORS.textLight} 
-                  style={styles.inputIcon} 
+                <MaterialCommunityIcons
+                  name="email-outline"
+                  size={22}
+                  color={emailError ? COLORS.error : COLORS.textLight}
+                  style={styles.inputIcon}
                 />
                 <TextInput
                   ref={emailInputRef}
@@ -354,11 +379,15 @@ export default function SignupScreen() {
                   returnKeyType="next"
                   mode="flat"
                   style={[styles.input, emailError && styles.inputError]}
-                  underlineColor={emailError ? COLORS.error : COLORS.borderLight}
-                  activeUnderlineColor={emailError ? COLORS.error : COLORS.primary}
+                  underlineColor={
+                    emailError ? COLORS.error : COLORS.borderLight
+                  }
+                  activeUnderlineColor={
+                    emailError ? COLORS.error : COLORS.primary
+                  }
                   error={!!emailError}
-                  theme={{ 
-                    colors: { 
+                  theme={{
+                    colors: {
                       primary: emailError ? COLORS.error : COLORS.primary,
                       text: COLORS.text,
                       placeholder: COLORS.textLight,
@@ -371,14 +400,14 @@ export default function SignupScreen() {
                   <Text style={styles.errorText}>{emailError}</Text>
                 ) : null}
               </View>
-              
+
               {/* Password Input */}
               <View style={styles.inputContainer}>
-                <MaterialCommunityIcons 
-                  name="lock-outline" 
-                  size={22} 
-                  color={passwordError ? COLORS.error : COLORS.textLight} 
-                  style={styles.inputIcon} 
+                <MaterialCommunityIcons
+                  name="lock-outline"
+                  size={22}
+                  color={passwordError ? COLORS.error : COLORS.textLight}
+                  style={styles.inputIcon}
                 />
                 <TextInput
                   ref={passwordInputRef}
@@ -390,17 +419,21 @@ export default function SignupScreen() {
                   returnKeyType="next"
                   mode="flat"
                   style={[styles.input, passwordError && styles.inputError]}
-                  underlineColor={passwordError ? COLORS.error : COLORS.borderLight}
-                  activeUnderlineColor={passwordError ? COLORS.error : COLORS.primary}
+                  underlineColor={
+                    passwordError ? COLORS.error : COLORS.borderLight
+                  }
+                  activeUnderlineColor={
+                    passwordError ? COLORS.error : COLORS.primary
+                  }
                   error={!!passwordError}
                   right={
-                    <TextInput.Icon 
-                      icon={secureTextEntry ? "eye" : "eye-off"} 
+                    <TextInput.Icon
+                      icon={secureTextEntry ? 'eye' : 'eye-off'}
                       onPress={toggleSecureEntry}
                     />
                   }
-                  theme={{ 
-                    colors: { 
+                  theme={{
+                    colors: {
                       primary: passwordError ? COLORS.error : COLORS.primary,
                       text: COLORS.text,
                       placeholder: COLORS.textLight,
@@ -413,21 +446,30 @@ export default function SignupScreen() {
                   <Text style={styles.errorText}>{passwordError}</Text>
                 ) : password ? (
                   <View style={styles.passwordStrengthContainer}>
-                    <View style={[styles.passwordStrengthBar, { backgroundColor: passwordStrength.color }]} />
-                    <Text style={[styles.passwordStrengthText, { color: passwordStrength.color }]}>
+                    <View
+                      style={[
+                        styles.passwordStrengthBar,
+                        { backgroundColor: passwordStrength.color },
+                      ]}
+                    />
+                    <Text
+                      style={[
+                        styles.passwordStrengthText,
+                        { color: passwordStrength.color },
+                      ]}>
                       {passwordStrength.text}
                     </Text>
                   </View>
                 ) : null}
               </View>
-              
+
               {/* Confirm Password Input */}
               <View style={styles.inputContainer}>
-                <MaterialCommunityIcons 
-                  name="lock-check-outline" 
-                  size={22} 
-                  color={confirmError ? COLORS.error : COLORS.textLight} 
-                  style={styles.inputIcon} 
+                <MaterialCommunityIcons
+                  name="lock-check-outline"
+                  size={22}
+                  color={confirmError ? COLORS.error : COLORS.textLight}
+                  style={styles.inputIcon}
                 />
                 <TextInput
                   ref={confirmPasswordInputRef}
@@ -439,17 +481,21 @@ export default function SignupScreen() {
                   returnKeyType="done"
                   mode="flat"
                   style={[styles.input, confirmError && styles.inputError]}
-                  underlineColor={confirmError ? COLORS.error : COLORS.borderLight}
-                  activeUnderlineColor={confirmError ? COLORS.error : COLORS.primary}
+                  underlineColor={
+                    confirmError ? COLORS.error : COLORS.borderLight
+                  }
+                  activeUnderlineColor={
+                    confirmError ? COLORS.error : COLORS.primary
+                  }
                   error={!!confirmError}
                   right={
-                    <TextInput.Icon 
-                      icon={secureConfirmEntry ? "eye" : "eye-off"} 
+                    <TextInput.Icon
+                      icon={secureConfirmEntry ? 'eye' : 'eye-off'}
                       onPress={toggleSecureConfirmEntry}
                     />
                   }
-                  theme={{ 
-                    colors: { 
+                  theme={{
+                    colors: {
                       primary: confirmError ? COLORS.error : COLORS.primary,
                       text: COLORS.text,
                       placeholder: COLORS.textLight,
@@ -462,81 +508,86 @@ export default function SignupScreen() {
                   <Text style={styles.errorText}>{confirmError}</Text>
                 ) : null}
               </View>
-              
+
               {/* Terms & Conditions */}
               <View style={styles.termsContainer}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.termsCheckContainer}
-                  onPress={() => setAcceptTerms(!acceptTerms)}
-                >
-                  <MaterialCommunityIcons 
-                    name={acceptTerms ? "checkbox-marked" : "checkbox-blank-outline"} 
-                    size={20} 
-                    color={acceptTerms ? COLORS.primary : COLORS.textLight} 
+                  onPress={() => setAcceptTerms(!acceptTerms)}>
+                  <MaterialCommunityIcons
+                    name={
+                      acceptTerms ? 'checkbox-marked' : 'checkbox-blank-outline'
+                    }
+                    size={20}
+                    color={acceptTerms ? COLORS.primary : COLORS.textLight}
                   />
                   <Text style={styles.termsText}>
                     I agree to the{' '}
-                    <Text style={styles.termsLink}>Terms of Service</Text>
-                    {' '}and{' '}
+                    <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
                     <Text style={styles.termsLink}>Privacy Policy</Text>
                   </Text>
                 </TouchableOpacity>
               </View>
-              
+
               {/* Sign Up Button */}
               <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[
-                    styles.signupButton, 
+                    styles.signupButton,
                     !isFormValid && styles.signupButtonDisabled,
-                    isFormValid && styles.signupButtonActive
+                    isFormValid && styles.signupButtonActive,
                   ]}
                   onPress={onSignup}
-                  disabled={!isFormValid || isLoading}
-                >
+                  disabled={!isFormValid || isLoading}>
                   {isLoading ? (
                     <ActivityIndicator color={COLORS.white} size="small" />
                   ) : (
                     <>
-                      <Text style={styles.signupButtonText}>Create Account</Text>
-                      <MaterialCommunityIcons 
-                        name="arrow-right" 
-                        size={20} 
-                        color={COLORS.white} 
+                      <Text style={styles.signupButtonText}>
+                        Create Account
+                      </Text>
+                      <MaterialCommunityIcons
+                        name="arrow-right"
+                        size={20}
+                        color={COLORS.white}
                         style={styles.signupButtonIcon}
                       />
                     </>
                   )}
                 </TouchableOpacity>
               </Animated.View>
-              
+
               {/* Divider */}
               <View style={styles.divider}>
                 <View style={styles.dividerLine} />
                 <Text style={styles.dividerText}>or sign up with</Text>
                 <View style={styles.dividerLine} />
               </View>
-              
+
               {/* Google Button */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.googleButton}
-                onPress={() => Alert.alert("Google Sign-Up", "Coming soon!")}
-              >
+                onPress={() => Alert.alert('Google Sign-Up', 'Coming soon!')}>
                 <View style={styles.googleButtonContent}>
                   <View style={styles.googleIconContainer}>
-                    <MaterialCommunityIcons name="google" size={20} color="#4285F4" />
+                    <MaterialCommunityIcons
+                      name="google"
+                      size={20}
+                      color="#4285F4"
+                    />
                   </View>
-                  <Text style={styles.googleButtonText}>Continue with Google</Text>
+                  <Text style={styles.googleButtonText}>
+                    Continue with Google
+                  </Text>
                 </View>
               </TouchableOpacity>
-              
+
               {/* Login Link */}
               <View style={styles.loginContainer}>
                 <Text style={styles.loginText}>Already have an account?</Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => !isLoading && nav.replace('Login')}
-                  style={styles.loginButton}
-                >
+                  style={styles.loginButton}>
                   <Text style={styles.loginButtonText}>Log in</Text>
                 </TouchableOpacity>
               </View>
@@ -557,13 +608,13 @@ const styles = StyleSheet.create({
   },
   videoContainer: {
     ...StyleSheet.absoluteFillObject,
-    height: height,
-    width: width,
+    height,
+    width,
   },
   backgroundVideo: {
     ...StyleSheet.absoluteFillObject,
-    height: height,
-    width: width,
+    height,
+    width,
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
@@ -749,4 +800,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 15,
   },
-}); 
+});

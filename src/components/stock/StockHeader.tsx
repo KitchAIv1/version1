@@ -1,5 +1,12 @@
 import React from 'react';
-import { View, TextInput, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native';
+import {
+  View,
+  TextInput,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  Platform,
+} from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons'; // Or any icon library you prefer
 
 interface StockHeaderProps {
@@ -8,7 +15,7 @@ interface StockHeaderProps {
   onScanPress: () => void;
   onManualPress: () => void;
   // Optional: add props for styling or button states if needed
-  isScanning?: boolean; 
+  isScanning?: boolean;
   isAddingManually?: boolean;
 }
 
@@ -35,20 +42,31 @@ export const StockHeader: React.FC<StockHeaderProps> = ({
       </View>
 
       <View style={styles.buttonsContainer}>
-        <TouchableOpacity 
-          style={[styles.button, styles.scanButton, (isScanning || isAddingManually) && styles.disabledButton]} 
-          onPress={onScanPress} 
-          disabled={isScanning || isAddingManually}
-        >
-          <Icon name="camera-alt" size={20} color="#FFF" style={styles.buttonIcon} />
+        <TouchableOpacity
+          style={[
+            styles.button,
+            styles.scanButton,
+            (isScanning || isAddingManually) && styles.disabledButton,
+          ]}
+          onPress={onScanPress}
+          disabled={isScanning || isAddingManually}>
+          <Icon
+            name="camera-alt"
+            size={20}
+            color="#FFF"
+            style={styles.buttonIcon}
+          />
           <Text style={styles.buttonText}>Scan Pantry</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[styles.button, styles.manualButton, (isScanning || isAddingManually) && styles.disabledButton]} 
-          onPress={onManualPress} 
-          disabled={isScanning || isAddingManually}
-        >
+        <TouchableOpacity
+          style={[
+            styles.button,
+            styles.manualButton,
+            (isScanning || isAddingManually) && styles.disabledButton,
+          ]}
+          onPress={onManualPress}
+          disabled={isScanning || isAddingManually}>
           <Icon name="add" size={20} color="#FFF" style={styles.buttonIcon} />
           <Text style={styles.buttonText}>Add Manually</Text>
         </TouchableOpacity>
@@ -120,9 +138,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-  disabledButton: { // Style for disabled state
-      opacity: 0.6,
-      backgroundColor: '#bdc3c7', // Example disabled color
+  disabledButton: {
+    // Style for disabled state
+    opacity: 0.6,
+    backgroundColor: '#bdc3c7', // Example disabled color
   },
 });
 
