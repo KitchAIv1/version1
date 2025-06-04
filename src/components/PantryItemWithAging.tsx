@@ -179,6 +179,12 @@ export const PantryItemWithAging = memo<PantryItemWithAgingProps>(
                 <Ionicons name="time-outline" size={12} />{' '}
                 {item.age_description}
               </Text>
+              {item.created_at && (
+                <Text style={styles.metaText}>
+                  <Ionicons name="calendar-outline" size={12} />{' '}
+                  Added {getShortRelativeTime(item.created_at)}
+                </Text>
+              )}
             </View>
 
             {/* Description if available */}
@@ -277,11 +283,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 2,
+    flexWrap: 'wrap',
   },
   metaText: {
     fontSize: 12,
     color: '#6b7280',
     marginRight: 12,
+    marginBottom: 2,
     fontWeight: '500',
   },
   itemDescription: {
