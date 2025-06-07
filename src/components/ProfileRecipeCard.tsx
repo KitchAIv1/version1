@@ -18,6 +18,76 @@ import { COLORS } from '../constants/theme'; // Assuming you have a theme file
 import { supabase } from '../services/supabase'; // Added for Supabase client
 import { useAuth } from '../providers/AuthProvider'; // Added to get user ID
 
+const PLACEHOLDER_IMAGE =
+  'https://via.placeholder.com/150/D3D3D3/808080?text=No+Image';
+const CARD_MARGIN = 6; // Slightly reduced for tighter grid
+const NUM_COLUMNS = 2;
+const screenWidth = Dimensions.get('window').width;
+const cardWidth =
+  (screenWidth - (NUM_COLUMNS + 1) * CARD_MARGIN * 2) / NUM_COLUMNS;
+
+// Move styles to top to fix "styles used before defined" errors
+const styles = StyleSheet.create({
+  cardWrapper: {
+    width: cardWidth,
+    margin: CARD_MARGIN,
+    marginBottom: 12,
+  },
+  cardContainer: {
+    width: '100%',
+    backgroundColor: COLORS.white || '#fff',
+    borderRadius: 12, // More rounded corners
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12, // Slightly stronger shadow
+    shadowRadius: 8, // More diffuse shadow
+    elevation: 4, // Better elevation for Android
+    overflow: 'hidden',
+  },
+  imageContainer: {
+    position: 'relative',
+    backgroundColor: '#f0f0f0', // Light background for images while loading
+  },
+  thumbnail: {
+    width: '100%',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  infoContainer: {
+    padding: 12, // More internal padding
+    backgroundColor: COLORS.white || '#fff',
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  recipeName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.text || '#333',
+    marginBottom: 6,
+    lineHeight: 18, // Better line height for readability
+  },
+  metaContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  icon: {
+    marginRight: 4,
+  },
+  dateText: {
+    fontSize: 12,
+    color: COLORS.textSecondary || '#777',
+  },
+  menuButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.4)', // Semi-transparent background for better visibility
+    padding: 6,
+    borderRadius: 15, // Circular background
+  },
+});
+
 interface ProfileRecipeCardProps {
   item: {
     recipe_id: string;
@@ -29,14 +99,6 @@ interface ProfileRecipeCardProps {
   onPress?: () => void;
   context: 'myRecipes' | 'savedRecipes' | 'otherUserRecipes'; // Added otherUserRecipes context
 }
-
-const PLACEHOLDER_IMAGE =
-  'https://via.placeholder.com/150/D3D3D3/808080?text=No+Image';
-const CARD_MARGIN = 6; // Slightly reduced for tighter grid
-const NUM_COLUMNS = 2;
-const screenWidth = Dimensions.get('window').width;
-const cardWidth =
-  (screenWidth - (NUM_COLUMNS + 1) * CARD_MARGIN * 2) / NUM_COLUMNS;
 
 // Simple date formatter (you might want to use a library like date-fns for more complex formatting)
 const formatDate = (dateString: string) => {
@@ -270,66 +332,5 @@ const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = React.memo(
     );
   },
 );
-
-const styles = StyleSheet.create({
-  cardWrapper: {
-    width: cardWidth,
-    margin: CARD_MARGIN,
-    marginBottom: 12,
-  },
-  cardContainer: {
-    width: '100%',
-    backgroundColor: COLORS.white || '#fff',
-    borderRadius: 12, // More rounded corners
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12, // Slightly stronger shadow
-    shadowRadius: 8, // More diffuse shadow
-    elevation: 4, // Better elevation for Android
-    overflow: 'hidden',
-  },
-  imageContainer: {
-    position: 'relative',
-    backgroundColor: '#f0f0f0', // Light background for images while loading
-  },
-  thumbnail: {
-    width: '100%',
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-  },
-  infoContainer: {
-    padding: 12, // More internal padding
-    backgroundColor: COLORS.white || '#fff',
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-  },
-  recipeName: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: COLORS.text || '#333',
-    marginBottom: 6,
-    lineHeight: 18, // Better line height for readability
-  },
-  metaContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  icon: {
-    marginRight: 4,
-  },
-  dateText: {
-    fontSize: 12,
-    color: COLORS.textSecondary || '#777',
-  },
-  menuButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.4)', // Semi-transparent background for better visibility
-    padding: 6,
-    borderRadius: 15, // Circular background
-  },
-});
 
 export default ProfileRecipeCard;

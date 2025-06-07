@@ -13,6 +13,47 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../constants/theme';
 
+const { width: screenWidth } = Dimensions.get('window');
+
+// Move styles to top to fix "styles used before defined" errors
+const styles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    // Ensure the container itself doesn't have a background if only tabBarContainer should be colored
+  },
+  tabBarContainer: {
+    flexDirection: 'row',
+    paddingVertical: 4,
+    backgroundColor: COLORS.primary || '#00796b', // Solid metallic green background
+    // Potentially add some horizontal padding if needed, or rounded corners for a more refined bar look
+    // e.g., paddingHorizontal: 10, borderRadius: 8,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 10, // Restored: Reduced padding for compactness
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeTabButton: {
+    borderBottomWidth: 2,
+    borderBottomColor: COLORS.white || '#FFFFFF', // White indicator for active tab
+  },
+  tabButtonText: {
+    fontSize: 14, // Increased font size
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.7)', // Light color for inactive tabs (70% white)
+    textTransform: 'capitalize',
+  },
+  activeTabButtonText: {
+    fontSize: 14, // Increased font size
+    color: COLORS.white || '#FFFFFF', // White for active tab text
+    fontWeight: '600',
+  },
+});
+
 interface FloatingTabBarProps {
   tabs: string[];
   activeTab: string;
@@ -92,45 +133,5 @@ const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
     </Animated.View>
   );
 };
-
-const { width: screenWidth } = Dimensions.get('window');
-
-const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-    // Ensure the container itself doesn't have a background if only tabBarContainer should be colored
-  },
-  tabBarContainer: {
-    flexDirection: 'row',
-    paddingVertical: 4,
-    backgroundColor: COLORS.primary || '#00796b', // Solid metallic green background
-    // Potentially add some horizontal padding if needed, or rounded corners for a more refined bar look
-    // e.g., paddingHorizontal: 10, borderRadius: 8,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 10, // Restored: Reduced padding for compactness
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  activeTabButton: {
-    borderBottomWidth: 2,
-    borderBottomColor: COLORS.white || '#FFFFFF', // White indicator for active tab
-  },
-  tabButtonText: {
-    fontSize: 14, // Increased font size
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.7)', // Light color for inactive tabs (70% white)
-    textTransform: 'capitalize',
-  },
-  activeTabButtonText: {
-    fontSize: 14, // Increased font size
-    color: COLORS.white || '#FFFFFF', // White for active tab text
-    fontWeight: '600',
-  },
-});
 
 export default FloatingTabBar;

@@ -24,6 +24,179 @@ import { supabase } from '../services/supabase';
 import { COLORS } from '../constants/theme';
 import { RecipeDetailsData } from '../hooks/useRecipeDetails';
 
+// Move styles to top to fix "styles used before defined" errors
+const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  backdrop: {
+    flex: 1,
+  },
+  modalContainer: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '90%',
+    minHeight: '60%',
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  dragHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: COLORS.border,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  closeButton: {
+    padding: 4,
+  },
+  content: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: COLORS.error,
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  commentsList: {
+    padding: 20,
+    paddingBottom: 120, // More space for input to prevent overlap
+  },
+  commentItem: {
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  commentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  avatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.surface,
+  },
+  avatarPlaceholder: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  commentInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  username: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  timestamp: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  commentText: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: COLORS.text,
+    paddingLeft: 44,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginTop: 4,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    backgroundColor: COLORS.white,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 8,
+  },
+  input: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    fontSize: 15,
+    maxHeight: 100,
+    color: COLORS.text,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    minHeight: 44,
+  },
+  sendButton: {
+    marginLeft: 12,
+    backgroundColor: COLORS.primary,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendButtonDisabled: {
+    backgroundColor: COLORS.border,
+    opacity: 0.6,
+  },
+});
+
 interface Comment {
   id: string;
   comment_text: string;
@@ -102,6 +275,31 @@ export default function CommentsModal({
 
   // Track if modal has been opened to defer heavy operations
   const hasOpenedRef = useRef(false);
+
+  const handleClose = useCallback(() => {
+    // Dismiss keyboard first
+    Keyboard.dismiss();
+
+    // Smooth parallel animation
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: 300,
+        duration: 250, // Faster for snappier feel
+        useNativeDriver: true,
+      }),
+      Animated.timing(keyboardAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onClose();
+      // Reset animations after modal is closed
+      slideAnim.setValue(0);
+      keyboardAnim.setValue(0);
+      hasOpenedRef.current = false;
+    });
+  }, [onClose, slideAnim, keyboardAnim]);
 
   // Pan responder for swipe to dismiss
   const panResponder = useRef(
@@ -433,31 +631,6 @@ export default function CommentsModal({
     }
   }, [commentText, postCommentMutation, recipeId, user?.id, comments]);
 
-  const handleClose = useCallback(() => {
-    // Dismiss keyboard first
-    Keyboard.dismiss();
-
-    // Smooth parallel animation
-    Animated.parallel([
-      Animated.timing(slideAnim, {
-        toValue: 300,
-        duration: 250, // Faster for snappier feel
-        useNativeDriver: true,
-      }),
-      Animated.timing(keyboardAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      onClose();
-      // Reset animations after modal is closed
-      slideAnim.setValue(0);
-      keyboardAnim.setValue(0);
-      hasOpenedRef.current = false;
-    });
-  }, [onClose, slideAnim, keyboardAnim]);
-
   // Optimized modal opening animation
   React.useEffect(() => {
     if (visible) {
@@ -587,175 +760,3 @@ export default function CommentsModal({
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    flex: 1,
-  },
-  modalContainer: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '90%',
-    minHeight: '60%',
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  dragHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: COLORS.border,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  closeButton: {
-    padding: 4,
-  },
-  content: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    color: COLORS.error,
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  commentsList: {
-    padding: 20,
-    paddingBottom: 120, // More space for input to prevent overlap
-  },
-  commentItem: {
-    marginBottom: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  commentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.surface,
-  },
-  avatarPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  commentInfo: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  username: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  timestamp: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  commentText: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: COLORS.text,
-    paddingLeft: 44,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-    marginTop: 16,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    marginTop: 4,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    backgroundColor: COLORS.white,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: COLORS.surface,
-    borderRadius: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    fontSize: 15,
-    maxHeight: 100,
-    color: COLORS.text,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    minHeight: 44,
-  },
-  sendButton: {
-    marginLeft: 12,
-    backgroundColor: COLORS.primary,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendButtonDisabled: {
-    backgroundColor: COLORS.border,
-    opacity: 0.6,
-  },
-});

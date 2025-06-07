@@ -10,6 +10,33 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
+// Move styles to top to fix "styles used before defined" errors
+const styles = StyleSheet.create({
+  cardContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    overflow: 'hidden', // Ensures content doesn't spill out during animation
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#f7f7f7',
+  },
+  headerText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  content: {
+    padding: 16,
+  },
+});
+
 interface CollapsibleCardProps {
   title: string;
   children: React.ReactNode;
@@ -48,31 +75,5 @@ const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  cardContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    marginVertical: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    overflow: 'hidden', // Ensures content doesn't spill out during animation
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#f7f7f7',
-  },
-  headerText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
-  content: {
-    padding: 16,
-  },
-});
 
 export default CollapsibleCard;

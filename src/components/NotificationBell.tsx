@@ -8,6 +8,45 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+// Move styles to top to fix "styles used before defined" errors
+const styles = StyleSheet.create({
+  container: {
+    padding: 8,
+  },
+  iconContainer: {
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#ef4444',
+    borderRadius: 12,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  dotBadge: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    minWidth: 12,
+    top: -6,
+    right: -6,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+});
+
 interface NotificationBellProps {
   unreadCount: number;
   onPress: () => void;
@@ -74,41 +113,3 @@ export const NotificationBell = memo<NotificationBellProps>(
 );
 
 NotificationBell.displayName = 'NotificationBell';
-
-const styles = StyleSheet.create({
-  container: {
-    padding: 8,
-  },
-  iconContainer: {
-    position: 'relative',
-  },
-  badge: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: '#ef4444',
-    borderRadius: 12,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  dotBadge: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    minWidth: 12,
-    top: -6,
-    right: -6,
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
-    textAlign: 'center',
-    lineHeight: 16,
-  },
-});

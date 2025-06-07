@@ -8,6 +8,40 @@ import {
 import { useAuth } from '../providers/AuthProvider';
 import { useFollowMutation, useFollowStatus } from '../hooks/useFollowMutation';
 
+// Move styles to top to fix "styles used before defined" errors
+const styles = StyleSheet.create({
+  followButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  notFollowingButton: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  followingButton: {
+    backgroundColor: 'transparent',
+    borderColor: '#ccc',
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  followButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  notFollowingText: {
+    color: '#fff',
+  },
+  followingText: {
+    color: '#666',
+  },
+});
+
 interface FollowButtonProps {
   targetUserId: string;
   style?: any;
@@ -81,36 +115,3 @@ export const FollowButton: React.FC<FollowButtonProps> = ({
     </TouchableOpacity>
   );
 };
-
-const styles = StyleSheet.create({
-  followButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
-    minWidth: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  notFollowingButton: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-  },
-  followingButton: {
-    backgroundColor: 'transparent',
-    borderColor: '#ccc',
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  followButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  notFollowingText: {
-    color: '#fff',
-  },
-  followingText: {
-    color: '#666',
-  },
-});

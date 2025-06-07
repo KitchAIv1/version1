@@ -22,7 +22,9 @@ import { MainStackParamList } from '../navigation/types';
 import { prefetchRecipeDetails } from '../hooks/useRecipeDetails';
 import { useAuth } from '../providers/AuthProvider';
 import WhatCanICookButton from './WhatCanICookButton';
+import { useNetworkQuality } from '../hooks/useNetworkQuality';
 
+// Move styles to top to fix "styles used before defined" errors
 const styles = StyleSheet.create({
   container: {
     width: '100%',
@@ -174,8 +176,30 @@ const styles = StyleSheet.create({
   },
 });
 
+// Helper function to safely access ingredient counts
+function getIngredientCounts(item: RecipeItem): {
+  userCount: number;
+  totalCount: number;
+} {
+  try {
+    if (item._userIngredientsCount !== undefined && item._totalIngredientsCount !== undefined) {
+      return {
+        userCount: item._userIngredientsCount,
+        totalCount: item._totalIngredientsCount,
+      };
+    }
+    return { userCount: 0, totalCount: 0 };
+  } catch (error) {
+    console.warn('Error accessing ingredient counts:', error);
+    return { userCount: 0, totalCount: 0 };
+  }
+}
+
 interface RecipeCardProps {
-  item: RecipeItem;
+  item: RecipeItem & {
+    onLike: () => void;
+    onSave: () => void;
+  };
   isActive: boolean;
   containerHeight: number;
   isScreenFocused: boolean;
@@ -183,10 +207,9 @@ interface RecipeCardProps {
   onWhatCanICookPress: () => void;
 }
 
-// Define the specific navigation prop type for this screen's context
 type RecipeCardNavigationProp = NativeStackNavigationProp<
   MainStackParamList,
-  'RecipeDetail' | 'SearchScreen'
+  'RecipeDetail'
 >;
 
 export default function RecipeCard({
@@ -197,10 +220,6 @@ export default function RecipeCard({
   pantryItemCount,
   onWhatCanICookPress,
 }: RecipeCardProps) {
-  // Log the item prop to debug potential string rendering issues
-  // console.log(`[RecipeCard DEBUG] Rendering item: ${item.id}, title: ${item.title}`);
-  // console.log(JSON.stringify(item, null, 2)); // UNCOMMENTED to debug error
-
   const videoRef = useRef<Video>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isPrefetched, setIsPrefetched] = useState(false);
@@ -208,11 +227,28 @@ export default function RecipeCard({
   const navigation = useNavigation<RecipeCardNavigationProp>();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const insets = useSafeAreaInsets(); // Added
+  const insets = useSafeAreaInsets();
+  const networkQuality = useNetworkQuality();
 
-  // Removed useEffect and useFocusEffect for play/pause logic
-  // The shouldPlay prop on the Video component will now manage this.
+  // Get video URL with fallback and apply network-based optimization
+  const getOptimizedVideoUrl = useCallback((url: string): string => {
+    if (!url) return url;
 
+    // For Supabase storage videos, add quality parameter based on network
+    if (url.includes('supabase.co')) {
+      const separator = url.includes('?') ? '&' : '?';
+      const quality = networkQuality.quality === 'low' ? '480p' : 
+                     networkQuality.quality === 'medium' ? '720p' : '1080p';
+      return `${url}${separator}quality=${quality}`;
+    }
+
+    // MUX videos handle adaptive streaming automatically
+    return url;
+  }, [networkQuality.quality]);
+
+  const videoUrl = getOptimizedVideoUrl(item.video || item.video_url || '');
+
+  // Prefetch recipe details when active
   useEffect(() => {
     if (isActive && isScreenFocused && isLoaded && !isPrefetched && item.id) {
       prefetchRecipeDetails(queryClient, item.id, user?.id)
@@ -345,8 +381,10 @@ export default function RecipeCard({
     if (item.pantryMatchPct && item.pantryMatchPct > 0) {
       return `${item.pantryMatchPct}% match`;
     }
-    if ((item._userIngredientsCount || 0) > 0) {
-      return `${item._userIngredientsCount || 0}/${item._totalIngredientsCount || 0} match`;
+    // Use the safe accessor function
+    const { userCount, totalCount } = getIngredientCounts(item);
+    if (userCount > 0) {
+      return `${userCount}/${totalCount} match`;
     }
     return '0% match';
   };
@@ -364,9 +402,10 @@ export default function RecipeCard({
   return (
     <TouchableWithoutFeedback onPressIn={handlePressIn}>
       <View style={[styles.container, containerStyle]}>
+        {/* Optimized Video Player */}
         <Video
           ref={videoRef}
-          source={{ uri: item.video || item.video_url || '' }}
+          source={{ uri: videoUrl }}
           resizeMode={ResizeMode.COVER}
           style={StyleSheet.absoluteFill}
           isLooping

@@ -2,6 +2,32 @@ import React, { useState, useRef, useCallback } from 'react';
 import { View, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+// Move styles to top to fix "styles used before defined" errors
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1f2937',
+    paddingVertical: 4,
+  },
+  clearButton: {
+    padding: 4,
+  },
+});
+
 interface SearchInputProps {
   placeholder?: string;
   onSearchChange: (query: string) => void;
@@ -69,28 +95,3 @@ export default function SearchInput({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: '#1f2937',
-    paddingVertical: 4,
-  },
-  clearButton: {
-    padding: 4,
-  },
-});

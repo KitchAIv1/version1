@@ -1,6 +1,28 @@
 import React from 'react';
 import { StyleSheet, View, Text, FlatList } from 'react-native';
 
+// Move styles to top to fix "styles used before defined" errors
+const styles = StyleSheet.create({
+  listContainer: {
+    paddingVertical: 8,
+  },
+  itemContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#f9f9f9',
+  },
+  itemText: { fontSize: 14, color: '#333' },
+  timestamp: { fontSize: 10, color: '#888', marginTop: 4 },
+  separator: { height: 1, backgroundColor: '#eee' },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: { color: '#666' },
+});
+
 // TODO: Define the actual structure of an activity item
 interface ActivityItem {
   id: string;
@@ -49,26 +71,5 @@ export const ActivityList: React.FC<ActivityListProps> = ({ data }) => {
     />
   );
 };
-
-const styles = StyleSheet.create({
-  listContainer: {
-    paddingVertical: 8,
-  },
-  itemContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#f9f9f9',
-  },
-  itemText: { fontSize: 14, color: '#333' },
-  timestamp: { fontSize: 10, color: '#888', marginTop: 4 },
-  separator: { height: 1, backgroundColor: '#eee' },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyText: { color: '#666' },
-});
 
 export default ActivityList;

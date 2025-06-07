@@ -33,6 +33,38 @@ import { useCommentCountSync } from '../../hooks/useCommentCountSync';
 import InsufficientItemsModal from '../../components/modals/InsufficientItemsModal';
 import { useWhatCanICook } from '../../hooks/useWhatCanICook';
 
+// Move styles to top to fix "styles used before defined" errors
+const styles = StyleSheet.create({
+  safeAreaOuter: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  containerForLayout: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  flashListContainer: {
+    flex: 1,
+    width: '100%',
+  },
+  centeredMessageContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    color: '#666',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+});
+
 export default function FeedScreen() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -321,34 +353,3 @@ export default function FeedScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeAreaOuter: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  containerForLayout: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  flashListContainer: {
-    flex: 1,
-    width: '100%',
-  },
-  centeredMessageContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyText: {
-    color: '#666',
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  errorText: {
-    color: 'red',
-    fontSize: 16,
-    textAlign: 'center',
-  },
-});

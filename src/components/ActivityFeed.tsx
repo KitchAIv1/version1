@@ -15,6 +15,88 @@ import { MainStackParamList } from '../navigation/types';
 import { ActivityItem } from '../hooks/useUserActivityFeed';
 import { COLORS } from '../constants/theme';
 
+// Move styles to top to fix "styles used before defined" errors
+const styles = StyleSheet.create({
+  listContainer: {
+    backgroundColor: '#ffffff',
+  },
+  activityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  activityContent: {
+    flex: 1,
+  },
+  activityDescription: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  activityTime: {
+    fontSize: 12,
+    color: '#9ca3af',
+    marginTop: 2,
+  },
+  recipeThumbnail: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginTop: 12,
+  },
+  errorText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ef4444',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  errorSubText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  emptySubText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    marginTop: 8,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+});
+
 interface ActivityFeedProps {
   data: ActivityItem[] | null;
   isLoading: boolean;
@@ -341,86 +423,5 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  listContainer: {
-    backgroundColor: '#ffffff',
-  },
-  activityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  activityContent: {
-    flex: 1,
-  },
-  activityDescription: {
-    fontSize: 14,
-    color: '#374151',
-    fontWeight: '500',
-    lineHeight: 20,
-  },
-  activityTime: {
-    fontSize: 12,
-    color: '#9ca3af',
-    marginTop: 2,
-  },
-  recipeThumbnail: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#6b7280',
-    marginTop: 12,
-  },
-  errorText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ef4444',
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  errorSubText: {
-    fontSize: 14,
-    color: '#9ca3af',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#6b7280',
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  emptySubText: {
-    fontSize: 14,
-    color: '#9ca3af',
-    marginTop: 8,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-});
 
 export default ActivityFeed;

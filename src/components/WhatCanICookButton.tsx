@@ -79,24 +79,30 @@ function WhatCanICookButton({
 }: WhatCanICookButtonProps) {
   const isEnabled = pantryItemCount >= 3;
 
+  // Extract nested ternary to helper function
+  const getButtonVariantStyle = () => {
+    if (variant === 'primary') return styles.primaryButton;
+    if (variant === 'secondary') return styles.secondaryButton;
+    return styles.textButton;
+  };
+
+  // Extract nested ternary to helper function
+  const getTextVariantStyle = () => {
+    if (variant === 'primary') return styles.primaryText;
+    if (variant === 'secondary') return styles.secondaryText;
+    return styles.textText;
+  };
+
   const buttonStyle = [
     styles.button,
-    variant === 'primary'
-      ? styles.primaryButton
-      : variant === 'secondary'
-        ? styles.secondaryButton
-        : styles.textButton,
+    getButtonVariantStyle(),
     !isEnabled && styles.disabledButton,
     style,
   ];
 
   const textStyle = [
     styles.buttonText,
-    variant === 'primary'
-      ? styles.primaryText
-      : variant === 'secondary'
-        ? styles.secondaryText
-        : styles.textText,
+    getTextVariantStyle(),
     !isEnabled && styles.disabledText,
   ];
 
@@ -113,5 +119,11 @@ function WhatCanICookButton({
     </TouchableOpacity>
   );
 }
+
+// Add default props to fix require-default-props linter errors
+WhatCanICookButton.defaultProps = {
+  style: undefined,
+  variant: 'primary',
+};
 
 export default WhatCanICookButton;

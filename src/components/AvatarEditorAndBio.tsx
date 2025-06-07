@@ -21,202 +21,7 @@ import {
 
 const MAX_BIO_LENGTH = 150; // Define max bio length
 
-interface AvatarEditorAndBioProps {
-  userId: string;
-  initialAvatarUrl: string | null;
-  initialBio: string;
-  onAvatarChange: (url: string) => void;
-  onBioChange: (text: string) => void;
-}
-
-export const AvatarEditorAndBio: React.FC<AvatarEditorAndBioProps> = ({
-  userId,
-  initialAvatarUrl,
-  initialBio,
-  onAvatarChange,
-  onBioChange,
-}) => {
-  const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
-  const [bio, setBio] = useState(initialBio);
-  const [uploading, setUploading] = useState(false);
-  const [compressionInfo, setCompressionInfo] = useState<string>('');
-
-  // Update internal state if initial props change (e.g., after saving)
-  useEffect(() => {
-    setAvatarUrl(initialAvatarUrl);
-    setBio(initialBio);
-  }, [initialAvatarUrl, initialBio]);
-
-  const handleBioChange = (text: string) => {
-    setBio(text);
-    onBioChange(text);
-  };
-
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'Permission Required',
-        'Sorry, we need camera roll permissions to make this work!',
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'images',
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 1.0, // Start with highest quality, we'll compress it ourselves
-      base64: false, // We'll get base64 from compression
-    });
-
-    if (!result.canceled && result.assets && result.assets[0]) {
-      const asset = result.assets[0];
-      await processAndUploadImage(asset.uri);
-    }
-  };
-
-  const processAndUploadImage = async (uri: string) => {
-    if (!userId) {
-      Alert.alert('Error', 'User ID is missing.');
-      return;
-    }
-
-    try {
-      setUploading(true);
-      setCompressionInfo('Checking image size...');
-
-      // Check if compression is needed
-      const { needsCompression: shouldCompress, currentSizeKB } =
-        await needsCompression(uri, 100);
-
-      if (shouldCompress) {
-        setCompressionInfo(
-          `Compressing ${Math.round(currentSizeKB)}KB image...`,
-        );
-
-        // Compress using AVATAR preset (400x400, ~100KB target)
-        const compressionResult = await compressImageWithPreset(uri, 'AVATAR');
-
-        const finalSizeKB = compressionResult.fileSize
-          ? Math.round(compressionResult.fileSize / 1024)
-          : 0;
-        const compressionPercent = compressionResult.compressionRatio
-          ? Math.round(compressionResult.compressionRatio * 100)
-          : 0;
-
-        setCompressionInfo(
-          `Optimized: ${finalSizeKB}KB (${compressionPercent}% smaller)`,
-        );
-
-        // Upload the compressed image
-        await uploadAvatar(compressionResult.base64!, compressionResult.uri);
-      } else {
-        setCompressionInfo(
-          `Image already optimized (${Math.round(currentSizeKB)}KB)`,
-        );
-
-        // Image is already small enough, but still compress for consistency
-        const compressionResult = await compressImageWithPreset(uri, 'AVATAR');
-        await uploadAvatar(compressionResult.base64!, compressionResult.uri);
-      }
-
-      // Clear compression info after a delay
-      setTimeout(() => setCompressionInfo(''), 3000);
-    } catch (error: any) {
-      console.error('Image processing error:', error);
-      Alert.alert(
-        'Processing Failed',
-        error.message || 'Could not process image.',
-      );
-      setCompressionInfo('');
-    }
-  };
-
-  const uploadAvatar = async (base64: string, uri: string) => {
-    try {
-      setCompressionInfo('Uploading to cloud...');
-
-      const fileExt = 'jpg'; // Always use jpg for avatars (better compression)
-      const path = `${userId}/${userId}-${Date.now()}.${fileExt}`;
-      const contentType = 'image/jpeg';
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(path, decode(base64), { contentType });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      const { data: urlData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(path);
-      const newUrl = urlData.publicUrl;
-
-      setAvatarUrl(newUrl);
-      onAvatarChange(newUrl);
-      setCompressionInfo('Upload complete!');
-    } catch (error: any) {
-      console.error('Avatar upload error:', error);
-      Alert.alert('Upload Failed', error.message || 'Could not upload avatar.');
-      setCompressionInfo('');
-      throw error;
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return (
-    <View style={styles.container}>
-      <TouchableOpacity
-        onPress={pickImage}
-        style={styles.avatarContainer}
-        disabled={uploading}>
-        {avatarUrl ? (
-          <Image
-            source={{ uri: avatarUrl }}
-            style={styles.avatar}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.avatarPlaceholder}>
-            <Icon name="person" size={40} color="#ccc" />
-          </View>
-        )}
-        {uploading ? (
-          <View style={styles.uploadIndicator}>
-            <ActivityIndicator size="large" color="#fff" />
-          </View>
-        ) : (
-          <View style={styles.editIconContainer}>
-            <Icon name="edit" size={18} color="#fff" />
-          </View>
-        )}
-      </TouchableOpacity>
-
-      {/* Compression info display */}
-      {compressionInfo && (
-        <Text style={styles.compressionInfo}>{compressionInfo}</Text>
-      )}
-
-      <Text style={styles.bioLabel}>Bio</Text>
-      <TextInput
-        value={bio}
-        onChangeText={handleBioChange}
-        style={styles.textInput}
-        placeholder="Tell us about yourself..."
-        placeholderTextColor="#aaa"
-        multiline
-        numberOfLines={4}
-        maxLength={MAX_BIO_LENGTH}
-      />
-      <Text
-        style={styles.charCounter}>{`${bio.length}/${MAX_BIO_LENGTH}`}</Text>
-    </View>
-  );
-};
-
+// Move styles to top to fix "styles used before defined" errors
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
@@ -297,5 +102,201 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 });
+
+interface AvatarEditorAndBioProps {
+  userId: string;
+  initialAvatarUrl: string | null;
+  initialBio: string;
+  onAvatarChange: (url: string) => void;
+  onBioChange: (text: string) => void;
+}
+
+export const AvatarEditorAndBio: React.FC<AvatarEditorAndBioProps> = ({
+  userId,
+  initialAvatarUrl,
+  initialBio,
+  onAvatarChange,
+  onBioChange,
+}) => {
+  const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
+  const [bio, setBio] = useState(initialBio);
+  const [uploading, setUploading] = useState(false);
+  const [compressionInfo, setCompressionInfo] = useState<string>('');
+
+  // Update internal state if initial props change (e.g., after saving)
+  useEffect(() => {
+    setAvatarUrl(initialAvatarUrl);
+    setBio(initialBio);
+  }, [initialAvatarUrl, initialBio]);
+
+  const handleBioChange = (text: string) => {
+    setBio(text);
+    onBioChange(text);
+  };
+
+  const uploadAvatar = async (base64: string, uri: string) => {
+    try {
+      setCompressionInfo('Uploading to cloud...');
+
+      const fileExt = 'jpg'; // Always use jpg for avatars (better compression)
+      const path = `${userId}/${userId}-${Date.now()}.${fileExt}`;
+      const contentType = 'image/jpeg';
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, decode(base64), { contentType });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(path);
+      const newUrl = urlData.publicUrl;
+
+      setAvatarUrl(newUrl);
+      onAvatarChange(newUrl);
+      setCompressionInfo('Upload complete!');
+    } catch (error: any) {
+      console.error('Avatar upload error:', error);
+      Alert.alert('Upload Failed', error.message || 'Could not upload avatar.');
+      setCompressionInfo('');
+      throw error;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const processAndUploadImage = async (uri: string) => {
+    if (!userId) {
+      Alert.alert('Error', 'User ID is missing.');
+      return;
+    }
+
+    try {
+      setUploading(true);
+      setCompressionInfo('Checking image size...');
+
+      // Check if compression is needed
+      const { needsCompression: shouldCompress, currentSizeKB } =
+        await needsCompression(uri, 100);
+
+      if (shouldCompress) {
+        setCompressionInfo(
+          `Compressing ${Math.round(currentSizeKB)}KB image...`,
+        );
+
+        // Compress using AVATAR preset (400x400, ~100KB target)
+        const compressionResult = await compressImageWithPreset(uri, 'AVATAR');
+
+        const finalSizeKB = compressionResult.fileSize
+          ? Math.round(compressionResult.fileSize / 1024)
+          : 0;
+        const compressionPercent = compressionResult.compressionRatio
+          ? Math.round(compressionResult.compressionRatio * 100)
+          : 0;
+
+        setCompressionInfo(
+          `Optimized: ${finalSizeKB}KB (${compressionPercent}% smaller)`,
+        );
+
+        // Upload the compressed image
+        await uploadAvatar(compressionResult.base64!, compressionResult.uri);
+      } else {
+        setCompressionInfo(
+          `Image already optimized (${Math.round(currentSizeKB)}KB)`,
+        );
+
+        // Image is already small enough, but still compress for consistency
+        const compressionResult = await compressImageWithPreset(uri, 'AVATAR');
+        await uploadAvatar(compressionResult.base64!, compressionResult.uri);
+      }
+
+      // Clear compression info after a delay
+      setTimeout(() => setCompressionInfo(''), 3000);
+    } catch (error: any) {
+      console.error('Image processing error:', error);
+      Alert.alert(
+        'Processing Failed',
+        error.message || 'Could not process image.',
+      );
+      setCompressionInfo('');
+    }
+  };
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Required',
+        'Sorry, we need camera roll permissions to make this work!',
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: 'images',
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 1.0, // Start with highest quality, we'll compress it ourselves
+      base64: false, // We'll get base64 from compression
+    });
+
+    if (!result.canceled && result.assets && result.assets[0]) {
+      const asset = result.assets[0];
+      await processAndUploadImage(asset.uri);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <TouchableOpacity
+        onPress={pickImage}
+        style={styles.avatarContainer}
+        disabled={uploading}>
+        {avatarUrl ? (
+          <Image
+            source={{ uri: avatarUrl }}
+            style={styles.avatar}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.avatarPlaceholder}>
+            <Icon name="person" size={40} color="#ccc" />
+          </View>
+        )}
+        {uploading ? (
+          <View style={styles.uploadIndicator}>
+            <ActivityIndicator size="large" color="#fff" />
+          </View>
+        ) : (
+          <View style={styles.editIconContainer}>
+            <Icon name="edit" size={18} color="#fff" />
+          </View>
+        )}
+      </TouchableOpacity>
+
+      {/* Compression info display */}
+      {compressionInfo && (
+        <Text style={styles.compressionInfo}>{compressionInfo}</Text>
+      )}
+
+      <Text style={styles.bioLabel}>Bio</Text>
+      <TextInput
+        value={bio}
+        onChangeText={handleBioChange}
+        style={styles.textInput}
+        placeholder="Tell us about yourself..."
+        placeholderTextColor="#aaa"
+        multiline
+        numberOfLines={4}
+        maxLength={MAX_BIO_LENGTH}
+      />
+      <Text
+        style={styles.charCounter}>{`${bio.length}/${MAX_BIO_LENGTH}`}</Text>
+    </View>
+  );
+};
 
 export default AvatarEditorAndBio;

@@ -11,6 +11,101 @@ import {
 // Constants
 const ACTIVE_COLOR = '#10b981';
 
+// Move styles to top to fix "styles used before defined" errors
+const styles = StyleSheet.create({
+  itemContainer: {
+    backgroundColor: '#fff',
+    marginHorizontal: 8,
+    marginVertical: 4,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    overflow: 'hidden', // Ensures age indicator bar doesn't overflow
+  },
+  mainContentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  itemIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f8f9fa',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  itemTextContainer: {
+    flex: 1,
+    marginRight: 8,
+  },
+  itemTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  itemText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    flex: 1,
+    marginRight: 8,
+  },
+  ageBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  ageBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  metaDataContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+    flexWrap: 'wrap',
+  },
+  metaText: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginRight: 12,
+    marginBottom: 2,
+    fontWeight: '500',
+  },
+  itemDescription: {
+    fontSize: 12,
+    color: '#9ca3af',
+    fontStyle: 'italic',
+  },
+  itemActionButton: {
+    padding: 8,
+    marginLeft: 4,
+    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  ageIndicatorBar: {
+    height: 3,
+    width: '100%',
+  },
+});
+
 // Item Icon Mapping (reusing from original PantryItemComponent)
 const itemIconMap: { [key: string]: string } = {
   // Fruits
@@ -216,97 +311,3 @@ export const PantryItemWithAging = memo<PantryItemWithAgingProps>(
 );
 
 PantryItemWithAging.displayName = 'PantryItemWithAging';
-
-const styles = StyleSheet.create({
-  itemContainer: {
-    backgroundColor: '#fff',
-    marginHorizontal: 8,
-    marginVertical: 4,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
-    overflow: 'hidden', // Ensures age indicator bar doesn't overflow
-  },
-  mainContentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-  },
-  itemIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f8f9fa',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  itemTextContainer: {
-    flex: 1,
-    marginRight: 8,
-  },
-  itemTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  itemText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-    flex: 1,
-    marginRight: 8,
-  },
-  ageBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    minWidth: 60,
-    alignItems: 'center',
-  },
-  ageBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  metaDataContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2,
-    flexWrap: 'wrap',
-  },
-  metaText: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginRight: 12,
-    marginBottom: 2,
-    fontWeight: '500',
-  },
-  itemDescription: {
-    fontSize: 12,
-    color: '#9ca3af',
-    fontStyle: 'italic',
-  },
-  itemActionButton: {
-    padding: 8,
-    marginLeft: 4,
-    borderRadius: 8,
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  ageIndicatorBar: {
-    height: 3,
-    width: '100%',
-  },
-});

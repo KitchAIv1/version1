@@ -3,6 +3,82 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AgeGroup, AGE_GROUP_CONFIG } from '../hooks/useStockAging';
 
+// Move styles to top to fix "styles used before defined" errors
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  tab: {
+    flex: 1,
+    marginHorizontal: 2,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    alignItems: 'center',
+  },
+  selectedTab: {
+    borderWidth: 2,
+  },
+  tabContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#6b7280',
+    textAlign: 'center',
+    marginTop: 2,
+    marginBottom: 2,
+  },
+  selectedTabLabel: {
+    fontWeight: '600',
+  },
+  countBadge: {
+    backgroundColor: '#e5e7eb',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    minWidth: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+  },
+  countText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  selectedCountText: {
+    color: '#fff',
+  },
+  helpContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 4,
+  },
+  helpText: {
+    fontSize: 11,
+    color: '#9ca3af',
+    marginLeft: 4,
+    flex: 1,
+    lineHeight: 14,
+  },
+});
+
 interface AgeFilterTabsProps {
   selectedFilter: AgeGroup | 'all';
   onFilterChange: (filter: AgeGroup | 'all') => void;
@@ -141,78 +217,3 @@ export const AgeFilterTabs = memo<AgeFilterTabsProps>(
 );
 
 AgeFilterTabs.displayName = 'AgeFilterTabs';
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#fff',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  tabsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  tab: {
-    flex: 1,
-    marginHorizontal: 2,
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    borderRadius: 8,
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-    alignItems: 'center',
-  },
-  selectedTab: {
-    borderWidth: 2,
-  },
-  tabContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#6b7280',
-    textAlign: 'center',
-    marginTop: 2,
-    marginBottom: 2,
-  },
-  selectedTabLabel: {
-    fontWeight: '600',
-  },
-  countBadge: {
-    backgroundColor: '#e5e7eb',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    minWidth: 20,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-  },
-  countText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-  selectedCountText: {
-    color: '#fff',
-  },
-  helpContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: 4,
-  },
-  helpText: {
-    fontSize: 11,
-    color: '#9ca3af',
-    marginLeft: 4,
-    flex: 1,
-    lineHeight: 14,
-  },
-});

@@ -3,6 +3,81 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { GroceryItemInput } from '../hooks/useGroceryManager'; // Import the type
 
+// Move styles to top to fix "styles used before defined" errors
+const styles = StyleSheet.create({
+  rowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 9,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  iconContainer: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  textGroupContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+    flexShrink: 1,
+    flex: 1, // Allow text group to take up available space before button
+  },
+  textBase: {
+    fontSize: 14,
+  },
+  boldText: {
+    fontWeight: 'bold',
+  },
+  qtyText: {
+    marginRight: 4,
+  },
+  unitText: {
+    marginRight: 4,
+  },
+  nameText: {
+    fontWeight: 'normal',
+  },
+  matchedText: {
+    fontWeight: '500',
+    color: '#1f2937',
+  },
+  missingText: {
+    color: '#6b7280',
+  },
+  matchedUnitText: {
+    color: '#4b5563',
+  },
+  missingUnitText: {
+    color: '#9ca3af',
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  addedState: {
+    // Style for the "ADDED" state view
+    backgroundColor: '#f0fdf4', // Light green background
+    borderColor: '#bbf7d0',
+    borderWidth: 1,
+  },
+  addedButtonText: {
+    color: '#166534', // Darker green text
+    fontSize: 11,
+    fontWeight: '600',
+    marginLeft: 4,
+    textTransform: 'uppercase',
+  },
+});
+
 type Props = {
   ing: { name: string; quantity?: string; unit?: string };
   matched: boolean;
@@ -110,78 +185,3 @@ export default function IngredientRow({
     </View>
   );
 }
-
-// Styles
-const styles = StyleSheet.create({
-  rowContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 9,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  iconContainer: {
-    width: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  textGroupContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    overflow: 'hidden',
-    flexShrink: 1,
-    flex: 1, // Allow text group to take up available space before button
-  },
-  textBase: {
-    fontSize: 14,
-  },
-  boldText: {
-    fontWeight: 'bold',
-  },
-  qtyText: {
-    marginRight: 4,
-  },
-  unitText: {
-    marginRight: 4,
-  },
-  nameText: {
-    fontWeight: 'normal',
-  },
-  matchedText: {
-    fontWeight: '500',
-    color: '#1f2937',
-  },
-  missingText: {
-    color: '#6b7280',
-  },
-  matchedUnitText: {
-    color: '#4b5563',
-  },
-  missingUnitText: {
-    color: '#9ca3af',
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  addedState: {
-    // Style for the "ADDED" state view
-    backgroundColor: '#f0fdf4', // Light green background
-    borderColor: '#bbf7d0',
-    borderWidth: 1,
-  },
-  addedButtonText: {
-    color: '#166534', // Darker green text
-    fontSize: 11,
-    fontWeight: '600',
-    marginLeft: 4,
-    textTransform: 'uppercase',
-  },
-});

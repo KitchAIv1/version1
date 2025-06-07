@@ -3,6 +3,39 @@ import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { AntDesign, Feather } from '@expo/vector-icons';
 import { RecipeItem } from '../types'; // Adjust path if necessary
 
+// Move styles to top to fix "styles used before definition" errors
+const styles = StyleSheet.create({
+  container: {
+    alignItems: 'center',
+  },
+  actionButton: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  iconContainer: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  filledIcon: {
+    backgroundColor: '#fff',
+    color: '#000',
+    borderRadius: 2,
+  },
+  countText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+});
+
 // Define props more explicitly
 interface ActionOverlayProps {
   item: RecipeItem & {
@@ -86,34 +119,8 @@ export default function ActionOverlay({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-  },
-  actionButton: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  iconContainer: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  filledIcon: {
-    backgroundColor: '#fff',
-    color: '#000',
-    borderRadius: 2,
-  },
-  countText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-});
+// Add default props to fix require-default-props linter errors
+ActionOverlay.defaultProps = {
+  onCommentPress: undefined,
+  onMorePress: undefined,
+};

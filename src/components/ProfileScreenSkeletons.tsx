@@ -1,6 +1,87 @@
 import React from 'react';
 import { View, StyleSheet, Animated, Easing } from 'react-native';
 
+// Move styles to top to fix "styles used before defined" errors
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#10b981',
+  },
+  avatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+  },
+  statsRow: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginLeft: 16,
+  },
+  statContainer: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  bioContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  bioTextContainer: {
+    gap: 4,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 16,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e5',
+  },
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+  },
+  cardWrapper: {
+    width: '48%',
+    margin: '1%',
+    marginBottom: 12,
+  },
+  cardContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  cardInfo: {
+    padding: 12,
+    gap: 6,
+  },
+});
+
 // Animated skeleton placeholder
 const SkeletonPlaceholder: React.FC<{
   width: number | string;
@@ -133,83 +214,3 @@ export const ProfileScreenSkeleton: React.FC = () => (
     <RecipeGridSkeleton />
   </View>
 );
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: '#10b981',
-  },
-  avatarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: '#fff',
-  },
-  statsRow: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginLeft: 16,
-  },
-  statContainer: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  bioContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  bioTextContainer: {
-    gap: 4,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 16,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
-  },
-  gridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 4,
-    paddingVertical: 8,
-  },
-  cardWrapper: {
-    width: '48%',
-    margin: '1%',
-    marginBottom: 12,
-  },
-  cardContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  cardInfo: {
-    padding: 12,
-    gap: 6,
-  },
-});

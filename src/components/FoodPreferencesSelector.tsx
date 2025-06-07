@@ -7,6 +7,44 @@ import {
   ScrollView,
 } from 'react-native';
 
+// Move styles to top to fix "styles used before defined" errors
+const styles = StyleSheet.create({
+  container: {
+    paddingVertical: 10,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
+  },
+  preferencesList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  preferenceItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#e0e0e0', // Light gray for unselected
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#ccc',
+  },
+  preferenceItemSelected: {
+    backgroundColor: '#22c55e', // Green for selected (Kitchai primary)
+    borderColor: '#16a34a', // Darker green border
+  },
+  preferenceText: {
+    fontSize: 14,
+    color: '#333', // Dark text for unselected
+  },
+  preferenceTextSelected: {
+    color: '#fff', // White text for selected
+    fontWeight: '500',
+  },
+});
+
 interface FoodPreferencesSelectorProps {
   currentPreferences: string[];
   onPreferencesChange: (preferences: string[]) => void;
@@ -67,42 +105,5 @@ const FoodPreferencesSelector: React.FC<FoodPreferencesSelectorProps> = ({
     </ScrollView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    paddingVertical: 10,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
-  },
-  preferencesList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  preferenceItem: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#e0e0e0', // Light gray for unselected
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#ccc',
-  },
-  preferenceItemSelected: {
-    backgroundColor: '#22c55e', // Green for selected (Kitchai primary)
-    borderColor: '#16a34a', // Darker green border
-  },
-  preferenceText: {
-    fontSize: 14,
-    color: '#333', // Dark text for unselected
-  },
-  preferenceTextSelected: {
-    color: '#fff', // White text for selected
-    fontWeight: '500',
-  },
-});
 
 export default FoodPreferencesSelector;

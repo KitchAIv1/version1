@@ -19,6 +19,152 @@ import { StorageLocationPicker } from './StorageLocationPicker';
 import { StorageLocation } from '../hooks/usePantryData';
 import { useStorageLocationPreference } from '../hooks/useStorageLocationPreference';
 
+// Move styles to top to fix "styles used before defined" errors
+const styles = StyleSheet.create({
+  keyboardAvoidingView: {
+    flex: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContainer: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 10,
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+  },
+  timestampContainer: {
+    marginBottom: 20,
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  timestampRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  timestampLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
+    marginRight: 4,
+  },
+  timestampValue: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+  formGroup: {
+    marginBottom: 18,
+  },
+  label: {
+    fontSize: 15,
+    color: '#555',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  input: {
+    backgroundColor: '#f9f9f9',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 10,
+    fontSize: 16,
+    color: '#333',
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  rowContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  quantityInputContainer: {
+    flex: 0.48,
+  },
+  unitPickerContainer: {
+    flex: 0.48,
+  },
+  submitButton: {
+    backgroundColor: '#10b981',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#a5d6a7',
+  },
+  submitButtonText: {
+    color: '#FFF',
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  pickerIcon: {
+    position: 'absolute',
+    right: 10,
+    top: Platform.OS === 'ios' ? 10 : 12,
+  },
+});
+
+const pickerSelectStyles = StyleSheet.create({
+  inputIOS: {
+    fontSize: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    color: '#333',
+    paddingRight: 30,
+    backgroundColor: '#f9f9f9',
+  },
+  inputAndroid: {
+    fontSize: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    color: '#333',
+    paddingRight: 30,
+    backgroundColor: '#f9f9f9',
+  },
+  placeholder: {
+    color: '#bbb',
+  },
+  iconContainer: {
+    top: Platform.OS === 'ios' ? 10 : 12,
+    right: 12,
+  },
+});
+
 interface PantryItem {
   id: string;
   user_id: string;
@@ -258,150 +404,5 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  keyboardAvoidingView: {
-    flex: 1,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContainer: {
-    backgroundColor: '#FFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '85%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 10,
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-  },
-  timestampContainer: {
-    marginBottom: 20,
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  timestampRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  timestampLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 8,
-    marginRight: 4,
-  },
-  timestampValue: {
-    fontSize: 14,
-    color: '#333',
-    fontWeight: '500',
-  },
-  formGroup: {
-    marginBottom: 18,
-  },
-  label: {
-    fontSize: 15,
-    color: '#555',
-    marginBottom: 8,
-    fontWeight: '500',
-  },
-  input: {
-    backgroundColor: '#f9f9f9',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 10,
-    fontSize: 16,
-    color: '#333',
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  rowContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  quantityInputContainer: {
-    flex: 0.48,
-  },
-  unitPickerContainer: {
-    flex: 0.48,
-  },
-  submitButton: {
-    backgroundColor: '#10b981',
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#a5d6a7',
-  },
-  submitButtonText: {
-    color: '#FFF',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  pickerIcon: {
-    position: 'absolute',
-    right: 10,
-    top: Platform.OS === 'ios' ? 10 : 12,
-  },
-});
-
-const pickerSelectStyles = StyleSheet.create({
-  inputIOS: {
-    fontSize: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    color: '#333',
-    paddingRight: 30,
-    backgroundColor: '#f9f9f9',
-  },
-  inputAndroid: {
-    fontSize: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    color: '#333',
-    paddingRight: 30,
-    backgroundColor: '#f9f9f9',
-  },
-  placeholder: {
-    color: '#bbb',
-  },
-  iconContainer: {
-    top: Platform.OS === 'ios' ? 10 : 12,
-    right: 12,
-  },
-});
 
 export default ManualAddSheet;

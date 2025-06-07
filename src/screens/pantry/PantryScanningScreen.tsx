@@ -1,3 +1,37 @@
+/**
+ * Pantry Scanning Screen
+ * 
+ * This screen provides AI-powered pantry item recognition using the device camera.
+ * It handles the complete scanning workflow from camera capture to item confirmation.
+ * 
+ * SCANNING FLOW:
+ * 1. Camera Permission Management - Requests and validates camera access
+ * 2. Image Capture - Takes high-quality photo with haptic feedback
+ * 3. AI Processing - Sends image to recognize-stock edge function
+ * 4. Item Recognition - Processes AI response and extracts items
+ * 5. User Confirmation - Shows items for user review and editing
+ * 6. Duplicate Handling - Manages existing items with user choices
+ * 7. Database Storage - Saves confirmed items to stock table
+ * 8. Real-time Updates - Triggers cache invalidation for immediate UI updates
+ * 
+ * FEATURES:
+ * - Real-time camera preview with custom interface
+ * - AI-powered item recognition via OpenAI GPT-4o
+ * - Smart duplicate detection and handling
+ * - Unit conversion and standardization
+ * - Loading animations with rotating messages
+ * - Haptic feedback for better UX
+ * - Automatic cache invalidation for real-time updates
+ * 
+ * DEPENDENCIES:
+ * - expo-camera: Camera functionality
+ * - Supabase Edge Functions: AI recognition service
+ * - React Query: Cache management
+ * - Custom pantry utilities: Image processing, duplicate handling, unit conversion
+ * 
+ * @module PantryScanningScreen
+ */
+
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View,

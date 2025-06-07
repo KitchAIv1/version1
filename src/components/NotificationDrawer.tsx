@@ -21,6 +21,191 @@ import {
   getNotificationColor,
 } from '../hooks/useNotifications';
 
+// Move styles to top to fix "styles used before defined" errors
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    backgroundColor: '#fff',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1f2937',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  markAllButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#10b981',
+    borderRadius: 8,
+  },
+  markAllButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#fef2f2',
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ef4444',
+  },
+  listContent: {
+    paddingBottom: 20,
+  },
+  emptyListContent: {
+    flex: 1,
+  },
+  notificationItem: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  unreadNotification: {
+    backgroundColor: '#f9fafb',
+    borderLeftWidth: 4,
+    borderLeftColor: '#10b981',
+  },
+  urgentNotification: {
+    borderLeftColor: '#ef4444',
+    backgroundColor: '#fef2f2',
+  },
+  notificationHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notificationContent: {
+    flex: 1,
+  },
+  notificationTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 4,
+  },
+  notificationTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    flex: 1,
+    marginRight: 8,
+  },
+  unreadTitle: {
+    fontWeight: '700',
+  },
+  notificationTime: {
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+  notificationTypeLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  notificationMessage: {
+    fontSize: 14,
+    color: '#6b7280',
+    lineHeight: 20,
+  },
+  notificationActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  actionButton: {
+    padding: 6,
+    borderRadius: 6,
+    backgroundColor: '#f9fafb',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  urgentBanner: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  urgentText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
+    marginHorizontal: 20,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 60,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  footer: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    backgroundColor: '#f9fafb',
+  },
+  footerText: {
+    fontSize: 13,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+});
+
 interface NotificationItemProps {
   notification: GlobalNotification;
   onMarkRead: (id: string) => void;
@@ -337,187 +522,3 @@ export const NotificationDrawer = memo<NotificationDrawerProps>(
 );
 
 NotificationDrawer.displayName = 'NotificationDrawer';
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    backgroundColor: '#fff',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1f2937',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  markAllButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#10b981',
-    borderRadius: 8,
-  },
-  markAllButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: '#fef2f2',
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ef4444',
-  },
-  listContent: {
-    paddingBottom: 20,
-  },
-  emptyListContent: {
-    flex: 1,
-  },
-  notificationItem: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  unreadNotification: {
-    backgroundColor: '#f9fafb',
-    borderLeftWidth: 4,
-    borderLeftColor: '#10b981',
-  },
-  urgentNotification: {
-    borderLeftColor: '#ef4444',
-    backgroundColor: '#fef2f2',
-  },
-  notificationHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  notificationContent: {
-    flex: 1,
-  },
-  notificationTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 4,
-  },
-  notificationTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-    flex: 1,
-    marginRight: 8,
-  },
-  unreadTitle: {
-    fontWeight: '700',
-  },
-  notificationTime: {
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-  notificationTypeLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  notificationMessage: {
-    fontSize: 14,
-    color: '#6b7280',
-    lineHeight: 20,
-  },
-  notificationActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  actionButton: {
-    padding: 6,
-    borderRadius: 6,
-    backgroundColor: '#f9fafb',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  urgentBanner: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#ef4444',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  urgentText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  separator: {
-    height: 1,
-    backgroundColor: '#f0f0f0',
-    marginHorizontal: 20,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-    paddingVertical: 60,
-  },
-  emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#6b7280',
-    marginTop: 16,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptyStateText: {
-    fontSize: 14,
-    color: '#9ca3af',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  footer: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    backgroundColor: '#f9fafb',
-  },
-  footerText: {
-    fontSize: 13,
-    color: '#6b7280',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-});

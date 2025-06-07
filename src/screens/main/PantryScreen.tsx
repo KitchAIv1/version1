@@ -70,6 +70,9 @@ import WhatCanICookButton from '../../components/WhatCanICookButton';
 import InsufficientItemsModal from '../../components/modals/InsufficientItemsModal';
 import { useWhatCanICook } from '../../hooks/useWhatCanICook';
 
+// Import real-time subscription hook
+import { useStockRealtime } from '../../hooks/useStockRealtime';
+
 // Navigation type
 type PantryNavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
@@ -188,6 +191,9 @@ export default function PantryScreen() {
   // RESTORED: Original pantry functionality - optimized
   const { invalidatePantryCache } = usePantryMutations(user?.id);
   const { lastUsedLocation } = useStorageLocationPreference();
+
+  // REAL-TIME: Set up real-time subscription for stock changes
+  useStockRealtime(user?.id);
 
   // State - OPTIMIZED: Use stable initial values
   const [searchQuery, setSearchQuery] = useState('');
@@ -810,6 +816,8 @@ export default function PantryScreen() {
           isVisible={showNotificationsPanel}
           onClose={handleCloseNotifications}
           onViewItem={handleViewItemFromNotification}
+          notifications={notifications}
+          unreadCount={unreadCount}
         />
       )}
     </View>

@@ -1,6 +1,33 @@
 import React from 'react';
 import { StyleSheet, View, Text, FlatList, Dimensions } from 'react-native';
 
+const numColumns = 3;
+const itemMargin = 1.5;
+
+// Move styles to top to fix "styles used before defined" errors
+const styles = StyleSheet.create({
+  listContainer: {
+    padding: itemMargin,
+  },
+  itemContainer: {
+    flex: 1 / numColumns,
+    aspectRatio: 1,
+    margin: itemMargin,
+    backgroundColor: '#e0e0e0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 4,
+  },
+  itemText: { fontSize: 10, textAlign: 'center' },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: { color: '#666' },
+});
+
 // TODO: Define the actual structure of a saved item
 interface SavedItem {
   id: string;
@@ -10,9 +37,6 @@ interface SavedItem {
 interface SavedGridProps {
   data: SavedItem[];
 }
-
-const numColumns = 3;
-const itemMargin = 1.5;
 
 export const SavedGrid: React.FC<SavedGridProps> = ({ data }) => {
   const renderItem = ({ item }: { item: SavedItem }) => (
@@ -40,28 +64,5 @@ export const SavedGrid: React.FC<SavedGridProps> = ({ data }) => {
     />
   );
 };
-
-const styles = StyleSheet.create({
-  listContainer: {
-    padding: itemMargin,
-  },
-  itemContainer: {
-    flex: 1 / numColumns,
-    aspectRatio: 1,
-    margin: itemMargin,
-    backgroundColor: '#e0e0e0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 4,
-  },
-  itemText: { fontSize: 10, textAlign: 'center' },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyText: { color: '#666' },
-});
 
 export default SavedGrid;

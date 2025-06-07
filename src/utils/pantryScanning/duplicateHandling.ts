@@ -24,6 +24,7 @@ export interface ItemToUpsert {
   unit: string;
   description?: string | null;
   created_at?: string;
+  storage_location?: string;
 }
 
 export interface DuplicateAction {
@@ -113,6 +114,7 @@ export const processItemsForDuplicates = async (
         unit: backendUnit,
         description: null,
         created_at: now,
+        storage_location: 'cupboard',
       });
     }
   }
@@ -151,6 +153,7 @@ export const handleDuplicateUserDecision = (
               quantity: newTotalQty,
               unit: backendUnit,
               description: null,
+              storage_location: 'cupboard',
             });
           },
         },
@@ -163,6 +166,7 @@ export const handleDuplicateUserDecision = (
               quantity: convertedQuantity,
               unit: backendUnit,
               description: null,
+              storage_location: 'cupboard',
             });
           },
         },

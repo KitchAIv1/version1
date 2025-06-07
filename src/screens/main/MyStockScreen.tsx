@@ -6,9 +6,15 @@ import { StockHeader } from '../../components/stock/StockHeader';
 import { StockList } from '../../components/stock/StockList';
 import { ManualAddModal } from '../../components/stock/ManualAddModal';
 import { COLORS as ThemeColors } from '../../constants/theme';
+import { useAuth } from '../../providers/AuthProvider';
+import { useStockRealtime } from '../../hooks/useStockRealtime';
 
 export default function MyStockScreen() {
   const navigation = useNavigation();
+  const { user } = useAuth();
+
+  // Set up real-time subscription for stock changes
+  useStockRealtime(user?.id);
 
   const {
     stockData,

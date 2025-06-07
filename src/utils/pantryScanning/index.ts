@@ -1,8 +1,17 @@
-// Export all image processing utilities
+/**
+ * Pantry Scanning Utilities
+ * 
+ * This module provides comprehensive utilities for the pantry scanning feature,
+ * including AI-powered image recognition, duplicate handling, and unit conversion.
+ * 
+ * @module pantryScanning
+ */
+
+// Image Processing & AI Recognition
 export * from './imageProcessing';
 
-// Export all unit conversion utilities
+// Unit Conversion & Standardization  
 export * from './unitConversion';
 
-// Export all duplicate handling utilities
+// Duplicate Detection & User Session Management
 export * from './duplicateHandling';
