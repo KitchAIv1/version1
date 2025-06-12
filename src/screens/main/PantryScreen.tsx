@@ -34,6 +34,7 @@ import { useAuth } from '../../providers/AuthProvider';
 import { useAccessControl } from '../../hooks/useAccessControl';
 import { getShortRelativeTime } from '../../utils/dateUtils';
 import ManualAddSheet from '../../components/ManualAddSheet';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 // Import NEW aging-related hooks and components
 import {
@@ -60,7 +61,6 @@ import {
   StorageLocation,
 } from '../../hooks/usePantryData';
 import { PantryItemComponent } from '../../components/PantryItemComponent';
-import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import SearchInput from '../../components/SearchInput';
 import { StorageLocationTabs } from '../../components/StorageLocationTabs';
 import { useStorageLocationPreference } from '../../hooks/useStorageLocationPreference';
@@ -73,6 +73,12 @@ import { useWhatCanICook } from '../../hooks/useWhatCanICook';
 // Import real-time subscription hook
 import { useStockRealtime } from '../../hooks/useStockRealtime';
 
+// Import NEW duplicate handling system
+import { useDuplicateHandling } from '../../hooks/useDuplicateHandling';
+import SmartSuggestionBar from '../../components/SmartSuggestionBar';
+import ReviewDuplicatesModal from '../../components/ReviewDuplicatesModal';
+import MergeDialog from '../../components/MergeDialog';
+
 // Navigation type
 type PantryNavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
@@ -80,10 +86,10 @@ type PantryNavigationProp = NativeStackNavigationProp<MainStackParamList>;
 const ACTIVE_COLOR = '#10b981';
 const DEBOUNCE_DELAY = 300;
 
-// OPTIMIZED: Pre-define unit options to prevent recreation
+// Unit options for the manual add sheet
 const UNIT_OPTIONS = [
   { label: 'Units', value: 'units' },
-  { label: 'Grams', value: 'grams' },
+  { label: 'Grams', value: 'g' },
   { label: 'Cups', value: 'cups' },
   { label: 'Milliliters', value: 'ml' },
   { label: 'Liters', value: 'l' },
@@ -195,6 +201,46 @@ export default function PantryScreen() {
   // REAL-TIME: Set up real-time subscription for stock changes
   useStockRealtime(user?.id);
 
+  // NEW: Duplicate handling system
+  const duplicateHandling = useDuplicateHandling(async () => {
+    console.log('[PantryScreen] 🔄 Refreshing pantry data after merge...');
+    await refetch();
+    
+    // QUANTITY TRACKING FIX: Update editingItem with fresh data after merge
+    if (editingItem) {
+      console.log('[PantryScreen] 🔄 Updating editingItem with fresh data after merge...');
+      
+      // Wait a bit for the data to be updated, then fetch fresh item data
+      setTimeout(async () => {
+        try {
+          const { data: freshItemData, error } = await supabase
+            .from('stock')
+            .select('id, item_name, quantity, unit, description, created_at, updated_at, user_id, storage_location, quantity_added, previous_quantity')
+            .eq('id', editingItem.id)
+            .single();
+          
+          if (error) {
+            console.error('[PantryScreen] ❌ Error fetching fresh item data:', error);
+            return;
+          }
+          
+          if (freshItemData) {
+            console.log('[PantryScreen] ✅ Found fresh item data, updating editingItem:', {
+              itemName: freshItemData.item_name,
+              oldQuantity: editingItem.quantity,
+              newQuantity: freshItemData.quantity,
+              quantityAdded: freshItemData.quantity_added,
+              previousQuantity: freshItemData.previous_quantity
+            });
+            setEditingItem(freshItemData);
+          }
+        } catch (error) {
+          console.error('[PantryScreen] ❌ Error updating editingItem:', error);
+        }
+      }, 500); // Wait 500ms for the cache to be updated
+    }
+  });
+
   // State - OPTIMIZED: Use stable initial values
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -225,6 +271,9 @@ export default function PantryScreen() {
         updated_at: item.updated_at,
         storage_location:
           (item.storage_location as StorageLocation) || 'cupboard',
+        // Include quantity tracking fields for mixed batches detection
+        quantity_added: item.quantity_added,
+        previous_quantity: item.previous_quantity,
       }));
       return groupItemsByStorageLocation(convertedItems);
     }
@@ -413,47 +462,73 @@ export default function PantryScreen() {
   const handleSaveItemFromSheet = useCallback(
     async (itemData: any) => {
       try {
-        const {
-          data: { user: currentUser },
-        } = await supabase.auth.getUser();
+        // NEW: For new items, check for duplicates BEFORE saving
+        if (!editingItem) {
+          console.log('[PantryScreen] 🔍 Checking for duplicates before save...');
+          
+          // Close the manual add sheet first
+          setIsManualAddSheetVisible(false);
+          
+          const hasDuplicates = await duplicateHandling.checkBeforeSave(itemData);
+          
+          if (hasDuplicates) {
+            console.log('[PantryScreen] ⚠️ Duplicates found - merge modal will appear');
+            // Don't save yet, let user decide what to do via the merge modal
+            // The merge modal will be shown by the duplicate handling hook
+            return;
+          }
+          
+          console.log('[PantryScreen] ✅ No duplicates found - proceeding with save');
+        }
+
+        // For editing existing items OR no duplicates found, proceed with normal save
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
         if (!currentUser?.id) {
           throw new Error('User not authenticated');
         }
 
         const payload = {
           user_id: currentUser.id,
-          item_name: itemData.item_name.toLowerCase(),
+          item_name: itemData.item_name.trim().toLowerCase(),
           quantity: itemData.quantity,
           unit: itemData.unit,
           description: itemData.description,
-          storage_location: itemData.storage_location,
+          storage_location: itemData.storage_location || 'cupboard',
         };
 
-        let result;
         if (editingItem) {
-          result = await supabase
+          // Update existing item
+          const { error } = await supabase
             .from('stock')
             .update(payload)
             .eq('id', editingItem.id);
+
+          if (error) throw error;
+          console.log('[PantryScreen] ✅ Item updated successfully');
         } else {
-          result = await supabase.from('stock').insert(payload);
+          // Add new item
+          const { error } = await supabase.from('stock').insert([payload]);
+          if (error) throw error;
+          console.log('[PantryScreen] ✅ Item added successfully');
         }
 
-        if (result.error) throw result.error;
-
+        // Refresh data and close sheet
         await refetch();
-        handleCloseSheet();
+        setIsManualAddSheetVisible(false);
+        setEditingItem(null);
 
+        // Show success message
         Alert.alert(
           'Success',
-          editingItem ? 'Item updated successfully' : 'Item added successfully',
+          editingItem ? 'Item updated successfully' : 'Item added successfully'
         );
+
       } catch (error: any) {
         console.error('[PantryScreen] Error saving item:', error);
         Alert.alert('Error', error.message || 'Failed to save item');
       }
     },
-    [editingItem, refetch, handleCloseSheet],
+    [editingItem, duplicateHandling, refetch]
   );
 
   // OPTIMIZED: Memoized header component with stable dependencies
@@ -820,6 +895,26 @@ export default function PantryScreen() {
           unreadCount={unreadCount}
         />
       )}
+
+      {/* Duplicate Handling Components */}
+      <MergeDialog
+        isVisible={duplicateHandling.showMergeDialog}
+        duplicateGroup={duplicateHandling.currentDuplicateGroup}
+        onConfirm={duplicateHandling.handleConfirmMerge}
+        onCancel={duplicateHandling.handleCancelMerge}
+        onKeepBoth={duplicateHandling.handleKeepBoth}
+        isLoading={duplicateHandling.isMerging}
+      />
+
+      <ReviewDuplicatesModal
+        isVisible={duplicateHandling.showReviewModal}
+        duplicateGroups={duplicateHandling.allDuplicateGroups}
+        onMergeItems={duplicateHandling.handleMergeFromReview}
+        onEditItem={() => {}} // TODO: Implement if needed
+        onDeleteItem={duplicateHandling.handleDeleteFromReview}
+        onClose={duplicateHandling.handleCloseReview}
+        onRefresh={duplicateHandling.loadAllDuplicates}
+      />
     </View>
   );
 }

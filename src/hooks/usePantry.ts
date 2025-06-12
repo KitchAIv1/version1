@@ -8,7 +8,13 @@ export interface PantryItem {
   user_id: string; // Added user_id
   item_name: string;
   quantity: number;
+  unit: string;
+  description?: string;
+  created_at: string;
+  updated_at?: string;
   expiry_date?: string | null; // Add optional expiry_date (string or null)
+  quantity_added?: number;
+  previous_quantity?: number;
   // Add any other fields that might exist in your 'stock' table
 }
 

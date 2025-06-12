@@ -1,11 +1,23 @@
 import React, { memo, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getShortRelativeTime } from '../utils/dateUtils';
+import { getMostRecentActivity } from '../utils/dateUtils';
 import { PantryItem } from '../hooks/usePantryData';
 
 // Constants
 const ACTIVE_COLOR = '#10b981';
+
+// Helper function to detect mixed batches
+const isMixedBatches = (item: PantryItem): boolean => {
+  return !!(
+    item.quantity_added !== null && 
+    item.quantity_added !== undefined && 
+    item.quantity_added !== 0 &&
+    item.previous_quantity !== null &&
+    item.previous_quantity !== undefined &&
+    item.previous_quantity > 0
+  );
+};
 
 // Move styles to top to fix "styles used before defined" errors
 const styles = StyleSheet.create({
@@ -56,7 +68,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
     marginRight: 12,
+    marginBottom: 2,
     fontWeight: '500',
+  },
+  mixedBatchesText: {
+    fontSize: 12,
+    color: '#6366f1', // indigo-500 to match the badge color
+    marginRight: 12,
+    marginBottom: 2,
+    fontWeight: '600', // slightly bolder to make it stand out
   },
   itemDescription: {
     fontSize: 12,
@@ -182,6 +202,15 @@ export const PantryItemComponent = memo<PantryItemComponentProps>(
       [item.item_name],
     );
 
+    // Check if this item has mixed batches
+    const hasMixedBatches = useMemo(() => isMixedBatches(item), [item]);
+
+    // Memoize activity calculation
+    const activityInfo = useMemo(
+      () => getMostRecentActivity(item.created_at, item.updated_at),
+      [item.created_at, item.updated_at],
+    );
+
     // Memoize event handlers
     const handleEdit = useCallback(() => onEdit(item), [onEdit, item]);
     const handleDelete = useCallback(() => onDelete(item), [onDelete, item]);
@@ -219,11 +248,17 @@ export const PantryItemComponent = memo<PantryItemComponentProps>(
               <Ionicons name="cube-outline" size={12} /> {item.quantity}{' '}
               {item.unit}
             </Text>
-            {item.created_at && (
-              <Text style={styles.metaText}>
-                <Ionicons name="time-outline" size={12} />{' '}
-                {getShortRelativeTime(item.created_at)}
+            {hasMixedBatches ? (
+              <Text style={styles.mixedBatchesText}>
+                <Ionicons name="layers-outline" size={12} /> Mixed Batches
               </Text>
+            ) : (
+              activityInfo.formattedTime && (
+                <Text style={styles.metaText}>
+                  <Ionicons name="time-outline" size={12} />{' '}
+                  {activityInfo.label} {activityInfo.formattedTime}
+                </Text>
+              )
             )}
           </View>
           {item.description && (

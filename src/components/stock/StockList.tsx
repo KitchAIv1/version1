@@ -61,6 +61,14 @@ export const StockList: React.FC<StockListProps> = ({
                 {`${item.quantity} ${item.unit || ''}`.trim()}
               </Text>
             </View>
+            {/* Show recent addition indicator */}
+            {item.quantity_added && item.quantity_added > 0 && (
+              <View style={styles.additionChip}>
+                <Text style={styles.additionChipText}>
+                  +{item.quantity_added}
+                </Text>
+              </View>
+            )}
             {lastUpdated && (
               <View style={styles.timestampContainer}>
                 <Icon name="time-outline" size={12} color="#999" />
@@ -222,6 +230,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#555',
     fontWeight: '500',
+  },
+  additionChip: {
+    backgroundColor: '#22c55e',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginRight: 6,
+  },
+  additionChipText: {
+    fontSize: 11,
+    color: '#fff',
+    fontWeight: '600',
   },
   itemDescription: {
     fontSize: 13,

@@ -14,10 +14,13 @@ import {
 } from 'react-native';
 import RNPickerSelect from 'react-native-picker-select';
 import { Ionicons } from '@expo/vector-icons';
-import { formatDetailedTimestamp } from '../utils/dateUtils';
-import { StorageLocationPicker } from './StorageLocationPicker';
-import { StorageLocation } from '../hooks/usePantryData';
+import { formatDetailedTimestamp, getMostRecentActivity } from '../utils/dateUtils';
+import { AGE_GROUP_CONFIG, AgeGroup } from '../hooks/useStockAging';
+import StorageLocationPicker from './StorageLocationPicker';
 import { useStorageLocationPreference } from '../hooks/useStorageLocationPreference';
+import { StorageLocation } from '../hooks/usePantryData';
+import { supabase } from '../services/supabase';
+import { useAuth } from '../providers/AuthProvider';
 
 // Move styles to top to fix "styles used before defined" errors
 const styles = StyleSheet.create({
@@ -65,19 +68,70 @@ const styles = StyleSheet.create({
   },
   timestampRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  timestampContent: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  timestampMainRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 4,
+  },
+  timestampDetailsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  timestampRowSecondary: {
+    marginTop: 8,
+    opacity: 0.8,
   },
   timestampLabel: {
     fontSize: 14,
     color: '#666',
-    marginLeft: 8,
     marginRight: 4,
+  },
+  quantityDetail: {
+    fontSize: 13,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  agingBadgeSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  agingBadgeTextSmall: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   timestampValue: {
     fontSize: 14,
     color: '#333',
     fontWeight: '500',
   },
+  activitySummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  activitySummaryText: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginLeft: 6,
+    fontStyle: 'italic',
+  },
+
   formGroup: {
     marginBottom: 18,
   },
@@ -127,9 +181,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   pickerIcon: {
-    position: 'absolute',
-    right: 10,
-    top: Platform.OS === 'ios' ? 10 : 12,
+    marginRight: 10,
   },
 });
 
@@ -175,6 +227,8 @@ interface PantryItem {
   created_at: string;
   updated_at?: string;
   storage_location?: StorageLocation;
+  quantity_added?: number;
+  previous_quantity?: number;
 }
 
 interface UnitOption {
@@ -191,6 +245,26 @@ interface ManualAddSheetProps {
   unitOptions: UnitOption[];
 }
 
+
+// Helper function to calculate aging information from PantryItem
+const calculateAgingInfo = (createdAt: string) => {
+  const now = new Date();
+  const created = new Date(createdAt);
+  const daysOld = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+  
+  const ageGroup: AgeGroup = daysOld < 7 ? 'green' : daysOld <= 14 ? 'yellow' : 'red';
+  const ageConfig = AGE_GROUP_CONFIG[ageGroup];
+  
+  return {
+    daysOld,
+    ageGroup,
+    ageConfig,
+    ageDescription: daysOld === 0 ? 'Added today' : 
+                   daysOld === 1 ? '1 day old' : 
+                   `${daysOld} days old`
+  };
+};
+
 const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
   isVisible,
   onClose,
@@ -200,6 +274,7 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
   unitOptions,
 }) => {
   const { getDefaultLocation, savePreference } = useStorageLocationPreference();
+  const { user } = useAuth();
 
   const [itemName, setItemName] = useState('');
   const [quantity, setQuantity] = useState('1');
@@ -210,6 +285,47 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
   const [isSaving, setIsSaving] = useState(false);
 
   const isEditMode = mode === 'edit';
+
+  // QUANTITY TRACKING FIX: State for fresh item data
+  const [freshItemData, setFreshItemData] = useState<PantryItem | null>(initialItemData || null);
+
+  // QUANTITY TRACKING FIX: Fetch fresh data when editing an item
+  useEffect(() => {
+    const fetchFreshData = async () => {
+      if (isEditMode && initialItemData?.id && isVisible) {
+        try {
+          console.log('[ManualAddSheet] 🔄 Fetching fresh data for item:', initialItemData.id);
+          
+          const { data: freshData, error } = await supabase
+            .from('stock')
+            .select('id, item_name, quantity, unit, description, created_at, updated_at, user_id, storage_location, quantity_added, previous_quantity')
+            .eq('id', initialItemData.id)
+            .single();
+          
+          if (error) {
+            console.error('[ManualAddSheet] ❌ Error fetching fresh data:', error);
+            return;
+          }
+          
+          if (freshData) {
+            console.log('[ManualAddSheet] ✅ Got fresh data:', {
+              itemName: freshData.item_name,
+              quantity: freshData.quantity,
+              quantityAdded: freshData.quantity_added,
+              previousQuantity: freshData.previous_quantity
+            });
+            setFreshItemData(freshData);
+          }
+        } catch (error) {
+          console.error('[ManualAddSheet] ❌ Error in fetchFreshData:', error);
+        }
+      } else {
+        setFreshItemData(initialItemData || null);
+      }
+    };
+    
+    fetchFreshData();
+  }, [isEditMode, initialItemData?.id, initialItemData?.updated_at, isVisible]);
 
   useEffect(() => {
     if (initialItemData && isEditMode) {
@@ -253,7 +369,7 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
     setIsSaving(true);
     try {
       const itemToSubmit = {
-        item_name: itemName.trim(),
+        item_name: itemName.trim().toLowerCase(), // ✅ FIXED: Always normalize case
         quantity: numQuantity,
         unit,
         description: description.trim() || null,
@@ -294,21 +410,161 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
                 </TouchableOpacity>
               </View>
 
-              {/* Timestamp Information for Edit Mode */}
-              {isEditMode && initialItemData && initialItemData.created_at && (
-                <View style={styles.timestampContainer}>
-                  <View style={styles.timestampRow}>
-                    <Ionicons
-                      name="add-circle-outline"
-                      size={16}
-                      color="#666"
-                    />
-                    <Text style={styles.timestampLabel}>Added: </Text>
-                    <Text style={styles.timestampValue}>
-                      {formatDetailedTimestamp(initialItemData.created_at)}
-                    </Text>
-                  </View>
-                </View>
+              {/* Enhanced Timestamp + Quantity + Aging Information for Edit Mode */}
+              {isEditMode && freshItemData && freshItemData.created_at && (
+                (() => {
+                  // Debug logging - now using freshItemData
+                  console.log('[ManualAddSheet] Debug - freshItemData:', {
+                    item_name: freshItemData.item_name,
+                    quantity: freshItemData.quantity,
+                    quantity_added: freshItemData.quantity_added,
+                    previous_quantity: freshItemData.previous_quantity,
+                    created_at: freshItemData.created_at,
+                    updated_at: freshItemData.updated_at
+                  });
+                  
+                  const originalAgingInfo = calculateAgingInfo(freshItemData.created_at);
+                  const freshAgingInfo = {
+                    ageGroup: 'green' as AgeGroup,
+                    ageConfig: AGE_GROUP_CONFIG.green,
+                    ageDescription: 'Just added'
+                  };
+                  const activityInfo = getMostRecentActivity(
+                    freshItemData.created_at, 
+                    freshItemData.updated_at
+                  );
+                  
+                  return (
+                    <View style={styles.timestampContainer}>
+                      {/* Updated At - Only show if there's been a meaningful quantity change */}
+                      {freshItemData.updated_at && 
+                       freshItemData.updated_at !== freshItemData.created_at &&
+                       freshItemData.quantity_added !== undefined &&
+                       freshItemData.quantity_added !== null &&
+                       freshItemData.previous_quantity !== undefined &&
+                       freshItemData.previous_quantity !== null &&
+                       freshItemData.quantity_added !== 0 && (
+                        <View style={styles.timestampRow}>
+                          <Ionicons
+                            name="refresh-circle-outline"
+                            size={16}
+                            color="#f59e0b"
+                          />
+                          <View style={styles.timestampContent}>
+                            <View style={styles.timestampMainRow}>
+                              <Text style={styles.timestampLabel}>Updated: </Text>
+                              <Text style={styles.timestampValue}>
+                                {formatDetailedTimestamp(freshItemData.updated_at)}
+                              </Text>
+                            </View>
+                            <View style={styles.timestampDetailsRow}>
+                              <Text style={styles.quantityDetail}>
+                                {freshItemData.quantity_added > 0 
+                                  ? `+${freshItemData.quantity_added} ${freshItemData.unit} (new addition)`
+                                  : freshItemData.quantity_added < 0
+                                  ? `${freshItemData.quantity_added} ${freshItemData.unit} (removed)`
+                                  : `${freshItemData.quantity} ${freshItemData.unit} (current total)`
+                                }
+                              </Text>
+                              <View
+                                style={[
+                                  styles.agingBadgeSmall,
+                                  {
+                                    backgroundColor: freshAgingInfo.ageConfig.backgroundColor,
+                                    borderColor: freshAgingInfo.ageConfig.color,
+                                  },
+                                ]}>
+                                <Ionicons
+                                  name="checkmark-circle"
+                                  size={12}
+                                  color={freshAgingInfo.ageConfig.color}
+                                />
+                                <Text
+                                  style={[
+                                    styles.agingBadgeTextSmall,
+                                    { color: freshAgingInfo.ageConfig.textColor },
+                                  ]}>
+                                  {freshAgingInfo.ageConfig.label}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+                      )}
+                      
+                      {/* Created At - ORIGINAL TIMESTAMP */}
+                      <View style={[
+                        styles.timestampRow,
+                        freshItemData.updated_at && 
+                        freshItemData.updated_at !== freshItemData.created_at && 
+                        styles.timestampRowSecondary
+                      ]}>
+                        <Ionicons
+                          name="add-circle-outline"
+                          size={16}
+                          color="#10b981"
+                        />
+                        <View style={styles.timestampContent}>
+                          <View style={styles.timestampMainRow}>
+                            <Text style={styles.timestampLabel}>Added: </Text>
+                            <Text style={styles.timestampValue}>
+                              {formatDetailedTimestamp(freshItemData.created_at)}
+                            </Text>
+                          </View>
+                                                      <View style={styles.timestampDetailsRow}>
+                              <Text style={styles.quantityDetail}>
+                                {freshItemData.previous_quantity !== undefined 
+                                  ? `${freshItemData.previous_quantity} ${freshItemData.unit} (original)`
+                                  : `${freshItemData.quantity} ${freshItemData.unit} (when first added)`
+                                }
+                              </Text>
+                              <View
+                                style={[
+                                  styles.agingBadgeSmall,
+                                  {
+                                    backgroundColor: originalAgingInfo.ageConfig.backgroundColor,
+                                    borderColor: originalAgingInfo.ageConfig.color,
+                                  },
+                                ]}>
+                                <Ionicons
+                                  name={
+                                    originalAgingInfo.ageGroup === 'red'
+                                      ? 'alert-circle'
+                                      : originalAgingInfo.ageGroup === 'yellow'
+                                      ? 'warning'
+                                      : 'checkmark-circle'
+                                  }
+                                  size={12}
+                                  color={originalAgingInfo.ageConfig.color}
+                                />
+                                <Text
+                                  style={[
+                                    styles.agingBadgeTextSmall,
+                                    { color: originalAgingInfo.ageConfig.textColor },
+                                  ]}>
+                                  {originalAgingInfo.ageConfig.label}
+                                </Text>
+                              </View>
+                            </View>
+                        </View>
+                      </View>
+                      
+                      {/* Most Recent Activity Summary */}
+                      {activityInfo.formattedTime && (
+                        <View style={styles.activitySummaryRow}>
+                          <Ionicons
+                            name="time-outline"
+                            size={14}
+                            color="#6b7280"
+                          />
+                                                     <Text style={styles.activitySummaryText}>
+                             {activityInfo.label} {activityInfo.formattedTime} • {originalAgingInfo.ageDescription}
+                           </Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })()
               )}
 
               <View style={styles.formGroup}>

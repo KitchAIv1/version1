@@ -15,6 +15,9 @@ export interface StockAgingItem {
   created_at: string;
   updated_at?: string;
   storage_location?: string;
+  // Quantity tracking fields for mixed batches detection
+  quantity_added?: number;
+  previous_quantity?: number;
   // Aging-specific fields from RPC
   age_group: AgeGroup;
   days_old: number;
@@ -205,6 +208,9 @@ export const useStockAging = (userId?: string) => {
               ...agingItem, // Override with aging-specific data (age_group, days_old)
               storage_location: validateStorageLocation(fullItem.storage_location),
               age_description: generateAgeDescription(agingItem.days_old),
+              // Preserve quantity tracking fields from full item data
+              quantity_added: fullItem.quantity_added,
+              previous_quantity: fullItem.previous_quantity,
             };
 
             return mergedItem;
@@ -219,6 +225,8 @@ export const useStockAging = (userId?: string) => {
             quantity: mergedItems[0]?.quantity,
             unit: mergedItems[0]?.unit,
             created_at: mergedItems[0]?.created_at,
+            quantity_added: mergedItems[0]?.quantity_added,
+            previous_quantity: mergedItems[0]?.previous_quantity,
           });
 
           return mergedItems;

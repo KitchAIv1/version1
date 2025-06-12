@@ -15,6 +15,9 @@ export interface StockItem {
   description?: string | null;
   user_id?: string;
   created_at?: string;
+  updated_at?: string;
+  quantity_added?: number;
+  previous_quantity?: number;
 }
 
 // Type for raw item from Supabase before quantity conversion if needed
@@ -50,7 +53,7 @@ const fetchUserSession = async () => {
 const fetchStockData = async (userId: string): Promise<StockItem[]> => {
   const { data, error } = await supabase
     .from('stock')
-    .select('id, item_name, quantity, unit, description, created_at')
+    .select('id, item_name, quantity, unit, description, created_at, updated_at, quantity_added, previous_quantity')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 

@@ -19,6 +19,8 @@ export interface PantryItem {
   created_at: string;
   updated_at?: string;
   storage_location?: StorageLocation; // NEW: Optional field for backward compatibility
+  quantity_added?: number;
+  previous_quantity?: number;
 }
 
 // Storage location constants for reuse
@@ -67,11 +69,11 @@ export const usePantryData = (userId?: string) => {
 
       console.log('[usePantryData] Fetching pantry data for user:', userId);
 
-      // UPDATED: Include storage_location in select query with backward compatibility
+      // UPDATED: Include storage_location and quantity tracking in select query with backward compatibility
       const { data, error, count } = await supabase
         .from('stock')
         .select(
-          'id, item_name, quantity, unit, description, created_at, updated_at, user_id, storage_location',
+          'id, item_name, quantity, unit, description, created_at, updated_at, user_id, storage_location, quantity_added, previous_quantity',
           { count: 'exact' },
         )
         .eq('user_id', userId)

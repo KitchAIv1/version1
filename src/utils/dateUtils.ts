@@ -105,3 +105,64 @@ export const getShortRelativeTime = (timestamp: string | undefined): string => {
     return '';
   }
 };
+
+/**
+ * Gets the most recent activity timestamp and appropriate label
+ * Considers both created_at and updated_at to show the latest activity
+ * @param created_at - When the item was originally created
+ * @param updated_at - When the item was last updated (e.g., from merge)
+ * @returns Object with timestamp, label, and formatted time
+ */
+export const getMostRecentActivity = (
+  created_at: string | undefined,
+  updated_at: string | undefined
+): {
+  timestamp: string;
+  label: string;
+  formattedTime: string;
+} => {
+  if (!created_at) {
+    return {
+      timestamp: '',
+      label: '',
+      formattedTime: '',
+    };
+  }
+
+  try {
+    const createdDate = parseISO(created_at);
+    const updatedDate = updated_at ? parseISO(updated_at) : null;
+
+    // If no updated_at or updated_at is same as created_at, show as "Added"
+    if (!updatedDate || Math.abs(updatedDate.getTime() - createdDate.getTime()) < 1000) {
+      return {
+        timestamp: created_at,
+        label: 'Added',
+        formattedTime: getShortRelativeTime(created_at),
+      };
+    }
+
+    // If updated_at is more recent than created_at, show as "Updated"
+    if (updatedDate.getTime() > createdDate.getTime()) {
+      return {
+        timestamp: updated_at!,
+        label: 'Updated',
+        formattedTime: getShortRelativeTime(updated_at),
+      };
+    }
+
+    // Fallback to created_at
+    return {
+      timestamp: created_at,
+      label: 'Added',
+      formattedTime: getShortRelativeTime(created_at),
+    };
+  } catch (error) {
+    console.error('Error determining most recent activity:', error);
+    return {
+      timestamp: created_at,
+      label: 'Added',
+      formattedTime: getShortRelativeTime(created_at),
+    };
+  }
+};

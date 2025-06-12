@@ -8,7 +8,16 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "description": "AI-powered recipe discovery and meal planning app. Scan your pantry, get personalized recipes, and plan your meals with intelligent recommendations.",
-    "keywords": ["recipe", "cooking", "AI", "meal planning", "food", "pantry", "kitchen", "nutrition"],
+    "keywords": [
+      "recipe",
+      "cooking",
+      "AI",
+      "meal planning",
+      "food",
+      "pantry",
+      "kitchen",
+      "nutrition"
+    ],
     "primaryColor": "#FF6B35",
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -58,7 +67,8 @@
       }
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "expo-video"
     ],
     "privacy": "public"
   }

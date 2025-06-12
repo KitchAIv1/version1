@@ -117,7 +117,7 @@ export const useStockManager = () => {
       console.warn("[useStockManager] fetchStock aborted: No user ID.");
       return;
     }
-    console.log([useStockManager] Fetching stock for user: ${idToUse});
+    console.log(`[useStockManager] Fetching stock for user: ${idToUse}`);
     setIsLoading(true);
     setError(null);
     try {
@@ -182,13 +182,13 @@ export const useStockManager = () => {
       };
       let response;
       if (originalItemName && originalItemName !== itemToSave.item_name) {
-        console.log([useStockManager] Updating item by matching old name: ${originalItemName} to ${itemToSave.item_name});
+        console.log(`[useStockManager] Updating item by matching old name: ${originalItemName} to ${itemToSave.item_name}`);
         response = await supabase
             .from('stock')
             .update(itemPayload)
             .match({ user_id: userId, item_name: originalItemName });
       } else if (itemToSave.id) { 
-         console.log([useStockManager] Updating item by ID: ${itemToSave.id});
+         console.log(`[useStockManager] Updating item by ID: ${itemToSave.id}`);
         response = await supabase
             .from('stock')
             .update(itemPayload)
@@ -266,10 +266,10 @@ export const useStockManager = () => {
     try {
       let query = supabase.from('stock').delete().eq('user_id', userId);
       if (itemToDelete.id) {
-        console.log([useStockManager] Deleting item by ID: ${itemToDelete.id});
+        console.log(`[useStockManager] Deleting item by ID: ${itemToDelete.id}`);
         query = query.eq('id', itemToDelete.id); 
       } else {
-        console.log([useStockManager] Deleting item by name: ${itemToDelete.item_name});
+        console.log(`[useStockManager] Deleting item by name: ${itemToDelete.item_name}`);
         query = query.eq('item_name', itemToDelete.item_name);
       }
       const { error: deleteDbError } = await query;
