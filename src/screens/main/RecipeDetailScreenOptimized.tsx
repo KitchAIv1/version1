@@ -18,6 +18,7 @@ import {
   ScrollView,
   Animated,
   StatusBar,
+  Share,
 } from 'react-native';
 import {
   useRoute,
@@ -42,6 +43,11 @@ import {
   useScreenLoadTracking,
   useApiPerformanceTracking,
 } from '../../hooks/usePerformanceMonitoring';
+
+// PHASE 3: Add enhanced performance monitoring and loading improvements
+import { usePerformanceTracking } from '../../utils/performanceWrapper';
+import { LoadingEnhancement } from '../../components/LoadingEnhancement';
+import { performanceBenchmark } from '../../utils/performanceBenchmark';
 import { supabase } from '../../services/supabase';
 import { useGroceryManager } from '../../hooks/useGroceryManager';
 import { COLORS } from '../../constants/theme';
@@ -53,15 +59,26 @@ import {
 import { useCommentCountSync } from '../../hooks/useCommentCountSync';
 
 // Lazy-loaded components for better performance
-const ActionOverlay = React.lazy(() => import('../../components/ActionOverlay'));
-const IngredientsTab = React.lazy(() => import('../recipe-detail-tabs/IngredientsTab'));
+const ActionOverlay = React.lazy(
+  () => import('../../components/ActionOverlay'),
+);
+const IngredientsTab = React.lazy(
+  () => import('../recipe-detail-tabs/IngredientsTab'),
+);
 const StepsTab = React.lazy(() => import('../recipe-detail-tabs/StepsTab'));
 const MacrosTab = React.lazy(() => import('../recipe-detail-tabs/MacrosTab'));
-const AddToMealPlannerModal = React.lazy(() => import('../../components/modals/AddToMealPlannerModal'));
-const CommentsModal = React.lazy(() => import('../../components/CommentsModal'));
+const AddToMealPlannerModal = React.lazy(
+  () => import('../../components/modals/AddToMealPlannerModal'),
+);
+const CommentsModal = React.lazy(
+  () => import('../../components/CommentsModal'),
+);
 
 // Types
-type RecipeDetailScreenRouteProp = RouteProp<MainStackParamList, 'RecipeDetail'>;
+type RecipeDetailScreenRouteProp = RouteProp<
+  MainStackParamList,
+  'RecipeDetail'
+>;
 
 // Constants
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -82,44 +99,48 @@ const OptimizedTabNavigator = React.memo<{
 }>(({ activeTab, setActiveTab, tabs, tabContent, onTabChange }) => {
   const animatedValue = useRef(new Animated.Value(0)).current;
 
-  const handleTabChange = useCallback((tab: string) => {
-    setActiveTab(tab);
-    onTabChange?.(tab);
+  const handleTabChange = useCallback(
+    (tab: string) => {
+      setActiveTab(tab);
+      onTabChange?.(tab);
 
-    Animated.spring(animatedValue, {
-      toValue: 1,
-      useNativeDriver: true,
-      tension: 50,
-      friction: 7,
-    }).start(() => {
-      animatedValue.setValue(0);
-    });
-  }, [setActiveTab, onTabChange, animatedValue]);
+      Animated.spring(animatedValue, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 7,
+      }).start(() => {
+        animatedValue.setValue(0);
+      });
+    },
+    [setActiveTab, onTabChange, animatedValue],
+  );
 
-  const tabButtons = useMemo(() => 
-    tabs.map(tab => (
-      <TouchableOpacity
-        key={`tab-${tab}`}
-        style={[
-          styles.tabButton,
-          activeTab === tab && styles.activeTabButton,
-        ]}
-        onPress={() => handleTabChange(tab)}>
-        <Text
+  const tabButtons = useMemo(
+    () =>
+      tabs.map(tab => (
+        <TouchableOpacity
+          key={`tab-${tab}`}
           style={[
-            styles.tabButtonText,
-            activeTab === tab && styles.activeTabButtonText,
-          ]}>
-          {tab}
-        </Text>
-      </TouchableOpacity>
-    )), [tabs, activeTab, handleTabChange]);
+            styles.tabButton,
+            activeTab === tab && styles.activeTabButton,
+          ]}
+          onPress={() => handleTabChange(tab)}>
+          <Text
+            style={[
+              styles.tabButtonText,
+              activeTab === tab && styles.activeTabButtonText,
+            ]}>
+            {tab}
+          </Text>
+        </TouchableOpacity>
+      )),
+    [tabs, activeTab, handleTabChange],
+  );
 
   return (
     <View style={styles.customTabContainer}>
-      <View style={styles.tabBarContainer}>
-        {tabButtons}
-      </View>
+      <View style={styles.tabBarContainer}>{tabButtons}</View>
       <Animated.View
         style={[
           styles.tabContentContainer,
@@ -155,86 +176,95 @@ const OptimizedVideoPlayer = React.memo<{
   onError: (error: string) => void;
   initialSeekTime: number;
   recipeId: string;
-}>(({ 
-  videoUrl, 
-  isScreenFocused, 
-  isMuted, 
-  onToggleMute, 
-  onLoad, 
-  onError, 
-  initialSeekTime,
-  recipeId 
-}) => {
-  const videoRef = useRef<Video>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+}>(
+  ({
+    videoUrl,
+    isScreenFocused,
+    isMuted,
+    onToggleMute,
+    onLoad,
+    onError,
+    initialSeekTime,
+    recipeId,
+  }) => {
+    const videoRef = useRef<Video>(null);
+    const [isLoaded, setIsLoaded] = useState(false);
 
-  // Optimized video playback control
-  useEffect(() => {
-    const videoElement = videoRef.current;
-    if (videoElement && isLoaded) {
-      if (isScreenFocused) {
-        videoElement
-          .playAsync()
-          .catch(e => console.error(`Video ${recipeId}: Focus play error:`, e));
-      } else {
-        videoElement
-          .pauseAsync()
-          .catch(e => console.error(`Video ${recipeId}: Focus pause error:`, e));
-      }
-    }
-  }, [isLoaded, isScreenFocused, recipeId]);
-
-  const handleLoad = useCallback(async (status: AVPlaybackStatus) => {
-    if (status.isLoaded) {
-      if (videoRef.current) {
-        if (initialSeekTime > 0) {
-          await videoRef.current.setPositionAsync(initialSeekTime, {
-            toleranceMillisBefore: 100,
-            toleranceMillisAfter: 100,
-          });
+    // Optimized video playback control
+    useEffect(() => {
+      const videoElement = videoRef.current;
+      if (videoElement && isLoaded) {
+        if (isScreenFocused) {
+          videoElement
+            .playAsync()
+            .catch(e =>
+              console.error(`Video ${recipeId}: Focus play error:`, e),
+            );
+        } else {
+          videoElement
+            .pauseAsync()
+            .catch(e =>
+              console.error(`Video ${recipeId}: Focus pause error:`, e),
+            );
         }
-        await videoRef.current.setIsMutedAsync(isMuted);
       }
-      setIsLoaded(true);
-      onLoad(status);
-    } else if (status.error) {
-      onError(status.error);
-    }
-  }, [initialSeekTime, isMuted, onLoad, onError]);
+    }, [isLoaded, isScreenFocused, recipeId]);
 
-  if (!videoUrl) {
+    const handleLoad = useCallback(
+      async (status: AVPlaybackStatus) => {
+        if (status.isLoaded) {
+          if (videoRef.current) {
+            if (initialSeekTime > 0) {
+              await videoRef.current.setPositionAsync(initialSeekTime, {
+                toleranceMillisBefore: 100,
+                toleranceMillisAfter: 100,
+              });
+            }
+            await videoRef.current.setIsMutedAsync(isMuted);
+          }
+          setIsLoaded(true);
+          onLoad(status);
+        } else if (status.error) {
+          onError(status.error);
+        }
+      },
+      [initialSeekTime, isMuted, onLoad, onError],
+    );
+
+    if (!videoUrl) {
+      return (
+        <View style={[styles.video, styles.videoPlaceholder]}>
+          <Ionicons name="videocam-off-outline" size={48} color="#ccc" />
+          <Text style={{ color: '#ccc' }}>Video not available</Text>
+        </View>
+      );
+    }
+
     return (
-      <View style={[styles.video, styles.videoPlaceholder]}>
-        <Ionicons name="videocam-off-outline" size={48} color="#ccc" />
-        <Text style={{ color: '#ccc' }}>Video not available</Text>
+      <View style={styles.videoContainer}>
+        <Video
+          ref={videoRef}
+          style={styles.videoPlayer}
+          source={{ uri: videoUrl }}
+          useNativeControls={false}
+          resizeMode={ResizeMode.COVER}
+          isLooping
+          onLoad={handleLoad}
+          onError={onError}
+          progressUpdateIntervalMillis={500}
+          isMuted={isMuted}
+        />
+        <TouchableOpacity style={styles.muteButton} onPress={onToggleMute}>
+          <Ionicons
+            name={isMuted ? 'volume-mute' : 'volume-high'}
+            size={24}
+            color="white"
+          />
+        </TouchableOpacity>
       </View>
     );
-  }
-
-  return (
-    <View style={styles.videoContainer}>
-      <Video
-        ref={videoRef}
-        style={styles.videoPlayer}
-        source={{ uri: videoUrl }}
-        useNativeControls={false}
-        resizeMode={ResizeMode.COVER}
-        isLooping
-        onLoad={handleLoad}
-        onError={onError}
-        progressUpdateIntervalMillis={500}
-        isMuted={isMuted}
-      />
-      <TouchableOpacity style={styles.muteButton} onPress={onToggleMute}>
-        <Ionicons
-          name={isMuted ? 'volume-mute' : 'volume-high'}
-          size={24}
-          color="white"
-        />
-      </TouchableOpacity>
-    </View>
-  );
-});
+  },
+);
 OptimizedVideoPlayer.displayName = 'OptimizedVideoPlayer';
 
 // Optimized Recipe Info Component
@@ -250,7 +280,10 @@ const OptimizedRecipeInfo = React.memo<{
 
   return (
     <View style={styles.recipeInfoSection}>
-      <Text style={styles.recipeTitleText} numberOfLines={3} ellipsizeMode="tail">
+      <Text
+        style={styles.recipeTitleText}
+        numberOfLines={3}
+        ellipsizeMode="tail">
         {recipeDetails.title}
       </Text>
 
@@ -258,7 +291,9 @@ const OptimizedRecipeInfo = React.memo<{
       {(recipeDetails?.username || recipeDetails?.is_ai_generated) && (
         <TouchableOpacity
           style={styles.authorInfoRow}
-          onPress={recipeDetails?.is_ai_generated ? undefined : onNavigateToAuthor}
+          onPress={
+            recipeDetails?.is_ai_generated ? undefined : onNavigateToAuthor
+          }
           disabled={recipeDetails?.is_ai_generated}>
           {recipeDetails?.is_ai_generated ? (
             <View style={styles.authorAvatarPlaceholder}>
@@ -320,79 +355,107 @@ const OptimizedActionRow = React.memo<{
   onComment: () => void;
   onShare: () => void;
   recipeId: string;
-}>(({ recipeDetails, user, likeMutation, saveMutation, onComment, onShare, recipeId }) => {
-  const handleLike = useCallback(() => {
-    if (!user?.id) {
-      Alert.alert('Authentication Required', 'Please log in to like recipes.');
-      return;
-    }
-    likeMutation.mutate(recipeId);
-  }, [user?.id, likeMutation, recipeId]);
+}>(
+  ({
+    recipeDetails,
+    user,
+    likeMutation,
+    saveMutation,
+    onComment,
+    onShare,
+    recipeId,
+  }) => {
+    const handleLike = useCallback(() => {
+      if (!user?.id) {
+        Alert.alert(
+          'Authentication Required',
+          'Please log in to like recipes.',
+        );
+        return;
+      }
+      likeMutation.mutate(recipeId);
+    }, [user?.id, likeMutation, recipeId]);
 
-  const handleSave = useCallback(() => {
-    if (!user?.id) {
-      Alert.alert('Authentication Required', 'Please log in to save recipes.');
-      return;
-    }
-    saveMutation.mutate(recipeId);
-  }, [user?.id, saveMutation, recipeId]);
+    const handleSave = useCallback(() => {
+      if (!user?.id) {
+        Alert.alert(
+          'Authentication Required',
+          'Please log in to save recipes.',
+        );
+        return;
+      }
+      saveMutation.mutate(recipeId);
+    }, [user?.id, saveMutation, recipeId]);
 
-  return (
-    <View style={styles.actionRow}>
-      <TouchableOpacity
-        style={[
-          styles.actionButton,
-          (!user?.id || likeMutation.isPending) && styles.actionButtonDisabled,
-        ]}
-        onPress={handleLike}
-        disabled={!user?.id || likeMutation.isPending}>
-        {likeMutation.isPending ? (
-          <ActivityIndicator size="small" color={COLORS.primary} />
-        ) : (
+    return (
+      <View style={styles.actionRow}>
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            (!user?.id || likeMutation.isPending) &&
+              styles.actionButtonDisabled,
+          ]}
+          onPress={handleLike}
+          disabled={!user?.id || likeMutation.isPending}>
+          {likeMutation.isPending ? (
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          ) : (
+            <Ionicons
+              name={recipeDetails?.is_liked_by_user ? 'heart' : 'heart-outline'}
+              size={26}
+              color={
+                recipeDetails?.is_liked_by_user ? COLORS.error : COLORS.primary
+              }
+            />
+          )}
+          {recipeDetails?.likes !== undefined && (
+            <Text style={styles.actionCount}>{recipeDetails.likes}</Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            (!user?.id || saveMutation.isPending) &&
+              styles.actionButtonDisabled,
+          ]}
+          onPress={handleSave}
+          disabled={!user?.id || saveMutation.isPending}>
+          {saveMutation.isPending ? (
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          ) : (
+            <Ionicons
+              name={
+                recipeDetails?.is_saved_by_user
+                  ? 'bookmark'
+                  : 'bookmark-outline'
+              }
+              size={24}
+              color={COLORS.primary}
+            />
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.actionButton} onPress={onComment}>
           <Ionicons
-            name={recipeDetails?.is_liked_by_user ? 'heart' : 'heart-outline'}
-            size={26}
-            color={
-              recipeDetails?.is_liked_by_user ? COLORS.error : COLORS.primary
-            }
-          />
-        )}
-        {recipeDetails?.likes !== undefined && (
-          <Text style={styles.actionCount}>{recipeDetails.likes}</Text>
-        )}
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[
-          styles.actionButton,
-          (!user?.id || saveMutation.isPending) && styles.actionButtonDisabled,
-        ]}
-        onPress={handleSave}
-        disabled={!user?.id || saveMutation.isPending}>
-        {saveMutation.isPending ? (
-          <ActivityIndicator size="small" color={COLORS.primary} />
-        ) : (
-          <Ionicons
-            name={recipeDetails?.is_saved_by_user ? 'bookmark' : 'bookmark-outline'}
+            name="chatbubble-outline"
             size={24}
             color={COLORS.primary}
           />
-        )}
-      </TouchableOpacity>
+          {recipeDetails?.comments_count !== undefined && (
+            <Text style={styles.actionCount}>
+              {recipeDetails.comments_count}
+            </Text>
+          )}
+        </TouchableOpacity>
 
-      <TouchableOpacity style={styles.actionButton} onPress={onComment}>
-        <Ionicons name="chatbubble-outline" size={24} color={COLORS.primary} />
-        {recipeDetails?.comments_count !== undefined && (
-          <Text style={styles.actionCount}>{recipeDetails.comments_count}</Text>
-        )}
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.actionButton} onPress={onShare}>
-        <Ionicons name="share-outline" size={24} color={COLORS.primary} />
-      </TouchableOpacity>
-    </View>
-  );
-});
+        <TouchableOpacity style={styles.actionButton} onPress={onShare}>
+          <Ionicons name="share-outline" size={24} color={COLORS.primary} />
+        </TouchableOpacity>
+      </View>
+    );
+  },
+);
 OptimizedActionRow.displayName = 'OptimizedActionRow';
 
 // Main RecipeDetailScreen component
@@ -401,13 +464,17 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { syncSingleRecipe } = useCommentCountSync();
-  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { groceryList, fetchGroceryList } = useGroceryManager();
   const isScreenFocused = useIsFocused();
 
   // Performance tracking
   useScreenLoadTracking('RecipeDetailScreen');
   const { startApiCall, endApiCall } = useApiPerformanceTracking();
+  
+  // PHASE 3: Enhanced performance monitoring wrapper
+  const { trackSearch } = usePerformanceTracking('RecipeDetailScreen');
 
   // Route params
   const id = route.params?.id;
@@ -441,7 +508,9 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
   const lastFocusTimeRef = useRef(Date.now());
 
   // Meal Planner integration
-  const { addRecipeToSlot } = useDailyMealPlan(format(new Date(), 'yyyy-MM-dd'));
+  const { addRecipeToSlot } = useDailyMealPlan(
+    format(new Date(), 'yyyy-MM-dd'),
+  );
 
   // Optimized data fetching
   const {
@@ -473,8 +542,9 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
       ) {
         const callId = `grocery_list_fetch_${Date.now()}`;
         startApiCall(callId);
-        fetchGroceryList(user.id)
-          .finally(() => endApiCall(callId, 'grocery_list_fetch'));
+        fetchGroceryList(user.id).finally(() =>
+          endApiCall(callId, 'grocery_list_fetch'),
+        );
       }
 
       lastFocusTimeRef.current = now;
@@ -486,10 +556,19 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
     if (isScreenFocused && !isAnyModalOpen && id && user?.id) {
       const callId = `comment_sync_${Date.now()}`;
       startApiCall(callId);
-      syncSingleRecipe(id, user.id)
-        .finally(() => endApiCall(callId, 'comment_sync'));
+      syncSingleRecipe(id, user.id).finally(() =>
+        endApiCall(callId, 'comment_sync'),
+      );
     }
-  }, [isScreenFocused, isAnyModalOpen, id, user?.id, syncSingleRecipe, startApiCall, endApiCall]);
+  }, [
+    isScreenFocused,
+    isAnyModalOpen,
+    id,
+    user?.id,
+    syncSingleRecipe,
+    startApiCall,
+    endApiCall,
+  ]);
 
   // Reset video error when video_url changes
   useEffect(() => {
@@ -548,7 +627,7 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
 
   const handleShare = useCallback(async () => {
     if (!recipeDetails) return;
-    
+
     try {
       await Share.share({
         message: `Check out this recipe: ${recipeDetails.title}`,
@@ -572,14 +651,28 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
     }
   }, [recipeDetails?.user_id, navigation]);
 
-  const handleTabChange = useCallback((tab: string) => {
-    if (currentScrollPosition > HEADER_HEIGHT) {
-      scrollViewRef.current?.scrollTo({
-        y: HEADER_HEIGHT,
-        animated: true,
-      });
-    }
-  }, [currentScrollPosition]);
+  const handleTabChange = useCallback(
+    (tab: string) => {
+      // PHASE 3: Track tab switching performance (non-intrusive)
+      const tabStartTime = Date.now();
+      
+      if (currentScrollPosition > HEADER_HEIGHT) {
+        scrollViewRef.current?.scrollTo({
+          y: HEADER_HEIGHT,
+          animated: true,
+        });
+      }
+      
+      // PHASE 3: Log tab performance in development
+      if (__DEV__) {
+        const tabDuration = Date.now() - tabStartTime;
+        if (tabDuration > 50) { // Only log if slower than 50ms
+          console.log(`[Performance] 📑 Tab switch to ${tab}: ${tabDuration}ms`);
+        }
+      }
+    },
+    [currentScrollPosition],
+  );
 
   const handleScroll = useCallback((event: any) => {
     const scrollY = event.nativeEvent.contentOffset.y;
@@ -598,38 +691,42 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
     setIsPlannerModalVisible(false);
   }, []);
 
-  const handleAddToMealPlan = useCallback(async (date: Date, slot: MealSlot) => {
-    if (!recipeDetails) {
-      Alert.alert('Error', 'Cannot add to plan, recipe details are missing.');
-      return;
-    }
+  const handleAddToMealPlan = useCallback(
+    async (date: Date, slot: MealSlot) => {
+      if (!recipeDetails) {
+        Alert.alert('Error', 'Cannot add to plan, recipe details are missing.');
+        return;
+      }
 
-    const dateString = format(date, 'yyyy-MM-dd');
-    try {
-      await addRecipeToSlot({
-        planDate: dateString,
-        slot,
-        recipeId: recipeDetails.recipe_id,
-        recipeTitle: recipeDetails.title,
-        recipeThumbnailUrl: recipeDetails.video_url || undefined,
-      });
+      const dateString = format(date, 'yyyy-MM-dd');
+      try {
+        await addRecipeToSlot({
+          planDate: dateString,
+          slot,
+          recipeId: recipeDetails.recipe_id,
+          recipeTitle: recipeDetails.title,
+          recipeThumbnailUrl: recipeDetails.video_url || undefined,
+        });
 
-      Alert.alert(
-        'Success',
-        `Added ${recipeDetails.title} to your meal plan for ${format(date, 'MMM d, yyyy')} (${slot}).`,
-      );
+        Alert.alert(
+          'Success',
+          `Added ${recipeDetails.title} to your meal plan for ${format(date, 'MMM d, yyyy')} (${slot}).`,
+        );
 
-      queryClient.invalidateQueries({
-        queryKey: ['dailyMealPlan', dateString],
-      });
-    } catch (e: any) {
-      Alert.alert(
-        'Error',
-        e.message || 'An unexpected error occurred while adding to meal plan.',
-      );
-    }
-    setIsPlannerModalVisible(false);
-  }, [recipeDetails, addRecipeToSlot, queryClient]);
+        queryClient.invalidateQueries({
+          queryKey: ['dailyMealPlan', dateString],
+        });
+      } catch (e: any) {
+        Alert.alert(
+          'Error',
+          e.message ||
+            'An unexpected error occurred while adding to meal plan.',
+        );
+      }
+      setIsPlannerModalVisible(false);
+    },
+    [recipeDetails, addRecipeToSlot, queryClient],
+  );
 
   const handleCloseCommentsModal = useCallback(() => {
     setIsCommentsModalVisible(false);
@@ -737,7 +834,11 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
           onPress={() =>
             navigation.navigate('MainTabs', { screen: 'GroceryList' })
           }>
-          <Ionicons name="cart-outline" size={28} color={COLORS.white || '#FFF'} />
+          <Ionicons
+            name="cart-outline"
+            size={28}
+            color={COLORS.white || '#FFF'}
+          />
           {groceryList.length > 0 && (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{groceryList.length}</Text>
@@ -774,17 +875,13 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
       <ScrollView
         ref={scrollViewRef}
         style={styles.scrollView}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: 80 },
-        ]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 80 }]}
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}
         decelerationRate="fast"
         bounces
         overScrollMode="always">
-        
         {/* Recipe Info Section */}
         <OptimizedRecipeInfo
           recipeDetails={recipeDetails}
@@ -794,7 +891,9 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
         />
 
         {/* Divider */}
-        <View style={[styles.sectionDivider, { marginTop: 16, marginBottom: 10 }]} />
+        <View
+          style={[styles.sectionDivider, { marginTop: 16, marginBottom: 10 }]}
+        />
 
         {/* Action Row */}
         <OptimizedActionRow
@@ -1108,4 +1207,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default RecipeDetailScreenOptimized; 
+export default RecipeDetailScreenOptimized;
