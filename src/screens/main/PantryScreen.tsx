@@ -79,6 +79,10 @@ import SmartSuggestionBar from '../../components/SmartSuggestionBar';
 import ReviewDuplicatesModal from '../../components/ReviewDuplicatesModal';
 import MergeDialog from '../../components/MergeDialog';
 
+// Import performance tracking wrapper
+import { usePerformanceTracking } from '../../utils/performanceWrapper';
+import { LoadingEnhancement, SearchLoadingWrapper } from '../../components/LoadingEnhancement';
+
 // Navigation type
 type PantryNavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
@@ -136,6 +140,9 @@ export default function PantryScreen() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+  
+  // PERFORMANCE TRACKING: Non-intrusive monitoring wrapper
+  const { trackSearch } = usePerformanceTracking('PantryScreen');
   const {
     performPantryScan,
     canPerformScan,
@@ -190,7 +197,7 @@ export default function PantryScreen() {
   // OPTIMIZED: Memoize aging features
   const agingStatistics = useAgingStatistics(agingItems);
   const { notifications = [] } = useAgingNotifications(user?.id);
-  
+
   // Since we don't have is_read functionality, use total count for badge
   const unreadCount = notifications.length;
 
@@ -205,33 +212,43 @@ export default function PantryScreen() {
   const duplicateHandling = useDuplicateHandling(async () => {
     console.log('[PantryScreen] 🔄 Refreshing pantry data after merge...');
     await refetch();
-    
+
     // QUANTITY TRACKING FIX: Update editingItem with fresh data after merge
     if (editingItem) {
-      console.log('[PantryScreen] 🔄 Updating editingItem with fresh data after merge...');
-      
+      console.log(
+        '[PantryScreen] 🔄 Updating editingItem with fresh data after merge...',
+      );
+
       // Wait a bit for the data to be updated, then fetch fresh item data
       setTimeout(async () => {
         try {
           const { data: freshItemData, error } = await supabase
             .from('stock')
-            .select('id, item_name, quantity, unit, description, created_at, updated_at, user_id, storage_location, quantity_added, previous_quantity')
+            .select(
+              'id, item_name, quantity, unit, description, created_at, updated_at, user_id, storage_location, quantity_added, previous_quantity',
+            )
             .eq('id', editingItem.id)
             .single();
-          
+
           if (error) {
-            console.error('[PantryScreen] ❌ Error fetching fresh item data:', error);
+            console.error(
+              '[PantryScreen] ❌ Error fetching fresh item data:',
+              error,
+            );
             return;
           }
-          
+
           if (freshItemData) {
-            console.log('[PantryScreen] ✅ Found fresh item data, updating editingItem:', {
-              itemName: freshItemData.item_name,
-              oldQuantity: editingItem.quantity,
-              newQuantity: freshItemData.quantity,
-              quantityAdded: freshItemData.quantity_added,
-              previousQuantity: freshItemData.previous_quantity
-            });
+            console.log(
+              '[PantryScreen] ✅ Found fresh item data, updating editingItem:',
+              {
+                itemName: freshItemData.item_name,
+                oldQuantity: editingItem.quantity,
+                newQuantity: freshItemData.quantity,
+                quantityAdded: freshItemData.quantity_added,
+                previousQuantity: freshItemData.previous_quantity,
+              },
+            );
             setEditingItem(freshItemData);
           }
         } catch (error) {
@@ -291,9 +308,11 @@ export default function PantryScreen() {
     [groupedItems],
   );
 
-  // OPTIMIZED: Filtered items with efficient filtering
+  // OPTIMIZED: Filtered items with efficient filtering + performance tracking
   const filteredItems = useMemo(() => {
+    const startTime = Date.now(); // PERFORMANCE: Track search time
     const locationItems = groupedItems[activeStorageLocation] || [];
+    let results: (StockAgingItem | PantryItem)[];
 
     if (hasAgingFeatures && ageFilter !== 'all') {
       const agingItemsForLocation = agingItems.filter(
@@ -308,21 +327,27 @@ export default function PantryScreen() {
 
       if (debouncedSearchQuery.trim()) {
         const query = debouncedSearchQuery.toLowerCase();
-        return filteredByAge.filter(item =>
+        results = filteredByAge.filter(item =>
           item.item_name.toLowerCase().includes(query),
         );
+      } else {
+        results = filteredByAge;
       }
-      return filteredByAge;
-    }
-
-    if (debouncedSearchQuery.trim()) {
+    } else if (debouncedSearchQuery.trim()) {
       const query = debouncedSearchQuery.toLowerCase();
-      return locationItems.filter(item =>
+      results = locationItems.filter(item =>
         item.item_name.toLowerCase().includes(query),
       );
+    } else {
+      results = locationItems;
     }
 
-    return locationItems;
+    // PERFORMANCE: Track search performance (non-intrusive)
+    if (debouncedSearchQuery.trim()) {
+      trackSearch(debouncedSearchQuery, results.length, startTime);
+    }
+
+    return results;
   }, [
     groupedItems,
     activeStorageLocation,
@@ -330,6 +355,7 @@ export default function PantryScreen() {
     ageFilter,
     agingItems,
     debouncedSearchQuery,
+    trackSearch, // PERFORMANCE: Add to dependencies
   ]);
 
   // OPTIMIZED: Pantry item count
@@ -464,25 +490,34 @@ export default function PantryScreen() {
       try {
         // NEW: For new items, check for duplicates BEFORE saving
         if (!editingItem) {
-          console.log('[PantryScreen] 🔍 Checking for duplicates before save...');
-          
+          console.log(
+            '[PantryScreen] 🔍 Checking for duplicates before save...',
+          );
+
           // Close the manual add sheet first
           setIsManualAddSheetVisible(false);
-          
-          const hasDuplicates = await duplicateHandling.checkBeforeSave(itemData);
-          
+
+          const hasDuplicates =
+            await duplicateHandling.checkBeforeSave(itemData);
+
           if (hasDuplicates) {
-            console.log('[PantryScreen] ⚠️ Duplicates found - merge modal will appear');
+            console.log(
+              '[PantryScreen] ⚠️ Duplicates found - merge modal will appear',
+            );
             // Don't save yet, let user decide what to do via the merge modal
             // The merge modal will be shown by the duplicate handling hook
             return;
           }
-          
-          console.log('[PantryScreen] ✅ No duplicates found - proceeding with save');
+
+          console.log(
+            '[PantryScreen] ✅ No duplicates found - proceeding with save',
+          );
         }
 
         // For editing existing items OR no duplicates found, proceed with normal save
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        const {
+          data: { user: currentUser },
+        } = await supabase.auth.getUser();
         if (!currentUser?.id) {
           throw new Error('User not authenticated');
         }
@@ -520,15 +555,14 @@ export default function PantryScreen() {
         // Show success message
         Alert.alert(
           'Success',
-          editingItem ? 'Item updated successfully' : 'Item added successfully'
+          editingItem ? 'Item updated successfully' : 'Item added successfully',
         );
-
       } catch (error: any) {
         console.error('[PantryScreen] Error saving item:', error);
         Alert.alert('Error', error.message || 'Failed to save item');
       }
     },
-    [editingItem, duplicateHandling, refetch]
+    [editingItem, duplicateHandling, refetch],
   );
 
   // OPTIMIZED: Memoized header component with stable dependencies
@@ -720,7 +754,10 @@ export default function PantryScreen() {
           <View style={styles.headerActions}>
             {hasAgingFeatures && (
               <TouchableOpacity
-                style={[styles.notificationButton, styles.notificationBellHeader]}
+                style={[
+                  styles.notificationButton,
+                  styles.notificationBellHeader,
+                ]}
                 onPress={handleToggleNotifications}
                 accessibilityLabel={`Aging alerts, ${unreadCount} unread`}
                 accessibilityHint="Open aging notifications panel">
@@ -786,33 +823,41 @@ export default function PantryScreen() {
           )}
 
         <View style={styles.mainContent}>
-          <FlatList
-            data={filteredItems}
-            renderItem={renderPantryItem}
-            keyExtractor={keyExtractor}
-            ListHeaderComponent={renderPantryHeader}
-            ListHeaderComponentStyle={styles.listHeader}
-            ListEmptyComponent={listEmptyComponent}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                colors={[ACTIVE_COLOR]}
-                tintColor={ACTIVE_COLOR}
+          <LoadingEnhancement
+            isLoading={isLoading && displayItems.length === 0}
+            loadingText="Loading your pantry..."
+            skeletonCount={6}
+            showProgress={true}>
+            <SearchLoadingWrapper isSearching={searchQuery !== debouncedSearchQuery}>
+              <FlatList
+                data={filteredItems}
+                renderItem={renderPantryItem}
+                keyExtractor={keyExtractor}
+                ListHeaderComponent={renderPantryHeader}
+                ListHeaderComponentStyle={styles.listHeader}
+                ListEmptyComponent={listEmptyComponent}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    colors={[ACTIVE_COLOR]}
+                    tintColor={ACTIVE_COLOR}
+                  />
+                }
+                showsVerticalScrollIndicator={false}
+                removeClippedSubviews
+                maxToRenderPerBatch={10}
+                windowSize={10}
+                initialNumToRender={8}
+                updateCellsBatchingPeriod={100}
+                getItemLayout={getItemLayout}
+                contentContainerStyle={styles.listContentContainer}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                scrollEventThrottle={16}
               />
-            }
-            showsVerticalScrollIndicator={false}
-            removeClippedSubviews
-            maxToRenderPerBatch={10}
-            windowSize={10}
-            initialNumToRender={8}
-            updateCellsBatchingPeriod={100}
-            getItemLayout={getItemLayout}
-            contentContainerStyle={styles.listContentContainer}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-            scrollEventThrottle={16}
-          />
+            </SearchLoadingWrapper>
+          </LoadingEnhancement>
         </View>
       </View>
 
@@ -833,8 +878,9 @@ export default function PantryScreen() {
                 description: editingItem.description || '',
                 created_at: editingItem.created_at,
                 updated_at: editingItem.updated_at || editingItem.created_at,
-                storage_location: (editingItem as any)
-                  .storage_location as StorageLocation || 'cupboard',
+                storage_location:
+                  ((editingItem as any).storage_location as StorageLocation) ||
+                  'cupboard',
               }
             : null
         }
