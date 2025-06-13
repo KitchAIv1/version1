@@ -33,6 +33,20 @@ import { useCommentCountSync } from '../../hooks/useCommentCountSync';
 import InsufficientItemsModal from '../../components/modals/InsufficientItemsModal';
 import { useWhatCanICook } from '../../hooks/useWhatCanICook';
 
+// Import SafeWrapper for error boundary protection
+import SafeWrapper from '../../components/SafeWrapper';
+import { logMemoryUsage, useMemoryMonitor, SafeViewLogger } from '../../utils/memoryUtils';
+import { createResilientSupabaseCall } from '../../utils/networkResilience';
+
+// PHASE 3: Add performance monitoring and loading enhancements
+import { usePerformanceTracking } from '../../utils/performanceWrapper';
+import { LoadingEnhancement } from '../../components/LoadingEnhancement';
+import { performanceBenchmark } from '../../utils/performanceBenchmark';
+import { 
+  useStandardizedScreenPerformance, 
+  getStandardizedLoadingConfig 
+} from '../../utils/codeConsolidation';
+
 // Move styles to top to fix "styles used before defined" errors
 const styles = StyleSheet.create({
   safeAreaOuter: {
@@ -70,6 +84,10 @@ export default function FeedScreen() {
   const queryClient = useQueryClient();
   const cacheManager = useCacheManager();
   const { smartSync, syncSingleRecipe } = useCommentCountSync();
+  
+  // PHASE 3: Non-intrusive performance monitoring wrapper
+  const { trackSearch } = usePerformanceTracking('FeedScreen');
+  const { trackVideoOperation, trackApiCall, logMemoryPeriodically } = useStandardizedScreenPerformance('FeedScreen');
   const { data: feedData, isLoading, error: feedError } = useFeed();
   const isFeedScreenFocused = useIsFocused();
   const flashListRef = useRef<FlashList<FeedItem>>(null);
@@ -94,9 +112,29 @@ export default function FeedScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [layoutReady, setLayoutReady] = useState(false);
   const [itemHeight, setItemHeight] = useState(Dimensions.get('window').height);
-  const [loggedViews, setLoggedViews] = useState<Set<string>>(new Set());
+  const [viewLogger] = useState(() => new SafeViewLogger(1000)); // Memory-efficient view logging
 
   const itemsToRender: FeedItem[] = feedData || [];
+
+  // MEMORY MONITORING: Track memory usage in development
+  const { logMemory } = useMemoryMonitor('FeedScreen', 30000);
+  
+  // PHASE 3: Start periodic memory logging
+  useEffect(() => {
+    logMemoryPeriodically();
+  }, [logMemoryPeriodically]);
+
+  // MEMORY OPTIMIZATION: SafeViewLogger handles cleanup automatically
+  useEffect(() => {
+    // Log current view logger size periodically in development
+    if (__DEV__) {
+      const monitorInterval = setInterval(() => {
+        console.log(`[FeedScreen] View logger size: ${viewLogger.getSize()} items`);
+      }, 60000); // Check every minute
+      
+      return () => clearInterval(monitorInterval);
+    }
+  }, [viewLogger]);
 
   useEffect(() => {
     console.log(
@@ -176,11 +214,19 @@ export default function FeedScreen() {
         console.log(
           `[FeedScreen] 🔧 Syncing ${itemsNeedingSync.length} items with missing like data`,
         );
+        // MEMORY OPTIMIZATION: Use refs to track timeouts for cleanup
+        const timeouts: NodeJS.Timeout[] = [];
         itemsNeedingSync.forEach((item: FeedItem, index: number) => {
-          setTimeout(() => {
+          const timeout = setTimeout(() => {
             cacheManager.updateLikeCount(item.id, user.id);
           }, index * 500);
+          timeouts.push(timeout);
         });
+
+        // Cleanup function to clear timeouts if component unmounts
+        return () => {
+          timeouts.forEach(timeout => clearTimeout(timeout));
+        };
       }
     }
   }, [isFeedScreenFocused, feedData, currentIndex, user?.id, cacheManager]);
@@ -215,28 +261,39 @@ export default function FeedScreen() {
         const newIndex = validViewableItems[0].index!;
         setCurrentIndex(prevIndex => {
           if (prevIndex !== newIndex) {
+            // MEMORY MONITORING: Log memory usage on scroll
+            if (__DEV__ && newIndex % 5 === 0) { // Log every 5th item
+              logMemoryUsage(`FeedScreen - Item ${newIndex}`);
+            }
             return newIndex;
           }
           return prevIndex;
         });
         const recipeItem = itemsToRender[newIndex];
-        if (user?.id && recipeItem?.id && !loggedViews.has(recipeItem.id)) {
+        if (user?.id && recipeItem?.id && !viewLogger.hasLogged(recipeItem.id)) {
           console.log(
             `[FeedScreen] Logging view for recipe ${recipeItem.id} by user ${user.id}`,
           );
-          supabase
-            .rpc('log_recipe_view', {
+          
+          // PHASE 3: Track video view performance (non-intrusive)
+          const viewStartTime = Date.now();
+          
+          createResilientSupabaseCall(async () => {
+            const result = await supabase.rpc('log_recipe_view', {
               p_user_id: user.id,
               p_recipe_id: recipeItem.id,
-            })
-            .then(({ error: rpcError }) => {
+            });
+            return result;
+          })
+            .then((result: any) => {
+              const { error: rpcError } = result;
               if (rpcError) {
                 // Check if it's a duplicate key error (user already viewed this recipe)
                 if (rpcError.code === '23505') {
                   console.log(
                     `[FeedScreen] View already logged for recipe ${recipeItem.id} - skipping`,
                   );
-                  setLoggedViews(prev => new Set(prev).add(recipeItem.id)); // Mark as logged to prevent retries
+                  viewLogger.markAsLogged(recipeItem.id); // Mark as logged to prevent retries
                   return;
                 }
                 console.error(
@@ -250,13 +307,21 @@ export default function FeedScreen() {
                   '[FeedScreen] Successfully logged view for recipe',
                   recipeItem.id,
                 );
-                setLoggedViews(prev => new Set(prev).add(recipeItem.id));
+                viewLogger.markAsLogged(recipeItem.id);
+                
+                // PHASE 3: Track video view logging performance (development only)
+                if (__DEV__) {
+                  const viewDuration = Date.now() - viewStartTime;
+                  if (viewDuration > 100) { // Only log if slower than 100ms
+                    console.log(`[Performance] 🎬 Video view log: ${viewDuration}ms`);
+                  }
+                }
               }
             });
         }
       }
     },
-    [itemsToRender, user, loggedViews],
+    [itemsToRender, user, viewLogger],
   );
 
   const viewabilityConfig = useRef({
@@ -285,71 +350,87 @@ export default function FeedScreen() {
   }, [itemHeight]);
 
   return (
-    <SafeAreaView style={styles.safeAreaOuter} edges={['left', 'right']}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="transparent"
-        translucent
-      />
-      <View style={styles.containerForLayout} onLayout={handleContainerLayout}>
-        {isLoading || !layoutReady ? (
-          <View style={styles.centeredMessageContainer}>
-            <ActivityIndicator size="large" color="#666" />
-          </View>
-        ) : feedError ? (
-          <View style={styles.centeredMessageContainer}>
-            <Text style={styles.errorText}>
-              Error loading feed: {feedError.message}
-            </Text>
-          </View>
-        ) : itemsToRender.length === 0 ? (
-          <View style={styles.centeredMessageContainer}>
-            <Text style={styles.emptyText}>No recipes found.</Text>
-          </View>
-        ) : (
-          <View style={styles.flashListContainer}>
-            <FlashList<FeedItem>
-              ref={flashListRef}
-              data={itemsToRender}
-              keyExtractor={item => item.id}
-              renderItem={({ item, index }) => (
-                <RecipeCard
-                  item={{
-                    ...item,
-                    onLike: () => likeMutation.mutate(item.id),
-                    onSave: () => saveMutation.mutate(item.id),
-                  }}
-                  isActive={index === currentIndex}
-                  containerHeight={itemHeight}
-                  isScreenFocused={isFeedScreenFocused}
-                  pantryItemCount={pantryItemCount}
-                  onWhatCanICookPress={handleWhatCanICookPress}
-                />
-              )}
-              estimatedItemSize={itemHeight}
-              pagingEnabled
-              disableIntervalMomentum
-              showsVerticalScrollIndicator={false}
-              viewabilityConfig={viewabilityConfig}
-              onViewableItemsChanged={onViewableItemsChanged}
-              extraData={{ currentIndex, isFeedScreenFocused }}
-              overrideItemLayout={layout => {
-                layout.size = itemHeight;
-              }}
-              removeClippedSubviews
-              decelerationRate="fast"
-            />
-          </View>
-        )}
-      </View>
+    <SafeWrapper componentName="FeedScreen">
+      <SafeAreaView style={styles.safeAreaOuter} edges={['left', 'right']}>
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor="transparent"
+          translucent
+        />
+        
 
-      {/* "What Can I Cook?" Insufficient Items Modal */}
-      <InsufficientItemsModal
-        visible={showInsufficientModal}
-        onClose={handleCloseModal}
-        onNavigateToPantry={handleNavigateToPantry}
-        currentItemCount={pantryItemCount}
-      />
-    </SafeAreaView>
+
+        <View
+          style={styles.containerForLayout}
+          onLayout={handleContainerLayout}>
+          {isLoading || !layoutReady ? (
+            <LoadingEnhancement
+              isLoading={true}
+              {...getStandardizedLoadingConfig('feed')}>
+              <View style={styles.centeredMessageContainer}>
+                <ActivityIndicator size="large" color="#666" />
+              </View>
+            </LoadingEnhancement>
+          ) : feedError ? (
+            <View style={styles.centeredMessageContainer}>
+              <Text style={styles.errorText}>
+                Error loading feed: {feedError.message}
+              </Text>
+            </View>
+          ) : itemsToRender.length === 0 ? (
+            <View style={styles.centeredMessageContainer}>
+              <Text style={styles.emptyText}>No recipes found.</Text>
+            </View>
+          ) : (
+            <View style={styles.flashListContainer}>
+              <FlashList<FeedItem>
+                ref={flashListRef}
+                data={itemsToRender}
+                keyExtractor={item => item.id}
+                renderItem={({ item, index }) => (
+                  <RecipeCard
+                    item={{
+                      ...item,
+                      onLike: () => likeMutation.mutate(item.id),
+                      onSave: () => saveMutation.mutate(item.id),
+                    }}
+                    isActive={index === currentIndex}
+                    containerHeight={itemHeight}
+                    isScreenFocused={isFeedScreenFocused}
+                    pantryItemCount={pantryItemCount}
+                    onWhatCanICookPress={handleWhatCanICookPress}
+                  />
+                )}
+                estimatedItemSize={itemHeight}
+                pagingEnabled
+                disableIntervalMomentum
+                showsVerticalScrollIndicator={false}
+                viewabilityConfig={viewabilityConfig}
+                onViewableItemsChanged={onViewableItemsChanged}
+                extraData={{ currentIndex, isFeedScreenFocused }}
+                overrideItemLayout={layout => {
+                  layout.size = itemHeight;
+                }}
+                decelerationRate="fast"
+                // VIDEO-FRIENDLY OPTIMIZATIONS: Removed aggressive optimizations that interfere with video playback:
+                // - removeClippedSubviews: Causes videos to unmount/remount when scrolling
+                // - drawDistance: Limits render distance causing video state loss  
+                // - getItemType: Aggressive recycling interferes with video component state
+              />
+            </View>
+          )}
+        </View>
+
+        {/* "What Can I Cook?" Insufficient Items Modal */}
+        <InsufficientItemsModal
+          visible={showInsufficientModal}
+          onClose={handleCloseModal}
+          onNavigateToPantry={handleNavigateToPantry}
+          currentItemCount={pantryItemCount}
+        />
+
+
+      </SafeAreaView>
+    </SafeWrapper>
   );
 }
