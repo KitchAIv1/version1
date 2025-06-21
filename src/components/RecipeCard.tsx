@@ -182,7 +182,10 @@ function getIngredientCounts(item: RecipeItem): {
   totalCount: number;
 } {
   try {
-    if (item._userIngredientsCount !== undefined && item._totalIngredientsCount !== undefined) {
+    if (
+      item._userIngredientsCount !== undefined &&
+      item._totalIngredientsCount !== undefined
+    ) {
       return {
         userCount: item._userIngredientsCount,
         totalCount: item._totalIngredientsCount,
@@ -220,46 +223,46 @@ export default function RecipeCard({
   pantryItemCount,
   onWhatCanICookPress,
 }: RecipeCardProps) {
-  const videoRef = useRef<Video>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [isPrefetched, setIsPrefetched] = useState(false);
-  const [isBuffering, setIsBuffering] = useState(false);
   const navigation = useNavigation<RecipeCardNavigationProp>();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const videoRef = useRef<Video>(null);
+  const [isBuffering, setIsBuffering] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const networkQuality = useNetworkQuality();
 
-  // Get video URL with fallback and apply network-based optimization
-  const getOptimizedVideoUrl = useCallback((url: string): string => {
-    if (!url) return url;
-
-    // For Supabase storage videos, add quality parameter based on network
-    if (url.includes('supabase.co')) {
-      const separator = url.includes('?') ? '&' : '?';
-      const quality = networkQuality.quality === 'low' ? '480p' : 
-                     networkQuality.quality === 'medium' ? '720p' : '1080p';
-      return `${url}${separator}quality=${quality}`;
-    }
-
-    // MUX videos handle adaptive streaming automatically
-    return url;
-  }, [networkQuality.quality]);
-
-  const videoUrl = getOptimizedVideoUrl(item.video || item.video_url || '');
+  // Simple video URL processing - no complex detection needed
+  const videoUrl = item.video || item.video_url || '';
+  const hasValidVideoUrl = videoUrl && videoUrl.trim() !== '';
+  
+  // Simple cleanup on unmount only
+  useEffect(() => {
+    return () => {
+      if (videoRef.current) {
+        videoRef.current.unloadAsync().catch(() => {
+          // Ignore cleanup errors on unmount
+        });
+      }
+    };
+  }, []);
 
   // Prefetch recipe details when active
   useEffect(() => {
-    if (isActive && isScreenFocused && isLoaded && !isPrefetched && item.id) {
+    if (isActive && isScreenFocused && !hasError && item.id) {
       prefetchRecipeDetails(queryClient, item.id, user?.id)
-        .then(() => setIsPrefetched(true))
-        .catch(e => console.error(`Prefetch error for ${item.id}:`, e));
+        .then(() => {
+          // No need to set isPrefetched here, as we're using hasError to track prefetch status
+        })
+        .catch(e => {
+          console.error(`Prefetch error for ${item.id}:`, e);
+          setHasError(true);
+        });
     }
   }, [
     isActive,
     isScreenFocused,
-    isLoaded,
-    isPrefetched,
+    hasError,
     item.id,
     queryClient,
     user?.id,
@@ -267,24 +270,18 @@ export default function RecipeCard({
 
   const handleLoad = (status: AVPlaybackStatus) => {
     if (status.isLoaded) {
-      if (!isLoaded) {
-        setIsLoaded(true);
-      }
       setIsBuffering(false);
-    } else if (status.error) {
-      console.error(
-        `RecipeCard ${item.id}: Video load error from onLoad:`,
-        status.error,
-      );
-      setIsLoaded(false);
+      setHasError(false);
+    } else {
       setIsBuffering(false);
+      setHasError(true);
     }
   };
 
   const handleError = (error: string) => {
-    console.error(`RecipeCard ${item.id}: Video onError event:`, error);
-    setIsLoaded(false);
+    console.error(`RecipeCard ${item.id}: Video error:`, error);
     setIsBuffering(false);
+    setHasError(true);
   };
 
   const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
@@ -292,31 +289,29 @@ export default function RecipeCard({
       if (isActive && isScreenFocused) {
         setIsBuffering(true);
       }
-      setIsLoaded(false);
       return;
     }
-    setIsLoaded(true);
+    
+    setIsBuffering(false);
     if (isActive && isScreenFocused) {
       if (status.isBuffering) {
         setIsBuffering(true);
-      } else {
-        setIsBuffering(false);
       }
-      if (status.isPlaying && status.isBuffering) {
-        setIsBuffering(true);
-      }
-    } else {
-      setIsBuffering(false);
     }
   };
 
   const handlePressIn = useCallback(() => {
-    if (item.id && !isPrefetched) {
+    if (item.id && !hasError) {
       prefetchRecipeDetails(queryClient, item.id, user?.id)
-        .then(() => setIsPrefetched(true))
-        .catch(e => console.error(`Prefetch error for ${item.id}:`, e));
+        .then(() => {
+          // No need to set isPrefetched here, as we're using hasError to track prefetch status
+        })
+        .catch(e => {
+          console.error(`Prefetch error for ${item.id}:`, e);
+          setHasError(true);
+        });
     }
-  }, [item.id, isPrefetched, queryClient, user?.id]);
+  }, [item.id, hasError, queryClient, user?.id]);
 
   const handleNavigateToDetail = async () => {
     console.log(`Navigating to RecipeDetail for ID: ${item.id}`);
@@ -402,22 +397,42 @@ export default function RecipeCard({
   return (
     <TouchableWithoutFeedback onPressIn={handlePressIn}>
       <View style={[styles.container, containerStyle]}>
-        {/* Optimized Video Player */}
-        <Video
-          ref={videoRef}
-          source={{ uri: videoUrl }}
-          resizeMode={ResizeMode.COVER}
-          style={StyleSheet.absoluteFill}
-          isLooping
-          isMuted={false}
-          shouldPlay={isActive && isScreenFocused}
-          onLoad={handleLoad}
-          onError={handleError}
-          progressUpdateIntervalMillis={500}
-          onPlaybackStatusUpdate={
-            isActive && isScreenFocused ? onPlaybackStatusUpdate : undefined
-          }
-        />
+        {/* Simple Video Player - Back to Working Configuration */}
+        {hasValidVideoUrl ? (
+          <Video
+            ref={videoRef}
+            source={{ uri: videoUrl }}
+            resizeMode={ResizeMode.COVER}
+            style={StyleSheet.absoluteFill}
+            isLooping
+            isMuted={false}
+            shouldPlay={isActive && isScreenFocused}
+            onLoad={handleLoad}
+            onError={handleError}
+            progressUpdateIntervalMillis={500}
+            onPlaybackStatusUpdate={
+              isActive && isScreenFocused ? onPlaybackStatusUpdate : undefined
+            }
+          />
+        ) : (
+          // Fallback for recipes without videos - show thumbnail
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}>
+            {item.thumbnail_url ? (
+              <Image
+                source={{ uri: item.thumbnail_url }}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: '#333', justifyContent: 'center', alignItems: 'center' }]}>
+                <Feather name="image" size={48} color="#666" />
+                <Text style={{ color: '#666', marginTop: 8 }}>No Video Available</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+
 
         <View style={topOverlayContainerStyle}>
           {item.pantryMatchPct !== undefined ? (
@@ -447,6 +462,7 @@ export default function RecipeCard({
           />
         </View>
 
+        {/* Simple Buffering Indicator */}
         {isActive && isScreenFocused && isBuffering && (
           <View style={styles.bufferingOverlay}>
             <ActivityIndicator size="large" color="#FFFFFF" />

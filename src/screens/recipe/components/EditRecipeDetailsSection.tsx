@@ -1,10 +1,5 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { OptimizedCollapsibleCard } from './OptimizedCollapsibleCard';
 
 interface FormData {
@@ -21,88 +16,96 @@ interface EditRecipeDetailsSectionProps {
   onUpdateFormData: (field: string, value: any) => void;
 }
 
-export const EditRecipeDetailsSection: React.FC<EditRecipeDetailsSectionProps> = React.memo(({
-  formData,
-  onUpdateFormData,
-}) => {
-  return (
-    <>
-      {/* General Details */}
-      <OptimizedCollapsibleCard title="General Details" icon="edit" defaultCollapsed={false}>
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Recipe Title *</Text>
-          <TextInput
-            placeholder="Enter recipe title"
-            value={formData.title}
-            onChangeText={(value) => onUpdateFormData('title', value)}
-            style={[styles.input, !formData.title.trim() && styles.inputRequired]}
-            placeholderTextColor="#9ca3af"
-            maxLength={100}
-          />
-        </View>
-        
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Description</Text>
-          <TextInput
-            placeholder="Describe your recipe (optional)"
-            value={formData.description}
-            onChangeText={(value) => onUpdateFormData('description', value)}
-            style={styles.inputMulti}
-            multiline
-            numberOfLines={4}
-            placeholderTextColor="#9ca3af"
-            maxLength={500}
-            textAlignVertical="top"
-          />
-        </View>
-      </OptimizedCollapsibleCard>
+export const EditRecipeDetailsSection: React.FC<EditRecipeDetailsSectionProps> =
+  React.memo(({ formData, onUpdateFormData }) => {
+    return (
+      <>
+        {/* General Details */}
+        <OptimizedCollapsibleCard
+          title="General Details"
+          icon="edit"
+          defaultCollapsed={false}>
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Recipe Title *</Text>
+            <TextInput
+              placeholder="Enter recipe title"
+              value={formData.title}
+              onChangeText={value => onUpdateFormData('title', value)}
+              style={[
+                styles.input,
+                !formData.title.trim() && styles.inputRequired,
+              ]}
+              placeholderTextColor="#9ca3af"
+              maxLength={100}
+            />
+          </View>
 
-      {/* Timings & Servings */}
-      <OptimizedCollapsibleCard title="Timings & Servings" icon="clock">
-        <View style={styles.row}>
-          <View style={styles.halfWidth}>
-            <Text style={styles.inputLabel}>Prep Time</Text>
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Description</Text>
             <TextInput
-              placeholder="Minutes"
-              value={formData.prepTimeMinutes}
-              onChangeText={(value) => onUpdateFormData('prepTimeMinutes', value)}
+              placeholder="Describe your recipe (optional)"
+              value={formData.description}
+              onChangeText={value => onUpdateFormData('description', value)}
+              style={styles.inputMulti}
+              multiline
+              numberOfLines={4}
+              placeholderTextColor="#9ca3af"
+              maxLength={500}
+              textAlignVertical="top"
+            />
+          </View>
+        </OptimizedCollapsibleCard>
+
+        {/* Timings & Servings */}
+        <OptimizedCollapsibleCard title="Timings & Servings" icon="clock">
+          <View style={styles.row}>
+            <View style={styles.halfWidth}>
+              <Text style={styles.inputLabel}>Prep Time</Text>
+              <TextInput
+                placeholder="Minutes"
+                value={formData.prepTimeMinutes}
+                onChangeText={value =>
+                  onUpdateFormData('prepTimeMinutes', value)
+                }
+                style={styles.input}
+                keyboardType="numeric"
+                placeholderTextColor="#9ca3af"
+                maxLength={4}
+              />
+            </View>
+
+            <View style={styles.halfWidth}>
+              <Text style={styles.inputLabel}>Cook Time</Text>
+              <TextInput
+                placeholder="Minutes"
+                value={formData.cookTimeMinutes}
+                onChangeText={value =>
+                  onUpdateFormData('cookTimeMinutes', value)
+                }
+                style={styles.input}
+                keyboardType="numeric"
+                placeholderTextColor="#9ca3af"
+                maxLength={4}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Servings</Text>
+            <TextInput
+              placeholder="Number of servings"
+              value={formData.servings}
+              onChangeText={value => onUpdateFormData('servings', value)}
               style={styles.input}
               keyboardType="numeric"
               placeholderTextColor="#9ca3af"
-              maxLength={4}
+              maxLength={3}
             />
           </View>
-          
-          <View style={styles.halfWidth}>
-            <Text style={styles.inputLabel}>Cook Time</Text>
-            <TextInput
-              placeholder="Minutes"
-              value={formData.cookTimeMinutes}
-              onChangeText={(value) => onUpdateFormData('cookTimeMinutes', value)}
-              style={styles.input}
-              keyboardType="numeric"
-              placeholderTextColor="#9ca3af"
-              maxLength={4}
-            />
-          </View>
-        </View>
-        
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Servings</Text>
-          <TextInput
-            placeholder="Number of servings"
-            value={formData.servings}
-            onChangeText={(value) => onUpdateFormData('servings', value)}
-            style={styles.input}
-            keyboardType="numeric"
-            placeholderTextColor="#9ca3af"
-            maxLength={3}
-          />
-        </View>
-      </OptimizedCollapsibleCard>
-    </>
-  );
-});
+        </OptimizedCollapsibleCard>
+      </>
+    );
+  });
 
 EditRecipeDetailsSection.displayName = 'EditRecipeDetailsSection';
 
@@ -149,4 +152,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default EditRecipeDetailsSection; 
+export default EditRecipeDetailsSection;

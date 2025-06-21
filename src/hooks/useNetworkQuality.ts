@@ -16,9 +16,9 @@ export const useNetworkQuality = () => {
   });
 
   const getQualityFromSpeed = (speed: number): 'low' | 'medium' | 'high' => {
-    if (speed < 30) return 'low';    // 480p for slow connections
+    if (speed < 30) return 'low'; // 480p for slow connections
     if (speed < 100) return 'medium'; // 720p for medium connections
-    return 'high';                    // 1080p for fast connections
+    return 'high'; // 1080p for fast connections
   };
 
   const measureNetworkSpeed = async (): Promise<number> => {
@@ -30,12 +30,12 @@ export const useNetworkQuality = () => {
       });
       await response.blob();
       const endTime = Date.now();
-      
+
       const duration = (endTime - startTime) / 1000; // seconds
       const sizeInBits = 1024 * 8; // 1KB in bits
       const speedBps = sizeInBits / duration;
       const speedMbps = speedBps / (1024 * 1024);
-      
+
       return Math.max(speedMbps * 100, 10); // Scale up and ensure minimum
     } catch (error) {
       console.warn('Network speed test failed:', error);
@@ -70,7 +70,7 @@ export const useNetworkQuality = () => {
         }
 
         const speed = await measureNetworkSpeed();
-        
+
         setNetworkQuality({
           speed,
           connectionType: 'unknown', // Simplified since we don't have NetInfo
@@ -102,4 +102,4 @@ export const useNetworkQuality = () => {
   }, []);
 
   return networkQuality;
-}; 
+};

@@ -46,30 +46,30 @@ import {
 } from '../../hooks/usePerformanceMonitoring';
 
 // Lazy-loaded components for better performance
-const OptimizedCollapsibleCard = React.lazy(() => 
+const OptimizedCollapsibleCard = React.lazy(() =>
   import('./components/OptimizedCollapsibleCard').then(module => ({
-    default: module.OptimizedCollapsibleCard
-  }))
+    default: module.OptimizedCollapsibleCard,
+  })),
 );
-const MediaSelectionSection = React.lazy(() => 
+const MediaSelectionSection = React.lazy(() =>
   import('./components/MediaSelectionSection').then(module => ({
-    default: module.MediaSelectionSection
-  }))
+    default: module.MediaSelectionSection,
+  })),
 );
-const RecipeDetailsSection = React.lazy(() => 
+const RecipeDetailsSection = React.lazy(() =>
   import('./components/RecipeDetailsSection').then(module => ({
-    default: module.RecipeDetailsSection
-  }))
+    default: module.RecipeDetailsSection,
+  })),
 );
-const IngredientsSection = React.lazy(() => 
+const IngredientsSection = React.lazy(() =>
   import('./components/IngredientsSection').then(module => ({
-    default: module.IngredientsSection
-  }))
+    default: module.IngredientsSection,
+  })),
 );
-const PreparationStepsSection = React.lazy(() => 
+const PreparationStepsSection = React.lazy(() =>
   import('./components/PreparationStepsSection').then(module => ({
-    default: module.PreparationStepsSection
-  }))
+    default: module.PreparationStepsSection,
+  })),
 );
 
 // Constants
@@ -188,11 +188,14 @@ const OptimizedDietTags = React.memo<{
   dietTags: string[];
   onTagToggle: (tag: string) => void;
 }>(({ dietTags, onTagToggle }) => {
-  const memoizedTags = useMemo(() => 
-    DIET_TAGS_OPTIONS.map(tag => ({
-      tag,
-      isSelected: dietTags.includes(tag),
-    })), [dietTags]);
+  const memoizedTags = useMemo(
+    () =>
+      DIET_TAGS_OPTIONS.map(tag => ({
+        tag,
+        isSelected: dietTags.includes(tag),
+      })),
+    [dietTags],
+  );
 
   return (
     <Suspense fallback={<ActivityIndicator size="small" />}>
@@ -204,10 +207,7 @@ const OptimizedDietTags = React.memo<{
           {memoizedTags.map(({ tag, isSelected }) => (
             <TouchableOpacity
               key={tag}
-              style={[
-                styles.tag,
-                isSelected && styles.tagSelected,
-              ]}
+              style={[styles.tag, isSelected && styles.tagSelected]}
               onPress={() => onTagToggle(tag)}
               activeOpacity={0.7}>
               {isSelected && (
@@ -219,10 +219,7 @@ const OptimizedDietTags = React.memo<{
                 />
               )}
               <Text
-                style={[
-                  styles.tagText,
-                  isSelected && styles.tagTextSelected,
-                ]}>
+                style={[styles.tagText, isSelected && styles.tagTextSelected]}>
                 {tag}
               </Text>
             </TouchableOpacity>
@@ -271,10 +268,7 @@ const OptimizedPublishButton = React.memo<{
 }>(({ isUploading, uploadProgress, onPublish }) => (
   <>
     <TouchableOpacity
-      style={[
-        styles.publishButton,
-        isUploading && styles.saveButtonDisabled,
-      ]}
+      style={[styles.publishButton, isUploading && styles.saveButtonDisabled]}
       onPress={onPublish}
       disabled={isUploading}
       activeOpacity={0.8}>
@@ -303,10 +297,7 @@ const OptimizedPublishButton = React.memo<{
     {isUploading && uploadProgress > 0 && (
       <View style={styles.progressBarContainer}>
         <View
-          style={[
-            styles.progressBar,
-            { width: `${uploadProgress * 100}%` },
-          ]}
+          style={[styles.progressBar, { width: `${uploadProgress * 100}%` }]}
         />
         <Text style={styles.progressText}>
           {`${(uploadProgress * 100).toFixed(0)}%`}
@@ -318,12 +309,13 @@ const OptimizedPublishButton = React.memo<{
 OptimizedPublishButton.displayName = 'OptimizedPublishButton';
 
 // Main VideoRecipeUploaderScreen component
-export const VideoRecipeUploaderScreenOptimized: React.FC<VideoRecipeUploaderScreenProps> = ({
-  navigation: navPropFromProps,
-}) => {
-  const navigation = useNavigation<
-    NativeStackNavigationProp<MainStackParamList, 'VideoRecipeUploader'>
-  >();
+export const VideoRecipeUploaderScreenOptimized: React.FC<
+  VideoRecipeUploaderScreenProps
+> = ({ navigation: navPropFromProps }) => {
+  const navigation =
+    useNavigation<
+      NativeStackNavigationProp<MainStackParamList, 'VideoRecipeUploader'>
+    >();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -345,20 +337,23 @@ export const VideoRecipeUploaderScreenOptimized: React.FC<VideoRecipeUploaderScr
   } = useOptimizedFormState();
 
   // Optimized upload handlers
-  const onUploadSuccessHandler = useCallback((response: any) => {
-    const recipeId = response?.recipeId;
-    Alert.alert('Success', 'Recipe uploaded successfully!');
+  const onUploadSuccessHandler = useCallback(
+    (response: any) => {
+      const recipeId = response?.recipeId;
+      Alert.alert('Success', 'Recipe uploaded successfully!');
 
-    if (user?.id) {
-      queryClient.invalidateQueries({
-        queryKey: ['userRecipesForPlanner', user.id],
-      });
-      queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
-    }
+      if (user?.id) {
+        queryClient.invalidateQueries({
+          queryKey: ['userRecipesForPlanner', user.id],
+        });
+        queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
+      }
 
-    resetForm();
-    if (navigation.canGoBack()) navigation.goBack();
-  }, [user?.id, queryClient, resetForm, navigation]);
+      resetForm();
+      if (navigation.canGoBack()) navigation.goBack();
+    },
+    [user?.id, queryClient, resetForm, navigation],
+  );
 
   const onUploadErrorHandler = useCallback((errorDetails: any | string) => {
     console.error('onUploadErrorHandler received:', errorDetails);
@@ -398,57 +393,68 @@ export const VideoRecipeUploaderScreenOptimized: React.FC<VideoRecipeUploaderScr
     selectThumbnail().finally(() => endApiCall(callId, 'thumbnail_select'));
   }, [selectThumbnail, startApiCall, endApiCall]);
 
-  const handleTagToggle = useCallback((tag: string) => {
-    setDietTags(prev =>
-      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag],
-    );
-  }, [setDietTags]);
+  const handleTagToggle = useCallback(
+    (tag: string) => {
+      setDietTags(prev =>
+        prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag],
+      );
+    },
+    [setDietTags],
+  );
 
-  const handleIngredientChange = useCallback((
-    index: number,
-    field: keyof Ingredient,
-    value: string,
-  ) => {
-    setIngredients(prev => {
-      const newIngredients = [...prev];
-      newIngredients[index] = { ...newIngredients[index], [field]: value };
-      return newIngredients;
-    });
-  }, [setIngredients]);
+  const handleIngredientChange = useCallback(
+    (index: number, field: keyof Ingredient, value: string) => {
+      setIngredients(prev => {
+        const newIngredients = [...prev];
+        newIngredients[index] = { ...newIngredients[index], [field]: value };
+        return newIngredients;
+      });
+    },
+    [setIngredients],
+  );
 
   const handleAddIngredient = useCallback(() => {
     setIngredients(prev => [...prev, { name: '', quantity: '', unit: '' }]);
   }, [setIngredients]);
 
-  const handleRemoveIngredient = useCallback((indexToRemove: number) => {
-    setIngredients(prev => {
-      if (prev.length === 1) {
-        return [{ name: '', quantity: '', unit: '' }];
-      }
-      return prev.filter((_, index) => index !== indexToRemove);
-    });
-  }, [setIngredients]);
+  const handleRemoveIngredient = useCallback(
+    (indexToRemove: number) => {
+      setIngredients(prev => {
+        if (prev.length === 1) {
+          return [{ name: '', quantity: '', unit: '' }];
+        }
+        return prev.filter((_, index) => index !== indexToRemove);
+      });
+    },
+    [setIngredients],
+  );
 
-  const handleStepChange = useCallback((index: number, value: string) => {
-    setPreparationSteps(prev => {
-      const newSteps = [...prev];
-      newSteps[index] = value;
-      return newSteps;
-    });
-  }, [setPreparationSteps]);
+  const handleStepChange = useCallback(
+    (index: number, value: string) => {
+      setPreparationSteps(prev => {
+        const newSteps = [...prev];
+        newSteps[index] = value;
+        return newSteps;
+      });
+    },
+    [setPreparationSteps],
+  );
 
   const handleAddStep = useCallback(() => {
     setPreparationSteps(prev => [...prev, '']);
   }, [setPreparationSteps]);
 
-  const handleRemoveStep = useCallback((indexToRemove: number) => {
-    setPreparationSteps(prev => {
-      if (prev.length === 1) {
-        return [''];
-      }
-      return prev.filter((_, index) => index !== indexToRemove);
-    });
-  }, [setPreparationSteps]);
+  const handleRemoveStep = useCallback(
+    (indexToRemove: number) => {
+      setPreparationSteps(prev => {
+        if (prev.length === 1) {
+          return [''];
+        }
+        return prev.filter((_, index) => index !== indexToRemove);
+      });
+    },
+    [setPreparationSteps],
+  );
 
   // Optimized validation
   const validateForm = useCallback(() => {
@@ -539,25 +545,38 @@ export const VideoRecipeUploaderScreenOptimized: React.FC<VideoRecipeUploaderScr
     const callId = `recipe_upload_${Date.now()}`;
     startApiCall(callId);
     uploadRecipe(metadata).finally(() => endApiCall(callId, 'recipe_upload'));
-  }, [validateForm, formData, ingredients, dietTags, preparationSteps, uploadRecipe, startApiCall, endApiCall]);
+  }, [
+    validateForm,
+    formData,
+    ingredients,
+    dietTags,
+    preparationSteps,
+    uploadRecipe,
+    startApiCall,
+    endApiCall,
+  ]);
 
   // Memoized counts for performance
-  const ingredientCount = useMemo(() => 
-    ingredients.filter(i => i.name.trim()).length, [ingredients]);
-  
-  const stepCount = useMemo(() => 
-    preparationSteps.filter(s => s.trim()).length, [preparationSteps]);
+  const ingredientCount = useMemo(
+    () => ingredients.filter(i => i.name.trim()).length,
+    [ingredients],
+  );
+
+  const stepCount = useMemo(
+    () => preparationSteps.filter(s => s.trim()).length,
+    [preparationSteps],
+  );
 
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.scrollContentContainer}
       showsVerticalScrollIndicator={false}>
-      
       <OptimizedHeader />
 
       {/* Media Selection Section */}
-      <Suspense fallback={<ActivityIndicator size="large" style={{ margin: 20 }} />}>
+      <Suspense
+        fallback={<ActivityIndicator size="large" style={{ margin: 20 }} />}>
         <MediaSelectionSection
           videoUri={videoUri}
           thumbnailUri={thumbnailUri}
@@ -599,15 +618,12 @@ export const VideoRecipeUploaderScreenOptimized: React.FC<VideoRecipeUploaderScr
         </Suspense>
 
         {/* Diet Tags Section */}
-        <OptimizedDietTags
-          dietTags={dietTags}
-          onTagToggle={handleTagToggle}
-        />
+        <OptimizedDietTags dietTags={dietTags} onTagToggle={handleTagToggle} />
 
         {/* Visibility Section */}
         <OptimizedVisibility
           isPublic={formData.isPublic}
-          onToggle={(value) => updateFormData('isPublic', value)}
+          onToggle={value => updateFormData('isPublic', value)}
         />
       </View>
 
@@ -756,6 +772,7 @@ const styles = StyleSheet.create({
   },
 });
 
-VideoRecipeUploaderScreenOptimized.displayName = 'VideoRecipeUploaderScreenOptimized';
+VideoRecipeUploaderScreenOptimized.displayName =
+  'VideoRecipeUploaderScreenOptimized';
 
-export default VideoRecipeUploaderScreenOptimized; 
+export default VideoRecipeUploaderScreenOptimized;

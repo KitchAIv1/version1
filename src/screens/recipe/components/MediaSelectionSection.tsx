@@ -25,11 +25,15 @@ const OptimizedVideoPreview = React.memo<{
   videoUri?: string;
   onSelectVideo: () => void;
 }>(({ videoUri, onSelectVideo }) => {
-  const buttonStyle = useMemo(() => 
-    videoUri ? styles.buttonOutline : styles.button, [videoUri]);
-  
-  const buttonTextStyle = useMemo(() => 
-    videoUri ? styles.buttonOutlineText : styles.buttonText, [videoUri]);
+  const buttonStyle = useMemo(
+    () => (videoUri ? styles.buttonOutline : styles.button),
+    [videoUri],
+  );
+
+  const buttonTextStyle = useMemo(
+    () => (videoUri ? styles.buttonOutlineText : styles.buttonText),
+    [videoUri],
+  );
 
   return (
     <View style={styles.mediaPreviewWrapper}>
@@ -73,11 +77,15 @@ const OptimizedThumbnailPreview = React.memo<{
   thumbnailUri?: string;
   onSelectThumbnail: () => void;
 }>(({ thumbnailUri, onSelectThumbnail }) => {
-  const buttonStyle = useMemo(() => 
-    thumbnailUri ? styles.buttonOutline : styles.button, [thumbnailUri]);
-  
-  const buttonTextStyle = useMemo(() => 
-    thumbnailUri ? styles.buttonOutlineText : styles.buttonText, [thumbnailUri]);
+  const buttonStyle = useMemo(
+    () => (thumbnailUri ? styles.buttonOutline : styles.button),
+    [thumbnailUri],
+  );
+
+  const buttonTextStyle = useMemo(
+    () => (thumbnailUri ? styles.buttonOutlineText : styles.buttonText),
+    [thumbnailUri],
+  );
 
   return (
     <View style={styles.mediaPreviewWrapper}>
@@ -119,25 +127,22 @@ const OptimizedThumbnailPreview = React.memo<{
 OptimizedThumbnailPreview.displayName = 'OptimizedThumbnailPreview';
 
 // Main MediaSelectionSection Component
-export const MediaSelectionSection = React.memo<MediaSelectionSectionProps>(({
-  videoUri,
-  thumbnailUri,
-  onSelectVideo,
-  onSelectThumbnail,
-}) => {
-  return (
-    <View style={styles.mediaSelectionContainer}>
-      <OptimizedVideoPreview
-        videoUri={videoUri}
-        onSelectVideo={onSelectVideo}
-      />
-      <OptimizedThumbnailPreview
-        thumbnailUri={thumbnailUri}
-        onSelectThumbnail={onSelectThumbnail}
-      />
-    </View>
-  );
-});
+export const MediaSelectionSection = React.memo<MediaSelectionSectionProps>(
+  ({ videoUri, thumbnailUri, onSelectVideo, onSelectThumbnail }) => {
+    return (
+      <View style={styles.mediaSelectionContainer}>
+        <OptimizedVideoPreview
+          videoUri={videoUri}
+          onSelectVideo={onSelectVideo}
+        />
+        <OptimizedThumbnailPreview
+          thumbnailUri={thumbnailUri}
+          onSelectThumbnail={onSelectThumbnail}
+        />
+      </View>
+    );
+  },
+);
 
 MediaSelectionSection.displayName = 'MediaSelectionSection';
 
@@ -242,4 +247,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default MediaSelectionSection; 
+export default MediaSelectionSection;

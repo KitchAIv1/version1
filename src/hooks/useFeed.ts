@@ -4,6 +4,7 @@ import { supabase } from '../services/supabase';
 import { RecipeItem } from '../types';
 import { useCacheManager } from './useCacheManager';
 import { useAuth } from '../providers/AuthProvider';
+// Removed complex retry logic - using React Query's built-in retry instead
 
 // Interface for the raw item structure returned by the RPC
 interface PantryMatch {
@@ -68,6 +69,8 @@ export const useFeed = () => {
 
   const feedQuery = useQuery<FeedItem[]>({
     queryKey: ['feed'],
+    retry: 3, // Retry 3 times
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff: 1s, 2s, 4s
     queryFn: async () => {
       if (!user?.id) {
         throw new Error('User not authenticated');
@@ -75,6 +78,7 @@ export const useFeed = () => {
 
       console.log('[useFeed] Fetching feed data for user:', user.id);
 
+      // Direct Supabase call - let React Query handle retries with proper loading states
       const { data, error } = await supabase.rpc(
         'get_community_feed_pantry_match_v3',
         {
@@ -85,7 +89,7 @@ export const useFeed = () => {
       );
 
       if (error) {
-        console.error('[useFeed] RPC Error:', error);
+        console.error('[useFeed] RPC Error after retries:', error);
 
         // Check if this is the known backend issue with missing likes column
         if (
@@ -109,6 +113,7 @@ export const useFeed = () => {
           );
         }
 
+        // Throw the original error
         throw error;
       }
 

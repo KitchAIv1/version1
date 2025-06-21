@@ -99,6 +99,7 @@ const EditRecipeScreen: React.FC<EditRecipeScreenProps> = ({
     getIngredientsForSave,
     clearCachesAfterSave,
     isLoading: isLoadingParsedIngredients,
+    ensureIngredientSync,
   } = useSafeRecipeEdit(recipeId, user?.id);
 
   // Form state
@@ -152,17 +153,22 @@ const EditRecipeScreen: React.FC<EditRecipeScreenProps> = ({
     }
   }, [initialRecipeData, navigation]);
 
-  // --- NEW: Effect to sync parsed ingredients to display format ---
+  // --- Effect to sync parsed ingredients to display format ---
   useEffect(() => {
     if (parsedIngredients && parsedIngredients.length > 0) {
       const displayIngredients = parsedIngredients.map(parsed => ({
+        // FIX: Map 'ingredient' field from database to 'name' field for display
         name: parsed.ingredient || '',
         quantity: parsed.quantity || '',
         unit: parsed.unit || '',
       }));
+      
       setIngredients(displayIngredients);
+      
+      // SAFETY: Ensure sync is maintained after setting display ingredients
+      ensureIngredientSync(displayIngredients);
     }
-  }, [parsedIngredients]);
+  }, [parsedIngredients, ensureIngredientSync]);
 
   // --- Updated Handlers for Ingredients to sync with parsing ---
   const handleIngredientChange = (
@@ -174,14 +180,46 @@ const EditRecipeScreen: React.FC<EditRecipeScreenProps> = ({
     newIngredients[index] = { ...newIngredients[index], [field]: value };
     setIngredients(newIngredients);
 
-    // Also update the parsed ingredients to keep them in sync
+    // CRITICAL FIX: Ensure parsedIngredients array is properly sized and synchronized
     const newParsedIngredients = [...parsedIngredients];
-    if (newParsedIngredients[index]) {
-      if (field === 'name') newParsedIngredients[index].ingredient = value;
-      if (field === 'quantity') newParsedIngredients[index].quantity = value;
-      if (field === 'unit') newParsedIngredients[index].unit = value;
-      updateIngredients(newParsedIngredients);
+    
+    // SAFETY: Ensure the array is large enough for the current index
+    while (newParsedIngredients.length <= index) {
+      newParsedIngredients.push({
+        quantity: '',
+        unit: '',
+        ingredient: '',
+        original: '',
+      });
     }
+
+    // Ensure we have a valid parsed ingredient at this index
+    if (!newParsedIngredients[index]) {
+      newParsedIngredients[index] = {
+        quantity: '',
+        unit: '',
+        ingredient: '',
+        original: '',
+      };
+    }
+
+    // Update the correct field in parsed ingredients
+    if (field === 'name') {
+      newParsedIngredients[index].ingredient = value;
+    } else if (field === 'quantity') {
+      newParsedIngredients[index].quantity = value;
+    } else if (field === 'unit') {
+      newParsedIngredients[index].unit = value;
+    }
+
+    // DEBUG: Log the synchronization for troubleshooting
+    if (__DEV__) {
+      console.log(`[EditRecipe] Ingredient sync - Index: ${index}, Field: ${field}, Value: ${value}`);
+      console.log(`[EditRecipe] Updated parsed ingredient:`, newParsedIngredients[index]);
+    }
+
+    // Apply the update
+    updateIngredients(newParsedIngredients);
   };
 
   const handleAddIngredient = () => {
@@ -192,6 +230,13 @@ const EditRecipeScreen: React.FC<EditRecipeScreenProps> = ({
   const handleRemoveIngredient = (indexToRemove: number) => {
     if (ingredients.length === 1) {
       setIngredients([{ name: '', quantity: '', unit: '' }]);
+      // Reset parsed ingredients to have one empty ingredient
+      updateIngredients([{
+        quantity: '',
+        unit: '',
+        ingredient: '',
+        original: '',
+      }]);
       return;
     }
     setIngredients(ingredients.filter((_, index) => index !== indexToRemove));
@@ -435,31 +480,47 @@ const EditRecipeScreen: React.FC<EditRecipeScreenProps> = ({
         p_servings: parseInt(servings) || null,
         p_is_public: isPublic,
       };
-      console.log('Updating recipe with payload:', updatedRecipePayload);
-      setUploadProgress(0.75);
 
-      // 3. Call the update RPC
-      const { error: updateRpcError } = await supabase.rpc(
-        'update_recipe_details',
-        updatedRecipePayload,
-      );
-      if (updateRpcError) throw updateRpcError;
+      // Verify authentication before saving
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      if (authError || !authUser) {
+        console.error('[EditRecipeScreen] Auth error:', authError?.message || 'No user');
+        throw new Error('User not authenticated');
+      }
+
+      // 3. Call the RPC function
+      const { data, error } = await supabase.rpc('update_recipe_details', updatedRecipePayload);
+      
+      if (error) {
+        console.error('[EditRecipeScreen] Update failed:', error.message);
+        throw new Error(`Update failed: ${error.message}`);
+      }
 
       setUploadProgress(1);
       Alert.alert('Success', 'Recipe updated successfully!');
 
-      // 4. Clear caches using enhanced cache clearing
-      await clearCachesAfterSave();
-
-      // Also invalidate queries to refresh data
-      queryClient.invalidateQueries({
-        queryKey: ['editableRecipeDetails', recipeId],
-      });
-      queryClient.invalidateQueries({ queryKey: ['recipeDetails', recipeId] }); // For the detail view screen
+      // 4. SAFE cache management - Remove stale data instead of invalidating
+      
       if (user) {
-        // Invalidate profile query if user exists
+        // Remove specific cached data to force fresh fetch
+        queryClient.removeQueries({
+          queryKey: ['recipeDetails', recipeId, user.id],
+        });
+        
+        queryClient.removeQueries({
+          queryKey: ['editableRecipeDetails', recipeId, user.id],
+        });
+        
+        queryClient.removeQueries({
+          queryKey: ['pantryMatch', recipeId, user.id],
+        });
+        
+        // Invalidate profile data for recipe lists (this is safe to invalidate)
         queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
       }
+
+      // Ensure cache is cleared before navigation
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       navigation.goBack();
     } catch (error: any) {

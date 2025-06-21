@@ -244,10 +244,23 @@ export default function RecipeDetailScreen() {
       ) {
         console.log('RecipeDetailScreen focused, fetching grocery list...');
         fetchGroceryList(user.id);
+        
+        // ENHANCED: Also refresh recipe data if returning from a potential edit
+        if (id && timeSinceLastFocus > 3000) {
+          console.log(
+            `[RecipeDetailScreen] Refreshing recipe data after focus (${timeSinceLastFocus}ms since last focus)`,
+          );
+          queryClient.invalidateQueries({
+            queryKey: ['recipeDetails', id, user.id],
+          });
+          queryClient.invalidateQueries({
+            queryKey: ['pantryMatch', id, user.id],
+          });
+        }
       }
 
       lastFocusTimeRef.current = now;
-    }, [user?.id, fetchGroceryList, isAnyModalOpen]),
+    }, [user?.id, fetchGroceryList, isAnyModalOpen, id, queryClient]),
   );
 
   // Track modal state changes
@@ -326,18 +339,12 @@ export default function RecipeDetailScreen() {
     if (videoElement && isLoaded) {
       // Ensure video is loaded
       if (isScreenFocused) {
-        console.log(
-          `RecipeDetailScreen: Screen focused and video loaded, playing video for ID: ${id}`,
-        );
         videoElement
           .playAsync()
           .catch(e =>
             console.error(`RecipeDetailScreen ${id}: Focus play error:`, e),
           );
       } else {
-        console.log(
-          `RecipeDetailScreen: Screen NOT focused, pausing video for ID: ${id}`,
-        );
         videoElement
           .pauseAsync()
           .catch(e =>
@@ -349,9 +356,6 @@ export default function RecipeDetailScreen() {
 
   const handleLoad = async (status: AVPlaybackStatus) => {
     if (status.isLoaded) {
-      console.log(
-        `RecipeDetailScreen ${id}: Video loaded. Initial seek: ${initialSeekTime}ms. IsMuted: ${isMuted}`,
-      );
       if (videoRef.current) {
         if (initialSeekTime > 0) {
           // Set position but don't auto-play here; useEffect will handle it based on focus.
@@ -735,10 +739,6 @@ export default function RecipeDetailScreen() {
           }
 
           if (recipeDetails?.video_url) {
-            console.log(
-              'RecipeDetailScreen: Attempting to play video_url:',
-              recipeDetails.video_url,
-            );
             return (
               <View style={styles.videoContainer}>
                 <Video

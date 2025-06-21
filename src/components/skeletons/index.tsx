@@ -197,12 +197,20 @@ const skeletonStyles = StyleSheet.create({
  */
 export const PantryItemSkeleton = React.memo(() => (
   <View style={skeletonStyles.pantrySkeletonContainer}>
-    <View style={[skeletonStyles.skeleton, skeletonStyles.pantrySkeletonIcon]} />
+    <View
+      style={[skeletonStyles.skeleton, skeletonStyles.pantrySkeletonIcon]}
+    />
     <View style={skeletonStyles.pantrySkeletonContent}>
-      <View style={[skeletonStyles.skeleton, skeletonStyles.pantrySkeletonTitle]} />
-      <View style={[skeletonStyles.skeleton, skeletonStyles.pantrySkeletonSubtitle]} />
+      <View
+        style={[skeletonStyles.skeleton, skeletonStyles.pantrySkeletonTitle]}
+      />
+      <View
+        style={[skeletonStyles.skeleton, skeletonStyles.pantrySkeletonSubtitle]}
+      />
     </View>
-    <View style={[skeletonStyles.skeleton, skeletonStyles.pantrySkeletonActions]} />
+    <View
+      style={[skeletonStyles.skeleton, skeletonStyles.pantrySkeletonActions]}
+    />
   </View>
 ));
 PantryItemSkeleton.displayName = 'PantryItemSkeleton';
@@ -215,12 +223,22 @@ export const FeedItemSkeleton = React.memo(() => (
   <View style={skeletonStyles.feedSkeletonContainer}>
     <View style={[skeletonStyles.skeleton, skeletonStyles.feedSkeletonVideo]} />
     <View style={skeletonStyles.feedSkeletonOverlay}>
-      <View style={[skeletonStyles.skeleton, skeletonStyles.feedSkeletonProfile]} />
-      <View style={[skeletonStyles.skeleton, skeletonStyles.feedSkeletonTitle]} />
+      <View
+        style={[skeletonStyles.skeleton, skeletonStyles.feedSkeletonProfile]}
+      />
+      <View
+        style={[skeletonStyles.skeleton, skeletonStyles.feedSkeletonTitle]}
+      />
       <View style={skeletonStyles.feedSkeletonActions}>
-        <View style={[skeletonStyles.skeleton, skeletonStyles.feedSkeletonAction]} />
-        <View style={[skeletonStyles.skeleton, skeletonStyles.feedSkeletonAction]} />
-        <View style={[skeletonStyles.skeleton, skeletonStyles.feedSkeletonAction]} />
+        <View
+          style={[skeletonStyles.skeleton, skeletonStyles.feedSkeletonAction]}
+        />
+        <View
+          style={[skeletonStyles.skeleton, skeletonStyles.feedSkeletonAction]}
+        />
+        <View
+          style={[skeletonStyles.skeleton, skeletonStyles.feedSkeletonAction]}
+        />
       </View>
     </View>
   </View>
@@ -234,16 +252,32 @@ FeedItemSkeleton.displayName = 'FeedItemSkeleton';
 export const ProfileSkeleton = React.memo(() => (
   <View style={skeletonStyles.profileSkeletonContainer}>
     <View style={skeletonStyles.profileSkeletonHeader}>
-      <View style={[skeletonStyles.skeleton, skeletonStyles.profileSkeletonAvatar]} />
-      <View style={[skeletonStyles.skeleton, skeletonStyles.profileSkeletonName]} />
-      <View style={[skeletonStyles.skeleton, skeletonStyles.profileSkeletonBio]} />
+      <View
+        style={[skeletonStyles.skeleton, skeletonStyles.profileSkeletonAvatar]}
+      />
+      <View
+        style={[skeletonStyles.skeleton, skeletonStyles.profileSkeletonName]}
+      />
+      <View
+        style={[skeletonStyles.skeleton, skeletonStyles.profileSkeletonBio]}
+      />
     </View>
-    
+
     <View style={skeletonStyles.profileSkeletonStats}>
-      {[1, 2, 3].map((index) => (
+      {[1, 2, 3].map(index => (
         <View key={index} style={skeletonStyles.profileSkeletonStat}>
-          <View style={[skeletonStyles.skeleton, skeletonStyles.profileSkeletonStatNumber]} />
-          <View style={[skeletonStyles.skeleton, skeletonStyles.profileSkeletonStatLabel]} />
+          <View
+            style={[
+              skeletonStyles.skeleton,
+              skeletonStyles.profileSkeletonStatNumber,
+            ]}
+          />
+          <View
+            style={[
+              skeletonStyles.skeleton,
+              skeletonStyles.profileSkeletonStatLabel,
+            ]}
+          />
         </View>
       ))}
     </View>
@@ -255,74 +289,125 @@ ProfileSkeleton.displayName = 'ProfileSkeleton';
  * Recipe Grid Skeleton Component
  * Used while loading recipe grids
  */
-export const RecipeGridSkeleton = React.memo(({ itemCount = 6 }: { itemCount?: number }) => (
-  <View style={skeletonStyles.recipeGridSkeletonContainer}>
-    {Array(itemCount).fill(null).map((_, index) => (
-      <View key={index} style={skeletonStyles.recipeGridSkeletonItem}>
-        <View style={[skeletonStyles.skeleton, skeletonStyles.recipeGridSkeletonImage]} />
-        <View style={[skeletonStyles.skeleton, skeletonStyles.recipeGridSkeletonTitle]} />
-      </View>
-    ))}
-  </View>
-));
+export const RecipeGridSkeleton = React.memo(
+  ({ itemCount = 6 }: { itemCount?: number }) => (
+    <View style={skeletonStyles.recipeGridSkeletonContainer}>
+      {Array(itemCount)
+        .fill(null)
+        .map((_, index) => (
+          <View key={index} style={skeletonStyles.recipeGridSkeletonItem}>
+            <View
+              style={[
+                skeletonStyles.skeleton,
+                skeletonStyles.recipeGridSkeletonImage,
+              ]}
+            />
+            <View
+              style={[
+                skeletonStyles.skeleton,
+                skeletonStyles.recipeGridSkeletonTitle,
+              ]}
+            />
+          </View>
+        ))}
+    </View>
+  ),
+);
 RecipeGridSkeleton.displayName = 'RecipeGridSkeleton';
 
 /**
  * Search Results Skeleton Component
  * Used while loading search results
  */
-export const SearchResultsSkeleton = React.memo(({ itemCount = 5 }: { itemCount?: number }) => (
-  <View style={skeletonStyles.searchSkeletonContainer}>
-    {Array(itemCount).fill(null).map((_, index) => (
-      <View key={index} style={skeletonStyles.searchSkeletonItem}>
-        <View style={[skeletonStyles.skeleton, skeletonStyles.searchSkeletonImage]} />
-        <View style={skeletonStyles.searchSkeletonContent}>
-          <View style={[skeletonStyles.skeleton, skeletonStyles.searchSkeletonTitle]} />
-          <View style={[skeletonStyles.skeleton, skeletonStyles.searchSkeletonDescription]} />
-        </View>
-      </View>
-    ))}
-  </View>
-));
+export const SearchResultsSkeleton = React.memo(
+  ({ itemCount = 5 }: { itemCount?: number }) => (
+    <View style={skeletonStyles.searchSkeletonContainer}>
+      {Array(itemCount)
+        .fill(null)
+        .map((_, index) => (
+          <View key={index} style={skeletonStyles.searchSkeletonItem}>
+            <View
+              style={[
+                skeletonStyles.skeleton,
+                skeletonStyles.searchSkeletonImage,
+              ]}
+            />
+            <View style={skeletonStyles.searchSkeletonContent}>
+              <View
+                style={[
+                  skeletonStyles.skeleton,
+                  skeletonStyles.searchSkeletonTitle,
+                ]}
+              />
+              <View
+                style={[
+                  skeletonStyles.skeleton,
+                  skeletonStyles.searchSkeletonDescription,
+                ]}
+              />
+            </View>
+          </View>
+        ))}
+    </View>
+  ),
+);
 SearchResultsSkeleton.displayName = 'SearchResultsSkeleton';
 
 /**
  * Generic List Skeleton Component
  * Reusable skeleton for various list types
  */
-export const ListSkeleton = React.memo(({ 
-  itemCount = 5, 
-  itemHeight = 80,
-  showImage = true,
-  showSubtitle = true 
-}: {
-  itemCount?: number;
-  itemHeight?: number;
-  showImage?: boolean;
-  showSubtitle?: boolean;
-}) => (
-  <View>
-    {Array(itemCount).fill(null).map((_, index) => (
-      <View 
-        key={index} 
-        style={[
-          skeletonStyles.pantrySkeletonContainer,
-          { height: itemHeight }
-        ]}
-      >
-        {showImage && (
-          <View style={[skeletonStyles.skeleton, skeletonStyles.pantrySkeletonIcon]} />
-        )}
-        <View style={skeletonStyles.pantrySkeletonContent}>
-          <View style={[skeletonStyles.skeleton, skeletonStyles.pantrySkeletonTitle]} />
-          {showSubtitle && (
-            <View style={[skeletonStyles.skeleton, skeletonStyles.pantrySkeletonSubtitle]} />
-          )}
-        </View>
-      </View>
-    ))}
-  </View>
-));
+export const ListSkeleton = React.memo(
+  ({
+    itemCount = 5,
+    itemHeight = 80,
+    showImage = true,
+    showSubtitle = true,
+  }: {
+    itemCount?: number;
+    itemHeight?: number;
+    showImage?: boolean;
+    showSubtitle?: boolean;
+  }) => (
+    <View>
+      {Array(itemCount)
+        .fill(null)
+        .map((_, index) => (
+          <View
+            key={index}
+            style={[
+              skeletonStyles.pantrySkeletonContainer,
+              { height: itemHeight },
+            ]}>
+            {showImage && (
+              <View
+                style={[
+                  skeletonStyles.skeleton,
+                  skeletonStyles.pantrySkeletonIcon,
+                ]}
+              />
+            )}
+            <View style={skeletonStyles.pantrySkeletonContent}>
+              <View
+                style={[
+                  skeletonStyles.skeleton,
+                  skeletonStyles.pantrySkeletonTitle,
+                ]}
+              />
+              {showSubtitle && (
+                <View
+                  style={[
+                    skeletonStyles.skeleton,
+                    skeletonStyles.pantrySkeletonSubtitle,
+                  ]}
+                />
+              )}
+            </View>
+          </View>
+        ))}
+    </View>
+  ),
+);
 ListSkeleton.displayName = 'ListSkeleton';
 
 /**
@@ -332,8 +417,8 @@ ListSkeleton.displayName = 'ListSkeleton';
 export const TabsSkeleton = React.memo(() => (
   <View style={{ padding: 16 }}>
     <View style={{ flexDirection: 'row', marginBottom: 16 }}>
-      {[1, 2, 3].map((index) => (
-        <View 
+      {[1, 2, 3].map(index => (
+        <View
           key={index}
           style={[
             skeletonStyles.skeleton,
@@ -342,8 +427,8 @@ export const TabsSkeleton = React.memo(() => (
               height: 32,
               marginRight: 12,
               borderRadius: 16,
-            }
-          ]} 
+            },
+          ]}
         />
       ))}
     </View>
@@ -353,6 +438,4 @@ export const TabsSkeleton = React.memo(() => (
 TabsSkeleton.displayName = 'TabsSkeleton';
 
 // Export all skeleton components
-export {
-  skeletonStyles,
-};
+export { skeletonStyles };

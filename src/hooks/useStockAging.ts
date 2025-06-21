@@ -148,8 +148,10 @@ export const useStockAging = (userId?: string) => {
       console.log('[useStockAging] Fetching aging data for user:', userId);
 
       try {
-        console.log('[useStockAging] Attempting hybrid approach: RPC + full pantry data...');
-        
+        console.log(
+          '[useStockAging] Attempting hybrid approach: RPC + full pantry data...',
+        );
+
         // Fetch both aging data from RPC and full pantry data in parallel
         const [rpcResult, pantryResult] = await Promise.all([
           supabase.rpc('get_stock_aging', { p_user_id: userId }),
@@ -157,66 +159,95 @@ export const useStockAging = (userId?: string) => {
             .from('stock')
             .select('*')
             .eq('user_id', userId)
-            .order('created_at', { ascending: false })
+            .order('created_at', { ascending: false }),
         ]);
 
-        console.log('[useStockAging] RPC response:', { data: rpcResult.data, error: rpcResult.error });
-        console.log('[useStockAging] Pantry response:', { count: pantryResult.data?.length, error: pantryResult.error });
+        console.log('[useStockAging] RPC response:', {
+          data: rpcResult.data,
+          error: rpcResult.error,
+        });
+        console.log('[useStockAging] Pantry response:', {
+          count: pantryResult.data?.length,
+          error: pantryResult.error,
+        });
 
         // Check for errors
         if (rpcResult.error) {
-          console.warn('[useStockAging] RPC error, falling back to client-side calculation:', rpcResult.error);
+          console.warn(
+            '[useStockAging] RPC error, falling back to client-side calculation:',
+            rpcResult.error,
+          );
           throw rpcResult.error;
         }
 
         if (pantryResult.error) {
-          console.error('[useStockAging] Pantry data error:', pantryResult.error);
+          console.error(
+            '[useStockAging] Pantry data error:',
+            pantryResult.error,
+          );
           throw pantryResult.error;
         }
 
         // If we have both datasets, merge them
-        if (rpcResult.data && Array.isArray(rpcResult.data) && rpcResult.data.length > 0 && 
-            pantryResult.data && Array.isArray(pantryResult.data) && pantryResult.data.length > 0) {
-          
-          console.log('[useStockAging] Merging RPC aging data with full pantry data...');
-          
+        if (
+          rpcResult.data &&
+          Array.isArray(rpcResult.data) &&
+          rpcResult.data.length > 0 &&
+          pantryResult.data &&
+          Array.isArray(pantryResult.data) &&
+          pantryResult.data.length > 0
+        ) {
+          console.log(
+            '[useStockAging] Merging RPC aging data with full pantry data...',
+          );
+
           // Create a map of pantry items by ID for quick lookup
-          const pantryItemsMap = new Map(pantryResult.data.map(item => [item.id, item]));
-          
+          const pantryItemsMap = new Map(
+            pantryResult.data.map(item => [item.id, item]),
+          );
+
           // Merge aging data with full pantry item data
-          const mergedItems: StockAgingItem[] = rpcResult.data.map((agingItem: any) => {
-            const fullItem = pantryItemsMap.get(agingItem.id);
-            
-            if (!fullItem) {
-              console.warn(`[useStockAging] No matching pantry item found for aging item ${agingItem.id}`);
-              // Return aging item with defaults for missing fields
-              return {
-                ...agingItem,
-                quantity: 1,
-                unit: 'units',
-                description: '',
-                created_at: new Date().toISOString(), // Fallback
-                updated_at: new Date().toISOString(),
-                storage_location: 'cupboard',
+          const mergedItems: StockAgingItem[] = rpcResult.data.map(
+            (agingItem: any) => {
+              const fullItem = pantryItemsMap.get(agingItem.id);
+
+              if (!fullItem) {
+                console.warn(
+                  `[useStockAging] No matching pantry item found for aging item ${agingItem.id}`,
+                );
+                // Return aging item with defaults for missing fields
+                return {
+                  ...agingItem,
+                  quantity: 1,
+                  unit: 'units',
+                  description: '',
+                  created_at: new Date().toISOString(), // Fallback
+                  updated_at: new Date().toISOString(),
+                  storage_location: 'cupboard',
+                  age_description: generateAgeDescription(agingItem.days_old),
+                };
+              }
+
+              // Merge aging data with full item data
+              const mergedItem: StockAgingItem = {
+                ...fullItem, // Start with full item data (includes all missing fields)
+                ...agingItem, // Override with aging-specific data (age_group, days_old)
+                storage_location: validateStorageLocation(
+                  fullItem.storage_location,
+                ),
                 age_description: generateAgeDescription(agingItem.days_old),
+                // Preserve quantity tracking fields from full item data
+                quantity_added: fullItem.quantity_added,
+                previous_quantity: fullItem.previous_quantity,
               };
-            }
 
-            // Merge aging data with full item data
-            const mergedItem: StockAgingItem = {
-              ...fullItem, // Start with full item data (includes all missing fields)
-              ...agingItem, // Override with aging-specific data (age_group, days_old)
-              storage_location: validateStorageLocation(fullItem.storage_location),
-              age_description: generateAgeDescription(agingItem.days_old),
-              // Preserve quantity tracking fields from full item data
-              quantity_added: fullItem.quantity_added,
-              previous_quantity: fullItem.previous_quantity,
-            };
+              return mergedItem;
+            },
+          );
 
-            return mergedItem;
-          });
-
-          console.log(`[useStockAging] Successfully merged ${mergedItems.length} items`);
+          console.log(
+            `[useStockAging] Successfully merged ${mergedItems.length} items`,
+          );
           console.log('[useStockAging] Sample merged item:', {
             name: mergedItems[0]?.item_name,
             age_group: mergedItems[0]?.age_group,
@@ -233,12 +264,15 @@ export const useStockAging = (userId?: string) => {
         }
 
         // If RPC data is empty, fall back to client-side calculation
-        console.log('[useStockAging] RPC returned empty data, falling back to client-side calculation');
+        console.log(
+          '[useStockAging] RPC returned empty data, falling back to client-side calculation',
+        );
         throw new Error('RPC returned empty data');
-
       } catch (error) {
-        console.log('[useStockAging] Using fallback: fetching stock data and calculating aging client-side');
-        
+        console.log(
+          '[useStockAging] Using fallback: fetching stock data and calculating aging client-side',
+        );
+
         // Fallback to regular stock data with client-side aging calculations
         const { data: stockData, error: stockError } = await supabase
           .from('stock')
@@ -247,7 +281,10 @@ export const useStockAging = (userId?: string) => {
           .order('created_at', { ascending: false });
 
         if (stockError) {
-          console.error('[useStockAging] Error fetching stock data:', stockError);
+          console.error(
+            '[useStockAging] Error fetching stock data:',
+            stockError,
+          );
           throw stockError;
         }
 

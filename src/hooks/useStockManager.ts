@@ -53,7 +53,9 @@ const fetchUserSession = async () => {
 const fetchStockData = async (userId: string): Promise<StockItem[]> => {
   const { data, error } = await supabase
     .from('stock')
-    .select('id, item_name, quantity, unit, description, created_at, updated_at, quantity_added, previous_quantity')
+    .select(
+      'id, item_name, quantity, unit, description, created_at, updated_at, quantity_added, previous_quantity',
+    )
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 

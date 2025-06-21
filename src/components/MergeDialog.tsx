@@ -9,8 +9,14 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { DuplicateItem, DuplicateGroup } from '../services/DuplicateDetectionService';
-import { formatDetailedTimestamp, getMostRecentActivity } from '../utils/dateUtils';
+import {
+  DuplicateItem,
+  DuplicateGroup,
+} from '../services/DuplicateDetectionService';
+import {
+  formatDetailedTimestamp,
+  getMostRecentActivity,
+} from '../utils/dateUtils';
 
 interface MergeDialogProps {
   isVisible: boolean;
@@ -41,23 +47,31 @@ const MergeDialog: React.FC<MergeDialogProps> = ({
     if (items.length > 0) {
       // Get recommended unit (most common or first)
       const units = items.map(item => item.unit);
-      const unitCounts = units.reduce((acc, unit) => {
-        acc[unit] = (acc[unit] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-      
-      const recommendedUnit = Object.entries(unitCounts)
-        .sort(([,a], [,b]) => b - a)[0][0];
-      
+      const unitCounts = units.reduce(
+        (acc, unit) => {
+          acc[unit] = (acc[unit] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
+
+      const recommendedUnit = Object.entries(unitCounts).sort(
+        ([, a], [, b]) => b - a,
+      )[0][0];
+
       // Get recommended location (most common or first)
       const locations = items.map(item => item.storage_location);
-      const locationCounts = locations.reduce((acc, location) => {
-        acc[location] = (acc[location] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-      
-      const recommendedLocation = Object.entries(locationCounts)
-        .sort(([,a], [,b]) => b - a)[0][0];
+      const locationCounts = locations.reduce(
+        (acc, location) => {
+          acc[location] = (acc[location] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
+
+      const recommendedLocation = Object.entries(locationCounts).sort(
+        ([, a], [, b]) => b - a,
+      )[0][0];
 
       setSelectedUnit(recommendedUnit);
       setSelectedLocation(recommendedLocation);
@@ -78,10 +92,10 @@ const MergeDialog: React.FC<MergeDialogProps> = ({
 
   const getItemSummary = () => {
     if (items.length === 0) return '';
-    
+
     const itemName = items[0].item_name;
     const totalQuantity = getTotalQuantity();
-    
+
     return `${items.length} entries of "${itemName}" (${totalQuantity} total)`;
   };
 
@@ -91,28 +105,40 @@ const MergeDialog: React.FC<MergeDialogProps> = ({
     // Separate pending items from existing items
     const pendingItems = items.filter(item => item.id.startsWith('temp-'));
     const existingItems = items.filter(item => !item.id.startsWith('temp-'));
-    
+
     // Sort existing items by most recent activity
     const sortedExistingItems = existingItems.sort((a, b) => {
       const aActivity = getMostRecentActivity(a.created_at, a.updated_at);
       const bActivity = getMostRecentActivity(b.created_at, b.updated_at);
-      return new Date(bActivity.timestamp).getTime() - new Date(aActivity.timestamp).getTime();
+      return (
+        new Date(bActivity.timestamp).getTime() -
+        new Date(aActivity.timestamp).getTime()
+      );
     });
 
     return (
       <View style={styles.itemDetailsSection}>
         <Text style={styles.itemDetailsSectionTitle}>Item Details</Text>
-        
+
         {/* Existing Items */}
         {sortedExistingItems.map((item, index) => {
-          const activityInfo = getMostRecentActivity(item.created_at, item.updated_at);
+          const activityInfo = getMostRecentActivity(
+            item.created_at,
+            item.updated_at,
+          );
           return (
             <View key={item.id} style={styles.itemDetailRow}>
               <View style={styles.itemDetailIcon}>
-                <Ionicons 
-                  name={activityInfo.label === 'Updated' ? 'refresh-circle' : 'add-circle'} 
-                  size={16} 
-                  color={activityInfo.label === 'Updated' ? '#f59e0b' : '#10b981'} 
+                <Ionicons
+                  name={
+                    activityInfo.label === 'Updated'
+                      ? 'refresh-circle'
+                      : 'add-circle'
+                  }
+                  size={16}
+                  color={
+                    activityInfo.label === 'Updated' ? '#f59e0b' : '#10b981'
+                  }
                 />
               </View>
               <View style={styles.itemDetailContent}>
@@ -125,7 +151,8 @@ const MergeDialog: React.FC<MergeDialogProps> = ({
                   </Text>
                 </View>
                 <Text style={styles.itemDetailTimestamp}>
-                  {activityInfo.label}: {formatDetailedTimestamp(activityInfo.timestamp)}
+                  {activityInfo.label}:{' '}
+                  {formatDetailedTimestamp(activityInfo.timestamp)}
                 </Text>
               </View>
             </View>
@@ -133,8 +160,10 @@ const MergeDialog: React.FC<MergeDialogProps> = ({
         })}
 
         {/* Pending Item (new item being added) */}
-        {pendingItems.map((item) => (
-          <View key={item.id} style={[styles.itemDetailRow, styles.pendingItemRow]}>
+        {pendingItems.map(item => (
+          <View
+            key={item.id}
+            style={[styles.itemDetailRow, styles.pendingItemRow]}>
             <View style={styles.itemDetailIcon}>
               <Ionicons name="add-circle" size={16} color="#3b82f6" />
             </View>
@@ -150,9 +179,7 @@ const MergeDialog: React.FC<MergeDialogProps> = ({
                   <Text style={styles.newItemBadgeText}>New</Text>
                 </View>
               </View>
-              <Text style={styles.itemDetailTimestamp}>
-                Being added now
-              </Text>
+              <Text style={styles.itemDetailTimestamp}>Being added now</Text>
             </View>
           </View>
         ))}
@@ -162,31 +189,31 @@ const MergeDialog: React.FC<MergeDialogProps> = ({
 
   const handleConfirm = () => {
     if (!selectedUnit || !selectedLocation) {
-      Alert.alert('Selection Required', 'Please select both unit and location.');
+      Alert.alert(
+        'Selection Required',
+        'Please select both unit and location.',
+      );
       return;
     }
-    
+
     onConfirm(selectedUnit, selectedLocation);
   };
 
   const renderUnitOption = (unit: string) => {
     const isSelected = selectedUnit === unit;
     const isRecommended = unit === getUniqueUnits()[0]; // First unit is recommended
-    
+
     return (
       <TouchableOpacity
         key={unit}
-        style={[
-          styles.optionButton,
-          isSelected && styles.selectedOption,
-        ]}
-        onPress={() => setSelectedUnit(unit)}
-      >
+        style={[styles.optionButton, isSelected && styles.selectedOption]}
+        onPress={() => setSelectedUnit(unit)}>
         <View style={styles.optionContent}>
-          <Text style={[
-            styles.optionText,
-            isSelected && styles.selectedOptionText,
-          ]}>
+          <Text
+            style={[
+              styles.optionText,
+              isSelected && styles.selectedOptionText,
+            ]}>
             {unit}
           </Text>
           {isRecommended && (
@@ -195,9 +222,7 @@ const MergeDialog: React.FC<MergeDialogProps> = ({
             </View>
           )}
         </View>
-        {isSelected && (
-          <Ionicons name="checkmark" size={20} color="#2563eb" />
-        )}
+        {isSelected && <Ionicons name="checkmark" size={20} color="#2563eb" />}
       </TouchableOpacity>
     );
   };
@@ -205,21 +230,18 @@ const MergeDialog: React.FC<MergeDialogProps> = ({
   const renderLocationOption = (location: string) => {
     const isSelected = selectedLocation === location;
     const isRecommended = location === getUniqueLocations()[0]; // First location is recommended
-    
+
     return (
       <TouchableOpacity
         key={location}
-        style={[
-          styles.optionButton,
-          isSelected && styles.selectedOption,
-        ]}
-        onPress={() => setSelectedLocation(location)}
-      >
+        style={[styles.optionButton, isSelected && styles.selectedOption]}
+        onPress={() => setSelectedLocation(location)}>
         <View style={styles.optionContent}>
-          <Text style={[
-            styles.optionText,
-            isSelected && styles.selectedOptionText,
-          ]}>
+          <Text
+            style={[
+              styles.optionText,
+              isSelected && styles.selectedOptionText,
+            ]}>
             📍 {location}
           </Text>
           {isRecommended && (
@@ -228,9 +250,7 @@ const MergeDialog: React.FC<MergeDialogProps> = ({
             </View>
           )}
         </View>
-        {isSelected && (
-          <Ionicons name="checkmark" size={20} color="#2563eb" />
-        )}
+        {isSelected && <Ionicons name="checkmark" size={20} color="#2563eb" />}
       </TouchableOpacity>
     );
   };
@@ -240,8 +260,7 @@ const MergeDialog: React.FC<MergeDialogProps> = ({
       visible={isVisible}
       transparent
       animationType="fade"
-      onRequestClose={onCancel}
-    >
+      onRequestClose={onCancel}>
       <View style={styles.overlay}>
         <View style={styles.dialog}>
           {/* Header */}
@@ -287,21 +306,23 @@ const MergeDialog: React.FC<MergeDialogProps> = ({
             <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
-            
+
             {onKeepBoth && (
-              <TouchableOpacity style={styles.keepBothButton} onPress={onKeepBoth}>
+              <TouchableOpacity
+                style={styles.keepBothButton}
+                onPress={onKeepBoth}>
                 <Text style={styles.keepBothButtonText}>Keep Both</Text>
               </TouchableOpacity>
             )}
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={[
                 styles.confirmButton,
-                (!selectedUnit || !selectedLocation || isLoading) && styles.disabledButton,
-              ]} 
+                (!selectedUnit || !selectedLocation || isLoading) &&
+                  styles.disabledButton,
+              ]}
               onPress={handleConfirm}
-              disabled={!selectedUnit || !selectedLocation || isLoading}
-            >
+              disabled={!selectedUnit || !selectedLocation || isLoading}>
               {isLoading ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
@@ -485,16 +506,16 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 12,
   },
-     itemDetailRow: {
-     flexDirection: 'row',
-     alignItems: 'center',
-     padding: 12,
-     borderWidth: 1,
-     borderColor: '#e5e7eb',
-     borderRadius: 8,
-     marginBottom: 8,
-     backgroundColor: '#ffffff',
-   },
+  itemDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: '#ffffff',
+  },
   itemDetailIcon: {
     marginRight: 12,
   },
@@ -511,21 +532,21 @@ const styles = StyleSheet.create({
     color: '#374151',
     fontWeight: '500',
   },
-     itemDetailLocation: {
-     fontSize: 14,
-     color: '#6b7280',
-     fontWeight: '500',
-     marginLeft: 8,
-   },
+  itemDetailLocation: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
+    marginLeft: 8,
+  },
   itemDetailTimestamp: {
     fontSize: 12,
     color: '#6b7280',
     fontWeight: '500',
   },
-     pendingItemRow: {
-     backgroundColor: '#f0f9ff',
-     borderColor: '#3b82f6',
-   },
+  pendingItemRow: {
+    backgroundColor: '#f0f9ff',
+    borderColor: '#3b82f6',
+  },
   newItemBadge: {
     backgroundColor: '#3b82f6',
     paddingHorizontal: 4,
@@ -540,4 +561,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default MergeDialog; 
+export default MergeDialog;

@@ -147,13 +147,13 @@ export const parseIngredientsData = (
               return parsed;
             }
 
-            // Check if it's already in the correct format
+            // Check if it's already in the correct format (DATABASE FORMAT)
             if (
               ingredient.quantity !== undefined ||
               ingredient.unit !== undefined ||
               ingredient.ingredient !== undefined
             ) {
-              return {
+              const result = {
                 quantity: String(ingredient.quantity || ''),
                 unit: String(ingredient.unit || ''),
                 ingredient: String(
@@ -161,6 +161,7 @@ export const parseIngredientsData = (
                 ),
                 original: JSON.stringify(ingredient),
               };
+              return result;
             }
 
             // If it's an object but not in our format, convert to string and parse

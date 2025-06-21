@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 /**
  * Custom hook for debouncing values to improve performance
  * Used for search inputs and other frequently changing values
- * 
+ *
  * @param value - The value to debounce
  * @param delay - Delay in milliseconds (default: 300ms)
  * @returns The debounced value
@@ -27,7 +27,7 @@ export const useDebouncedValue = <T>(value: T, delay: number = 300): T => {
 /**
  * Enhanced search hook with instant feedback and optimized filtering
  * Provides debounced search with loading states for better UX
- * 
+ *
  * @param items - Array of items to search through
  * @param searchKey - Key to search in each item
  * @param debounceDelay - Debounce delay in milliseconds (default: 150ms)
@@ -36,14 +36,14 @@ export const useDebouncedValue = <T>(value: T, delay: number = 300): T => {
 export const useOptimizedSearch = <T extends Record<string, any>>(
   items: T[],
   searchKey: keyof T,
-  debounceDelay: number = 150
+  debounceDelay: number = 150,
 ) => {
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedQuery = useDebouncedValue(searchQuery, debounceDelay);
 
   const filteredItems = useMemo(() => {
     if (!debouncedQuery.trim()) return items;
-    
+
     const query = debouncedQuery.toLowerCase();
     return items.filter(item => {
       const searchValue = item[searchKey];
@@ -67,7 +67,7 @@ export const useOptimizedSearch = <T extends Record<string, any>>(
 /**
  * Multi-field search hook for complex search scenarios
  * Searches across multiple fields with weighted relevance
- * 
+ *
  * @param items - Array of items to search through
  * @param searchFields - Array of fields to search with optional weights
  * @param debounceDelay - Debounce delay in milliseconds
@@ -76,16 +76,16 @@ export const useOptimizedSearch = <T extends Record<string, any>>(
 export const useMultiFieldSearch = <T extends Record<string, any>>(
   items: T[],
   searchFields: Array<{ key: keyof T; weight?: number }>,
-  debounceDelay: number = 150
+  debounceDelay: number = 150,
 ) => {
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedQuery = useDebouncedValue(searchQuery, debounceDelay);
 
   const filteredItems = useMemo(() => {
     if (!debouncedQuery.trim()) return items;
-    
+
     const query = debouncedQuery.toLowerCase();
-    
+
     return items
       .map(item => {
         let relevanceScore = 0;

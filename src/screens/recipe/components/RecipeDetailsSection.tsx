@@ -1,10 +1,5 @@
 import React, { useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-} from 'react-native';
+import { View, Text, StyleSheet, TextInput } from 'react-native';
 import { OptimizedCollapsibleCard } from './OptimizedCollapsibleCard';
 
 const BRAND_PRIMARY = '#10B981';
@@ -29,13 +24,19 @@ const OptimizedBasicDetails = React.memo<{
   description: string;
   onUpdateFormData: (field: string, value: any) => void;
 }>(({ title, description, onUpdateFormData }) => {
-  const handleTitleChange = useCallback((value: string) => {
-    onUpdateFormData('title', value);
-  }, [onUpdateFormData]);
+  const handleTitleChange = useCallback(
+    (value: string) => {
+      onUpdateFormData('title', value);
+    },
+    [onUpdateFormData],
+  );
 
-  const handleDescriptionChange = useCallback((value: string) => {
-    onUpdateFormData('description', value);
-  }, [onUpdateFormData]);
+  const handleDescriptionChange = useCallback(
+    (value: string) => {
+      onUpdateFormData('description', value);
+    },
+    [onUpdateFormData],
+  );
 
   return (
     <OptimizedCollapsibleCard
@@ -94,17 +95,26 @@ const OptimizedTimings = React.memo<{
   servings: string;
   onUpdateFormData: (field: string, value: any) => void;
 }>(({ prepTimeMinutes, cookTimeMinutes, servings, onUpdateFormData }) => {
-  const handlePrepTimeChange = useCallback((value: string) => {
-    onUpdateFormData('prepTimeMinutes', value);
-  }, [onUpdateFormData]);
+  const handlePrepTimeChange = useCallback(
+    (value: string) => {
+      onUpdateFormData('prepTimeMinutes', value);
+    },
+    [onUpdateFormData],
+  );
 
-  const handleCookTimeChange = useCallback((value: string) => {
-    onUpdateFormData('cookTimeMinutes', value);
-  }, [onUpdateFormData]);
+  const handleCookTimeChange = useCallback(
+    (value: string) => {
+      onUpdateFormData('cookTimeMinutes', value);
+    },
+    [onUpdateFormData],
+  );
 
-  const handleServingsChange = useCallback((value: string) => {
-    onUpdateFormData('servings', value);
-  }, [onUpdateFormData]);
+  const handleServingsChange = useCallback(
+    (value: string) => {
+      onUpdateFormData('servings', value);
+    },
+    [onUpdateFormData],
+  );
 
   return (
     <OptimizedCollapsibleCard title="Timings & Servings" icon="clock">
@@ -134,26 +144,25 @@ const OptimizedTimings = React.memo<{
 OptimizedTimings.displayName = 'OptimizedTimings';
 
 // Main RecipeDetailsSection Component
-export const RecipeDetailsSection = React.memo<RecipeDetailsSectionProps>(({
-  formData,
-  onUpdateFormData,
-}) => {
-  return (
-    <>
-      <OptimizedBasicDetails
-        title={formData.title}
-        description={formData.description}
-        onUpdateFormData={onUpdateFormData}
-      />
-      <OptimizedTimings
-        prepTimeMinutes={formData.prepTimeMinutes}
-        cookTimeMinutes={formData.cookTimeMinutes}
-        servings={formData.servings}
-        onUpdateFormData={onUpdateFormData}
-      />
-    </>
-  );
-});
+export const RecipeDetailsSection = React.memo<RecipeDetailsSectionProps>(
+  ({ formData, onUpdateFormData }) => {
+    return (
+      <>
+        <OptimizedBasicDetails
+          title={formData.title}
+          description={formData.description}
+          onUpdateFormData={onUpdateFormData}
+        />
+        <OptimizedTimings
+          prepTimeMinutes={formData.prepTimeMinutes}
+          cookTimeMinutes={formData.cookTimeMinutes}
+          servings={formData.servings}
+          onUpdateFormData={onUpdateFormData}
+        />
+      </>
+    );
+  },
+);
 
 RecipeDetailsSection.displayName = 'RecipeDetailsSection';
 
@@ -216,4 +225,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default RecipeDetailsSection; 
+export default RecipeDetailsSection;

@@ -101,7 +101,7 @@ export const useEditableRecipeDetails = (
           : null,
         ingredients: Array.isArray(rawRecipe.ingredients)
           ? rawRecipe.ingredients.map((ing: any) => ({
-              name: String(ing.name ?? ''),
+              name: String(ing.ingredient ?? ing.name ?? ''), // FIX: Map database 'ingredient' field to display 'name' field
               quantity: String(ing.quantity ?? ''),
               unit: String(ing.unit ?? ''),
             }))
@@ -135,7 +135,11 @@ export const useEditableRecipeDetails = (
       return formattedRecipe;
     },
     enabled: !!recipeId && !!userId,
-    staleTime: 1 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes - prevent unnecessary refetching
+    gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache longer
+    retry: 1, // Only retry once to prevent multiple requests
+    refetchOnWindowFocus: false, // Don't refetch when window gains focus
+    refetchOnMount: true, // Always fetch fresh data when component mounts
   });
 
   return {

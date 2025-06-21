@@ -10,8 +10,8 @@ const ACTIVE_COLOR = '#10b981';
 // Helper function to detect mixed batches
 const isMixedBatches = (item: PantryItem): boolean => {
   return !!(
-    item.quantity_added !== null && 
-    item.quantity_added !== undefined && 
+    item.quantity_added !== null &&
+    item.quantity_added !== undefined &&
     item.quantity_added !== 0 &&
     item.previous_quantity !== null &&
     item.previous_quantity !== undefined &&

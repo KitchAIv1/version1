@@ -1,11 +1,5 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Image,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { OptimizedCollapsibleCard } from './OptimizedCollapsibleCard';
 
@@ -16,70 +10,75 @@ interface EditThumbnailSectionProps {
   onSelectThumbnail: () => void;
 }
 
-export const EditThumbnailSection: React.FC<EditThumbnailSectionProps> = React.memo(({
-  currentThumbnailUrl,
-  newLocalThumbnailUri,
-  compressionInfo,
-  onSelectThumbnail,
-}) => {
-  const displayUri = newLocalThumbnailUri || currentThumbnailUrl;
+export const EditThumbnailSection: React.FC<EditThumbnailSectionProps> =
+  React.memo(
+    ({
+      currentThumbnailUrl,
+      newLocalThumbnailUri,
+      compressionInfo,
+      onSelectThumbnail,
+    }) => {
+      const displayUri = newLocalThumbnailUri || currentThumbnailUrl;
 
-  return (
-    <OptimizedCollapsibleCard title="Thumbnail" icon="image">
-      <View style={styles.thumbnailContainer}>
-        {displayUri ? (
-          <View style={styles.imageContainer}>
-            <Image
-              source={{ uri: displayUri }}
-              style={styles.thumbnailPreview}
-              resizeMode="cover"
-            />
-            <View style={styles.imageOverlay}>
-              <TouchableOpacity
-                style={styles.changeButton}
-                onPress={onSelectThumbnail}
-                activeOpacity={0.8}>
-                <Feather name="camera" size={16} color="#fff" />
-                <Text style={styles.changeButtonText}>Change</Text>
-              </TouchableOpacity>
-            </View>
+      return (
+        <OptimizedCollapsibleCard title="Thumbnail" icon="image">
+          <View style={styles.thumbnailContainer}>
+            {displayUri ? (
+              <View style={styles.imageContainer}>
+                <Image
+                  source={{ uri: displayUri }}
+                  style={styles.thumbnailPreview}
+                  resizeMode="cover"
+                />
+                <View style={styles.imageOverlay}>
+                  <TouchableOpacity
+                    style={styles.changeButton}
+                    onPress={onSelectThumbnail}
+                    activeOpacity={0.8}>
+                    <Feather name="camera" size={16} color="#fff" />
+                    <Text style={styles.changeButtonText}>Change</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.thumbnailPlaceholder}>
+                <Feather name="image" size={48} color="#9ca3af" />
+                <Text style={styles.placeholderText}>
+                  No thumbnail selected
+                </Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.selectButton}
+              onPress={onSelectThumbnail}
+              activeOpacity={0.8}>
+              <Feather
+                name={displayUri ? 'edit-2' : 'plus'}
+                size={20}
+                color="#fff"
+                style={{ marginRight: 8 }}
+              />
+              <Text style={styles.selectButtonText}>
+                {displayUri ? 'Change Thumbnail' : 'Select Thumbnail'}
+              </Text>
+            </TouchableOpacity>
+
+            {compressionInfo && (
+              <View style={styles.compressionInfoContainer}>
+                <Feather name="check-circle" size={14} color="#10B981" />
+                <Text style={styles.compressionInfo}>{compressionInfo}</Text>
+              </View>
+            )}
+
+            <Text style={styles.helpText}>
+              Recommended: 16:9 aspect ratio, max 5MB
+            </Text>
           </View>
-        ) : (
-          <View style={styles.thumbnailPlaceholder}>
-            <Feather name="image" size={48} color="#9ca3af" />
-            <Text style={styles.placeholderText}>No thumbnail selected</Text>
-          </View>
-        )}
-        
-        <TouchableOpacity
-          style={styles.selectButton}
-          onPress={onSelectThumbnail}
-          activeOpacity={0.8}>
-          <Feather
-            name={displayUri ? "edit-2" : "plus"}
-            size={20}
-            color="#fff"
-            style={{ marginRight: 8 }}
-          />
-          <Text style={styles.selectButtonText}>
-            {displayUri ? 'Change Thumbnail' : 'Select Thumbnail'}
-          </Text>
-        </TouchableOpacity>
-        
-        {compressionInfo && (
-          <View style={styles.compressionInfoContainer}>
-            <Feather name="check-circle" size={14} color="#10B981" />
-            <Text style={styles.compressionInfo}>{compressionInfo}</Text>
-          </View>
-        )}
-        
-        <Text style={styles.helpText}>
-          Recommended: 16:9 aspect ratio, max 5MB
-        </Text>
-      </View>
-    </OptimizedCollapsibleCard>
+        </OptimizedCollapsibleCard>
+      );
+    },
   );
-});
 
 EditThumbnailSection.displayName = 'EditThumbnailSection';
 
@@ -167,4 +166,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default EditThumbnailSection; 
+export default EditThumbnailSection;

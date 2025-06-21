@@ -18,7 +18,11 @@ interface Ingredient {
 interface EditIngredientsSectionProps {
   ingredients: Ingredient[];
   ingredientCount: number;
-  onIngredientChange: (index: number, field: keyof Ingredient, value: string) => void;
+  onIngredientChange: (
+    index: number,
+    field: keyof Ingredient,
+    value: string,
+  ) => void;
   onAddIngredient: () => void;
   onRemoveIngredient: (index: number) => void;
 }
@@ -26,110 +30,121 @@ interface EditIngredientsSectionProps {
 const IngredientRow: React.FC<{
   ingredient: Ingredient;
   index: number;
-  onIngredientChange: (index: number, field: keyof Ingredient, value: string) => void;
+  onIngredientChange: (
+    index: number,
+    field: keyof Ingredient,
+    value: string,
+  ) => void;
   onRemoveIngredient: (index: number) => void;
   canRemove: boolean;
-}> = React.memo(({ ingredient, index, onIngredientChange, onRemoveIngredient, canRemove }) => (
-  <View style={styles.ingredientRow}>
-    <View style={styles.ingredientNumber}>
-      <Text style={styles.ingredientNumberText}>{index + 1}</Text>
-    </View>
-    
-    <View style={styles.ingredientInputs}>
-      <TextInput
-        placeholder="Ingredient name"
-        value={ingredient.name}
-        onChangeText={(value) => onIngredientChange(index, 'name', value)}
-        style={styles.ingredientNameInput}
-        placeholderTextColor="#9ca3af"
-        maxLength={50}
-      />
-      
-      <View style={styles.quantityUnitRow}>
-        <TextInput
-          placeholder="Qty"
-          value={ingredient.quantity}
-          onChangeText={(value) => onIngredientChange(index, 'quantity', value)}
-          style={styles.quantityInput}
-          keyboardType="numeric"
-          placeholderTextColor="#9ca3af"
-          maxLength={10}
-        />
-        
-        <TextInput
-          placeholder="Unit"
-          value={ingredient.unit}
-          onChangeText={(value) => onIngredientChange(index, 'unit', value)}
-          style={styles.unitInput}
-          placeholderTextColor="#9ca3af"
-          maxLength={15}
-        />
+}> = React.memo(
+  ({
+    ingredient,
+    index,
+    onIngredientChange,
+    onRemoveIngredient,
+    canRemove,
+  }) => (
+    <View style={styles.ingredientRow}>
+      <View style={styles.ingredientNumber}>
+        <Text style={styles.ingredientNumberText}>{index + 1}</Text>
       </View>
+
+      <View style={styles.ingredientInputs}>
+        <TextInput
+          placeholder="Ingredient name"
+          value={ingredient.name}
+          onChangeText={value => onIngredientChange(index, 'name', value)}
+          style={styles.ingredientNameInput}
+          placeholderTextColor="#9ca3af"
+          maxLength={50}
+        />
+
+        <View style={styles.quantityUnitRow}>
+          <TextInput
+            placeholder="Qty"
+            value={ingredient.quantity}
+            onChangeText={value => onIngredientChange(index, 'quantity', value)}
+            style={styles.quantityInput}
+            keyboardType="numeric"
+            placeholderTextColor="#9ca3af"
+            maxLength={10}
+          />
+
+          <TextInput
+            placeholder="Unit"
+            value={ingredient.unit}
+            onChangeText={value => onIngredientChange(index, 'unit', value)}
+            style={styles.unitInput}
+            placeholderTextColor="#9ca3af"
+            maxLength={15}
+          />
+        </View>
+      </View>
+
+      <TouchableOpacity
+        onPress={() => onRemoveIngredient(index)}
+        style={[styles.removeButton, !canRemove && styles.removeButtonDisabled]}
+        disabled={!canRemove}
+        activeOpacity={0.7}>
+        <Feather
+          name="trash-2"
+          size={18}
+          color={canRemove ? '#ef4444' : '#d1d5db'}
+        />
+      </TouchableOpacity>
     </View>
-    
-    <TouchableOpacity
-      onPress={() => onRemoveIngredient(index)}
-      style={[
-        styles.removeButton,
-        !canRemove && styles.removeButtonDisabled,
-      ]}
-      disabled={!canRemove}
-      activeOpacity={0.7}>
-      <Feather
-        name="trash-2"
-        size={18}
-        color={canRemove ? "#ef4444" : "#d1d5db"}
-      />
-    </TouchableOpacity>
-  </View>
-));
+  ),
+);
 
 IngredientRow.displayName = 'IngredientRow';
 
-export const EditIngredientsSection: React.FC<EditIngredientsSectionProps> = React.memo(({
-  ingredients,
-  ingredientCount,
-  onIngredientChange,
-  onAddIngredient,
-  onRemoveIngredient,
-}) => {
-  const canRemoveIngredients = ingredients.length > 1;
+export const EditIngredientsSection: React.FC<EditIngredientsSectionProps> =
+  React.memo(
+    ({
+      ingredients,
+      ingredientCount,
+      onIngredientChange,
+      onAddIngredient,
+      onRemoveIngredient,
+    }) => {
+      const canRemoveIngredients = ingredients.length > 1;
 
-  return (
-    <OptimizedCollapsibleCard 
-      title={`Ingredients (${ingredientCount})`} 
-      icon="list"
-    >
-      <View style={styles.ingredientsContainer}>
-        {ingredients.map((ingredient, index) => (
-          <IngredientRow
-            key={index}
-            ingredient={ingredient}
-            index={index}
-            onIngredientChange={onIngredientChange}
-            onRemoveIngredient={onRemoveIngredient}
-            canRemove={canRemoveIngredients}
-          />
-        ))}
-        
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={onAddIngredient}
-          activeOpacity={0.8}>
-          <Feather name="plus-circle" size={20} color="#10B981" />
-          <Text style={styles.addButtonText}>Add Ingredient</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.helpContainer}>
-          <Feather name="info" size={14} color="#6b7280" />
-          <Text style={styles.helpText}>
-            Be specific with quantities and units (e.g., "2 cups flour")
-          </Text>
-        </View>
-      </View>
-    </OptimizedCollapsibleCard>
+      return (
+        <OptimizedCollapsibleCard
+          title={`Ingredients (${ingredientCount})`}
+          icon="list">
+          <View style={styles.ingredientsContainer}>
+            {ingredients.map((ingredient, index) => (
+              <IngredientRow
+                key={index}
+                ingredient={ingredient}
+                index={index}
+                onIngredientChange={onIngredientChange}
+                onRemoveIngredient={onRemoveIngredient}
+                canRemove={canRemoveIngredients}
+              />
+            ))}
+
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={onAddIngredient}
+              activeOpacity={0.8}>
+              <Feather name="plus-circle" size={20} color="#10B981" />
+              <Text style={styles.addButtonText}>Add Ingredient</Text>
+            </TouchableOpacity>
+
+            <View style={styles.helpContainer}>
+              <Feather name="info" size={14} color="#6b7280" />
+              <Text style={styles.helpText}>
+                Be specific with quantities and units (e.g., "2 cups flour")
+              </Text>
+            </View>
+          </View>
+        </OptimizedCollapsibleCard>
+      );
+    },
   );
-});
 
 EditIngredientsSection.displayName = 'EditIngredientsSection';
 
@@ -234,4 +249,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default EditIngredientsSection; 
+export default EditIngredientsSection;

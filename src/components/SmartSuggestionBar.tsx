@@ -40,11 +40,13 @@ const SmartSuggestionBar: React.FC<SmartSuggestionBarProps> = ({
 
   console.log('[SmartSuggestionBar] 🎭 Render with props:', {
     isVisible,
-    duplicateGroup: duplicateGroup ? {
-      itemName: duplicateGroup.itemName,
-      totalCount: duplicateGroup.totalCount,
-      suggestedAction: duplicateGroup.suggestedAction
-    } : null
+    duplicateGroup: duplicateGroup
+      ? {
+          itemName: duplicateGroup.itemName,
+          totalCount: duplicateGroup.totalCount,
+          suggestedAction: duplicateGroup.suggestedAction,
+        }
+      : null,
   });
 
   useEffect(() => {
@@ -75,30 +77,29 @@ const SmartSuggestionBar: React.FC<SmartSuggestionBarProps> = ({
         console.log('[SmartSuggestionBar] ⏰ Clearing auto-dismiss timer');
         clearTimeout(timer);
       };
-    } else {
-      // Slide up animation
-      Animated.parallel([
-        Animated.spring(slideAnim, {
-          toValue: -100,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
     }
+    // Slide up animation
+    Animated.parallel([
+      Animated.spring(slideAnim, {
+        toValue: -100,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, [isVisible, duplicateGroup, slideAnim, opacityAnim, onDismiss]);
 
   if (!duplicateGroup) return null;
 
   const getMessage = () => {
     const count = duplicateGroup.totalCount;
-    const itemName = duplicateGroup.itemName;
-    
+    const { itemName } = duplicateGroup;
+
     if (count === 2) {
       return `You already have another entry for "${itemName}".`;
     }
@@ -107,12 +108,12 @@ const SmartSuggestionBar: React.FC<SmartSuggestionBarProps> = ({
 
   const getActionButtons = () => {
     const { suggestedAction, items } = duplicateGroup;
-    
+
     if (suggestedAction === 'merge' && items.length === 2) {
       // Show merge option for 2 compatible items
       const locations = [...new Set(items.map(item => item.storage_location))];
       const primaryLocation = locations[0];
-      
+
       return (
         <>
           <TouchableOpacity style={styles.primaryButton} onPress={onMerge}>
@@ -130,7 +131,7 @@ const SmartSuggestionBar: React.FC<SmartSuggestionBarProps> = ({
         </>
       );
     }
-    
+
     // Default actions for review cases
     return (
       <>
@@ -156,8 +157,7 @@ const SmartSuggestionBar: React.FC<SmartSuggestionBarProps> = ({
           transform: [{ translateY: slideAnim }],
           opacity: opacityAnim,
         },
-      ]}
-    >
+      ]}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.content}>
           {/* Message */}
@@ -169,9 +169,11 @@ const SmartSuggestionBar: React.FC<SmartSuggestionBarProps> = ({
           {/* Action Buttons */}
           <View style={styles.actionsContainer}>
             {getActionButtons()}
-            
+
             {/* Keep Both Button */}
-            <TouchableOpacity style={styles.tertiaryButton} onPress={onKeepBoth}>
+            <TouchableOpacity
+              style={styles.tertiaryButton}
+              onPress={onKeepBoth}>
               <Text style={styles.tertiaryButtonText}>Keep Both</Text>
             </TouchableOpacity>
 
@@ -268,4 +270,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SmartSuggestionBar; 
+export default SmartSuggestionBar;

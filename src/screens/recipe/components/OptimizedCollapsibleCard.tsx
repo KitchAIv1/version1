@@ -18,80 +18,77 @@ interface OptimizedCollapsibleCardProps {
   icon?: string;
 }
 
-export const OptimizedCollapsibleCard = React.memo<OptimizedCollapsibleCardProps>(({
-  title,
-  children,
-  defaultCollapsed = false,
-  icon,
-}) => {
-  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
-  const animatedHeight = useMemo(() => new Animated.Value(defaultCollapsed ? 0 : 1), [defaultCollapsed]);
+export const OptimizedCollapsibleCard =
+  React.memo<OptimizedCollapsibleCardProps>(
+    ({ title, children, defaultCollapsed = false, icon }) => {
+      const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
+      const animatedHeight = useMemo(
+        () => new Animated.Value(defaultCollapsed ? 0 : 1),
+        [defaultCollapsed],
+      );
 
-  useEffect(() => {
-    Animated.timing(animatedHeight, {
-      toValue: isCollapsed ? 0 : 1,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
-  }, [isCollapsed, animatedHeight]);
+      useEffect(() => {
+        Animated.timing(animatedHeight, {
+          toValue: isCollapsed ? 0 : 1,
+          duration: 300,
+          useNativeDriver: false,
+        }).start();
+      }, [isCollapsed, animatedHeight]);
 
-  const toggleCollapsed = useCallback(() => {
-    setIsCollapsed(prev => !prev);
-  }, []);
+      const toggleCollapsed = useCallback(() => {
+        setIsCollapsed(prev => !prev);
+      }, []);
 
-  const headerStyle = useMemo(() => [
-    styles.cardHeader,
-    !isCollapsed && styles.activeCardHeader,
-  ], [isCollapsed]);
+      const headerStyle = useMemo(
+        () => [styles.cardHeader, !isCollapsed && styles.activeCardHeader],
+        [isCollapsed],
+      );
 
-  const titleStyle = useMemo(() => [
-    styles.cardTitle,
-    !isCollapsed && styles.activeCardTitle,
-  ], [isCollapsed]);
+      const titleStyle = useMemo(
+        () => [styles.cardTitle, !isCollapsed && styles.activeCardTitle],
+        [isCollapsed],
+      );
 
-  const iconColor = isCollapsed ? '#666' : BRAND_PRIMARY;
-  const expandIconName = isCollapsed ? 'expand-more' : 'expand-less';
+      const iconColor = isCollapsed ? '#666' : BRAND_PRIMARY;
+      const expandIconName = isCollapsed ? 'expand-more' : 'expand-less';
 
-  return (
-    <View style={styles.cardContainer}>
-      <TouchableOpacity
-        onPress={toggleCollapsed}
-        style={headerStyle}
-        activeOpacity={0.7}>
-        <View style={styles.headerContent}>
-          {icon && (
-            <Feather
-              name={icon as any}
-              size={18}
-              color={iconColor}
-              style={styles.headerIcon}
-            />
-          )}
-          <Text style={titleStyle}>{title}</Text>
+      return (
+        <View style={styles.cardContainer}>
+          <TouchableOpacity
+            onPress={toggleCollapsed}
+            style={headerStyle}
+            activeOpacity={0.7}>
+            <View style={styles.headerContent}>
+              {icon && (
+                <Feather
+                  name={icon as any}
+                  size={18}
+                  color={iconColor}
+                  style={styles.headerIcon}
+                />
+              )}
+              <Text style={titleStyle}>{title}</Text>
+            </View>
+            <Icon name={expandIconName} size={24} color={iconColor} />
+          </TouchableOpacity>
+
+          <Animated.View
+            style={[
+              styles.animatedContent,
+              {
+                maxHeight: animatedHeight.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 1000],
+                }),
+                opacity: animatedHeight,
+              },
+            ]}>
+            <View style={styles.cardContent}>{children}</View>
+          </Animated.View>
         </View>
-        <Icon
-          name={expandIconName}
-          size={24}
-          color={iconColor}
-        />
-      </TouchableOpacity>
-
-      <Animated.View
-        style={[
-          styles.animatedContent,
-          {
-            maxHeight: animatedHeight.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0, 1000],
-            }),
-            opacity: animatedHeight,
-          },
-        ]}>
-        <View style={styles.cardContent}>{children}</View>
-      </Animated.View>
-    </View>
+      );
+    },
   );
-});
 
 OptimizedCollapsibleCard.displayName = 'OptimizedCollapsibleCard';
 
@@ -144,4 +141,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default OptimizedCollapsibleCard; 
+export default OptimizedCollapsibleCard;

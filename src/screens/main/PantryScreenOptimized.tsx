@@ -17,7 +17,10 @@ import { Ionicons } from '@expo/vector-icons';
 // Optimized imports
 import { useAuth } from '../../providers/AuthProvider';
 import { useOptimizedSearch } from '../../hooks/useDebouncedValue';
-import { useScreenLoadTracking, useSearchPerformanceTracking } from '../../hooks/usePerformanceMonitoring';
+import {
+  useScreenLoadTracking,
+  useSearchPerformanceTracking,
+} from '../../hooks/usePerformanceMonitoring';
 import { PantryItemSkeleton } from '../../components/skeletons';
 import { OptimizedFlatList } from '../../components/optimized/OptimizedFlatList';
 import { useStockRealtime } from '../../hooks/useStockRealtime';
@@ -28,7 +31,12 @@ type StorageLocation = 'refrigerator' | 'freezer' | 'cupboard' | 'condiments';
 
 // Constants - moved outside component to prevent recreation
 const ACTIVE_COLOR = '#10b981';
-const STORAGE_LOCATIONS: StorageLocation[] = ['refrigerator', 'freezer', 'cupboard', 'condiments'];
+const STORAGE_LOCATIONS: StorageLocation[] = [
+  'refrigerator',
+  'freezer',
+  'cupboard',
+  'condiments',
+];
 
 // Memoized components
 const EmptyState = React.memo(() => (
@@ -60,17 +68,29 @@ const OptimizedPantryItem = React.memo<{
   onDelete: (id: string) => void;
 }>(({ item, onEdit, onDelete }) => {
   const handleEdit = useCallback(() => onEdit(item), [item, onEdit]);
-  const handleDelete = useCallback(() => onDelete(item.id), [item.id, onDelete]);
-  
-  const iconName = useMemo(() => getIconForPantryItem(item.item_name), [item.item_name]);
-  
-  const itemStyle = useMemo(() => ({
-    ...styles.itemContainer,
-    opacity: item.quantity === 0 ? 0.6 : 1,
-  }), [item.quantity]);
+  const handleDelete = useCallback(
+    () => onDelete(item.id),
+    [item.id, onDelete],
+  );
+
+  const iconName = useMemo(
+    () => getIconForPantryItem(item.item_name),
+    [item.item_name],
+  );
+
+  const itemStyle = useMemo(
+    () => ({
+      ...styles.itemContainer,
+      opacity: item.quantity === 0 ? 0.6 : 1,
+    }),
+    [item.quantity],
+  );
 
   return (
-    <TouchableOpacity style={itemStyle} onPress={handleEdit} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={itemStyle}
+      onPress={handleEdit}
+      activeOpacity={0.7}>
       <View style={styles.itemIcon}>
         <Ionicons name={iconName as any} size={24} color={ACTIVE_COLOR} />
       </View>
@@ -98,59 +118,74 @@ const PantryHeader = React.memo<{
   activeLocation: StorageLocation;
   onLocationChange: (location: StorageLocation) => void;
   itemCounts: Record<StorageLocation, number>;
-}>(({ searchQuery, onSearchChange, isSearching, activeLocation, onLocationChange, itemCounts }) => {
-  const renderLocationTab = useCallback((location: StorageLocation) => {
-    const isActive = location === activeLocation;
-    const count = itemCounts[location] || 0;
-    
-    return (
-      <TouchableOpacity
-        key={location}
-        style={[styles.locationTab, isActive && styles.activeLocationTab]}
-        onPress={() => onLocationChange(location)}
-        activeOpacity={0.7}
-      >
-        <Text style={[styles.locationTabText, isActive && styles.activeLocationTabText]}>
-          {location.charAt(0).toUpperCase() + location.slice(1)}
-        </Text>
-        {count > 0 && (
-          <View style={styles.countBadge}>
-            <Text style={styles.countBadgeText}>{count}</Text>
-          </View>
-        )}
-      </TouchableOpacity>
-    );
-  }, [activeLocation, onLocationChange, itemCounts]);
+}>(
+  ({
+    searchQuery,
+    onSearchChange,
+    isSearching,
+    activeLocation,
+    onLocationChange,
+    itemCounts,
+  }) => {
+    const renderLocationTab = useCallback(
+      (location: StorageLocation) => {
+        const isActive = location === activeLocation;
+        const count = itemCounts[location] || 0;
 
-  return (
-    <View style={styles.header}>
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#9ca3af" />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search pantry items..."
-          value={searchQuery}
-          onChangeText={onSearchChange}
-          placeholderTextColor="#9ca3af"
-        />
-        {isSearching && (
-          <ActivityIndicator size="small" color={ACTIVE_COLOR} />
-        )}
+        return (
+          <TouchableOpacity
+            key={location}
+            style={[styles.locationTab, isActive && styles.activeLocationTab]}
+            onPress={() => onLocationChange(location)}
+            activeOpacity={0.7}>
+            <Text
+              style={[
+                styles.locationTabText,
+                isActive && styles.activeLocationTabText,
+              ]}>
+              {location.charAt(0).toUpperCase() + location.slice(1)}
+            </Text>
+            {count > 0 && (
+              <View style={styles.countBadge}>
+                <Text style={styles.countBadgeText}>{count}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        );
+      },
+      [activeLocation, onLocationChange, itemCounts],
+    );
+
+    return (
+      <View style={styles.header}>
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color="#9ca3af" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search pantry items..."
+            value={searchQuery}
+            onChangeText={onSearchChange}
+            placeholderTextColor="#9ca3af"
+          />
+          {isSearching && (
+            <ActivityIndicator size="small" color={ACTIVE_COLOR} />
+          )}
+        </View>
+
+        <View style={styles.locationTabs}>
+          {STORAGE_LOCATIONS.map(renderLocationTab)}
+        </View>
       </View>
-      
-      <View style={styles.locationTabs}>
-        {STORAGE_LOCATIONS.map(renderLocationTab)}
-      </View>
-    </View>
-  );
-});
+    );
+  },
+);
 PantryHeader.displayName = 'PantryHeader';
 
 export const PantryScreenOptimized = React.memo(() => {
   const navigation = useNavigation();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  
+
   // Performance tracking
   useScreenLoadTracking('PantryScreen');
   const { startSearch, endSearch } = useSearchPerformanceTracking();
@@ -167,7 +202,8 @@ export const PantryScreenOptimized = React.memo(() => {
   } = usePantryData(user?.id);
 
   // State
-  const [activeStorageLocation, setActiveStorageLocation] = useState<StorageLocation>('cupboard');
+  const [activeStorageLocation, setActiveStorageLocation] =
+    useState<StorageLocation>('cupboard');
   const [refreshing, setRefreshing] = useState(false);
 
   // Optimized search with performance tracking
@@ -180,16 +216,26 @@ export const PantryScreenOptimized = React.memo(() => {
   } = useOptimizedSearch(pantryItems, 'item_name', 150);
 
   // Track search performance
-  const handleSearchChange = useCallback((query: string) => {
-    if (query.length > 0 && searchQuery.length === 0) {
-      startSearch();
-    }
-    setSearchQuery(query);
-    
-    if (query.length === 0 || (query.length > 2 && !isSearching)) {
-      endSearch(query, resultCount);
-    }
-  }, [searchQuery, setSearchQuery, startSearch, endSearch, isSearching, resultCount]);
+  const handleSearchChange = useCallback(
+    (query: string) => {
+      if (query.length > 0 && searchQuery.length === 0) {
+        startSearch();
+      }
+      setSearchQuery(query);
+
+      if (query.length === 0 || (query.length > 2 && !isSearching)) {
+        endSearch(query, resultCount);
+      }
+    },
+    [
+      searchQuery,
+      setSearchQuery,
+      startSearch,
+      endSearch,
+      isSearching,
+      resultCount,
+    ],
+  );
 
   // Memoized grouped items
   const groupedItems = useMemo(() => {
@@ -211,17 +257,20 @@ export const PantryScreenOptimized = React.memo(() => {
   }, [filteredItems]);
 
   // Memoized item counts
-  const itemCounts = useMemo(() => ({
-    refrigerator: groupedItems.refrigerator.length,
-    freezer: groupedItems.freezer.length,
-    cupboard: groupedItems.cupboard.length,
-    condiments: groupedItems.condiments.length,
-  }), [groupedItems]);
+  const itemCounts = useMemo(
+    () => ({
+      refrigerator: groupedItems.refrigerator.length,
+      freezer: groupedItems.freezer.length,
+      cupboard: groupedItems.cupboard.length,
+      condiments: groupedItems.condiments.length,
+    }),
+    [groupedItems],
+  );
 
   // Current location items
-  const currentLocationItems = useMemo(() => 
-    groupedItems[activeStorageLocation] || [],
-    [groupedItems, activeStorageLocation]
+  const currentLocationItems = useMemo(
+    () => groupedItems[activeStorageLocation] || [],
+    [groupedItems, activeStorageLocation],
   );
 
   // Optimized handlers
@@ -264,7 +313,7 @@ export const PantryScreenOptimized = React.memo(() => {
         onDelete={handleDeleteItem}
       />
     ),
-    [handleEditItem, handleDeleteItem]
+    [handleEditItem, handleDeleteItem],
   );
 
   // Loading state with skeleton
@@ -276,9 +325,11 @@ export const PantryScreenOptimized = React.memo(() => {
           <View style={styles.skeletonTabs} />
         </View>
         <View style={styles.content}>
-          {Array(6).fill(null).map((_, index) => (
-            <PantryItemSkeleton key={`skeleton-${index}`} />
-          ))}
+          {Array(6)
+            .fill(null)
+            .map((_, index) => (
+              <PantryItemSkeleton key={`skeleton-${index}`} />
+            ))}
         </View>
       </SafeAreaView>
     );
@@ -310,14 +361,16 @@ export const PantryScreenOptimized = React.memo(() => {
         onLocationChange={setActiveStorageLocation}
         itemCounts={itemCounts}
       />
-      
+
       <View style={styles.content}>
         <OptimizedFlatList
           data={currentLocationItems}
           renderItem={renderPantryItem}
-          keyExtractor={(item) => item.id}
+          keyExtractor={item => item.id}
           itemHeight={80}
-          ListEmptyComponent={searchQuery ? <SearchEmptyState /> : <EmptyState />}
+          ListEmptyComponent={
+            searchQuery ? <SearchEmptyState /> : <EmptyState />
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -335,7 +388,9 @@ export const PantryScreenOptimized = React.memo(() => {
         <TouchableOpacity style={styles.fab} onPress={handleAddPress}>
           <Ionicons name="add" size={24} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.fab, styles.scanFab]} onPress={handleScanPress}>
+        <TouchableOpacity
+          style={[styles.fab, styles.scanFab]}
+          onPress={handleScanPress}>
           <Ionicons name="camera" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
@@ -542,4 +597,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default PantryScreenOptimized; 
+export default PantryScreenOptimized;

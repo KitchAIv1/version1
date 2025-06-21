@@ -14,7 +14,10 @@ export const useStockRealtime = (userId?: string) => {
   const setupSubscription = useCallback(() => {
     if (!userId) return;
 
-    console.log('[useStockRealtime] Setting up real-time subscription for user:', userId);
+    console.log(
+      '[useStockRealtime] Setting up real-time subscription for user:',
+      userId,
+    );
 
     try {
       // Clean up existing subscription
@@ -32,11 +35,16 @@ export const useStockRealtime = (userId?: string) => {
             table: 'stock',
             filter: `user_id=eq.${userId}`,
           },
-          (payload) => {
-            console.log('[useStockRealtime] New stock item inserted:', payload.new);
-            
+          payload => {
+            console.log(
+              '[useStockRealtime] New stock item inserted:',
+              payload.new,
+            );
+
             // Invalidate all stock-related queries to trigger refetch
-            queryClient.invalidateQueries({ queryKey: ['pantryItems', userId] });
+            queryClient.invalidateQueries({
+              queryKey: ['pantryItems', userId],
+            });
             queryClient.invalidateQueries({ queryKey: ['stock', userId] });
             queryClient.invalidateQueries({ queryKey: ['stockAging', userId] });
             queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
@@ -51,11 +59,13 @@ export const useStockRealtime = (userId?: string) => {
             table: 'stock',
             filter: `user_id=eq.${userId}`,
           },
-          (payload) => {
+          payload => {
             console.log('[useStockRealtime] Stock item updated:', payload.new);
-            
+
             // Invalidate all stock-related queries to trigger refetch
-            queryClient.invalidateQueries({ queryKey: ['pantryItems', userId] });
+            queryClient.invalidateQueries({
+              queryKey: ['pantryItems', userId],
+            });
             queryClient.invalidateQueries({ queryKey: ['stock', userId] });
             queryClient.invalidateQueries({ queryKey: ['stockAging', userId] });
             queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
@@ -70,11 +80,13 @@ export const useStockRealtime = (userId?: string) => {
             table: 'stock',
             filter: `user_id=eq.${userId}`,
           },
-          (payload) => {
+          payload => {
             console.log('[useStockRealtime] Stock item deleted:', payload.old);
-            
+
             // Invalidate all stock-related queries to trigger refetch
-            queryClient.invalidateQueries({ queryKey: ['pantryItems', userId] });
+            queryClient.invalidateQueries({
+              queryKey: ['pantryItems', userId],
+            });
             queryClient.invalidateQueries({ queryKey: ['stock', userId] });
             queryClient.invalidateQueries({ queryKey: ['stockAging', userId] });
             queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
@@ -119,7 +131,10 @@ export const useStockRealtimeOptimistic = (userId?: string) => {
   const setupSubscription = useCallback(() => {
     if (!userId) return;
 
-    console.log('[useStockRealtimeOptimistic] Setting up optimistic real-time subscription for user:', userId);
+    console.log(
+      '[useStockRealtimeOptimistic] Setting up optimistic real-time subscription for user:',
+      userId,
+    );
 
     try {
       // Clean up existing subscription
@@ -137,20 +152,26 @@ export const useStockRealtimeOptimistic = (userId?: string) => {
             table: 'stock',
             filter: `user_id=eq.${userId}`,
           },
-          (payload) => {
-            console.log('[useStockRealtimeOptimistic] New stock item inserted:', payload.new);
-            
+          payload => {
+            console.log(
+              '[useStockRealtimeOptimistic] New stock item inserted:',
+              payload.new,
+            );
+
             const newItem = payload.new as PantryItem;
-            
+
             // Optimistically update pantry items cache
-            queryClient.setQueryData(['pantryItems', userId], (old: PantryItem[] = []) => {
-              // Check if item already exists to avoid duplicates
-              const exists = old.some(item => item.id === newItem.id);
-              if (exists) return old;
-              
-              return [newItem, ...old];
-            });
-            
+            queryClient.setQueryData(
+              ['pantryItems', userId],
+              (old: PantryItem[] = []) => {
+                // Check if item already exists to avoid duplicates
+                const exists = old.some(item => item.id === newItem.id);
+                if (exists) return old;
+
+                return [newItem, ...old];
+              },
+            );
+
             // Also invalidate other related queries
             queryClient.invalidateQueries({ queryKey: ['stock', userId] });
             queryClient.invalidateQueries({ queryKey: ['stockAging', userId] });
@@ -164,18 +185,24 @@ export const useStockRealtimeOptimistic = (userId?: string) => {
             table: 'stock',
             filter: `user_id=eq.${userId}`,
           },
-          (payload) => {
-            console.log('[useStockRealtimeOptimistic] Stock item updated:', payload.new);
-            
+          payload => {
+            console.log(
+              '[useStockRealtimeOptimistic] Stock item updated:',
+              payload.new,
+            );
+
             const updatedItem = payload.new as PantryItem;
-            
+
             // Optimistically update pantry items cache
-            queryClient.setQueryData(['pantryItems', userId], (old: PantryItem[] = []) => {
-              return old.map(item => 
-                item.id === updatedItem.id ? updatedItem : item
-              );
-            });
-            
+            queryClient.setQueryData(
+              ['pantryItems', userId],
+              (old: PantryItem[] = []) => {
+                return old.map(item =>
+                  item.id === updatedItem.id ? updatedItem : item,
+                );
+              },
+            );
+
             // Also invalidate other related queries
             queryClient.invalidateQueries({ queryKey: ['stock', userId] });
             queryClient.invalidateQueries({ queryKey: ['stockAging', userId] });
@@ -189,16 +216,22 @@ export const useStockRealtimeOptimistic = (userId?: string) => {
             table: 'stock',
             filter: `user_id=eq.${userId}`,
           },
-          (payload) => {
-            console.log('[useStockRealtimeOptimistic] Stock item deleted:', payload.old);
-            
+          payload => {
+            console.log(
+              '[useStockRealtimeOptimistic] Stock item deleted:',
+              payload.old,
+            );
+
             const deletedItem = payload.old as PantryItem;
-            
+
             // Optimistically update pantry items cache
-            queryClient.setQueryData(['pantryItems', userId], (old: PantryItem[] = []) => {
-              return old.filter(item => item.id !== deletedItem.id);
-            });
-            
+            queryClient.setQueryData(
+              ['pantryItems', userId],
+              (old: PantryItem[] = []) => {
+                return old.filter(item => item.id !== deletedItem.id);
+              },
+            );
+
             // Also invalidate other related queries
             queryClient.invalidateQueries({ queryKey: ['stock', userId] });
             queryClient.invalidateQueries({ queryKey: ['stockAging', userId] });
@@ -212,7 +245,10 @@ export const useStockRealtimeOptimistic = (userId?: string) => {
         subscription.unsubscribe();
       };
     } catch (error) {
-      console.error('[useStockRealtimeOptimistic] Error setting up subscription:', error);
+      console.error(
+        '[useStockRealtimeOptimistic] Error setting up subscription:',
+        error,
+      );
     }
   }, [userId, queryClient]);
 
@@ -229,4 +265,4 @@ export const useStockRealtimeOptimistic = (userId?: string) => {
       }
     };
   }, []);
-}; 
+};

@@ -496,11 +496,30 @@ const processRecipeDetailsData = async (
     step.replace(/^"+|"+$/g, '').trim(),
   );
 
+  // 🔧 FIX: Transform ingredients to handle both database formats (ingredient vs name field)
+  const transformedIngredients = (data.ingredients || []).map((ing: any) => ({
+    name: String(ing.ingredient || ing.name || ''), // ← Map database 'ingredient' field to display 'name' field
+    quantity: String(ing.quantity || ''),
+    unit: String(ing.unit || ''),
+  }));
+
+  // Log the transformation for debugging edited recipes
+  if (data.ingredients && data.ingredients.length > 0) {
+    console.log(
+      `[processRecipeDetailsData] 🔧 INGREDIENT FIX for recipe ${recipeId}:`,
+      {
+        original_format: data.ingredients[0],
+        transformed_format: transformedIngredients[0],
+        total_ingredients: transformedIngredients.length,
+      },
+    );
+  }
+
   // Return data including pantry_match from calculate_pantry_match
   const processedData = {
     ...data,
     preparation_steps: cleanedSteps,
-    ingredients: data.ingredients || [],
+    ingredients: transformedIngredients, // ← Use transformed ingredients
     diet_tags: data.diet_tags || [],
     description: data.description || '',
     servings: data.servings ?? null,
@@ -637,6 +656,8 @@ export const useRecipeDetails = (
         enabled: !!recipeId && typeof userId !== 'undefined',
         staleTime: 10 * 60 * 1000,
         gcTime: 30 * 60 * 1000,
+        retry: 3, // Retry 3 times
+        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
       },
       // RESTORED: Keep separate pantry match query as fallback during transition
       {
@@ -645,6 +666,8 @@ export const useRecipeDetails = (
         enabled: !!recipeId && !!userId,
         staleTime: 5 * 60 * 1000,
         gcTime: 15 * 60 * 1000,
+        retry: 3, // Retry 3 times
+        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
       },
     ],
   });
@@ -652,63 +675,33 @@ export const useRecipeDetails = (
   const recipeResult = results[0];
   const pantryResult = results[1]; // RESTORED: pantryResult for fallback
 
-  // SIMPLE CACHE SYNC: Prevent race conditions by only updating feed if recipe details has BETTER data
+  // PERFORMANCE FIX: Only sync feed data when essential data changes, not on every render
+  // OPTIMIZED: Debounced cache sync to prevent performance issues
   useEffect(() => {
-    if (recipeResult.data && recipeId) {
-      console.log(
-        `[useRecipeDetails] 🔄 ALWAYS SYNC - Backend fixed, syncing all data for recipe ${recipeId}:`,
-        {
-          recipe_comments: recipeResult.data.comments_count,
-          recipe_likes: recipeResult.data.likes,
-          recipe_liked: recipeResult.data.is_liked_by_user,
-          recipe_saved: recipeResult.data.is_saved_by_user,
-        },
-      );
-
-      // SMART SYNC: Only update feed if recipe details data is fresher
+    if (!recipeResult.data || !recipeId) return;
+    
+    // Debounce cache updates to prevent rapid successive calls
+    const timeoutId = setTimeout(() => {
       queryClient.setQueryData(['feed'], (oldFeedData: any) => {
         if (!oldFeedData || !Array.isArray(oldFeedData)) return oldFeedData;
 
         return oldFeedData.map((item: any) => {
           if (item.id === recipeId || item.recipe_id === recipeId) {
-            // SMART COMMENT SYNC: Don't overwrite higher comment counts (indicates fresh data)
-            const shouldSyncComments =
-              recipeResult.data.comments_count >= (item.commentsCount || 0);
-            const finalCommentCount = shouldSyncComments
-              ? recipeResult.data.comments_count
-              : item.commentsCount;
-
-            console.log(
-              `[useRecipeDetails] 📊 Syncing feed item for recipe ${recipeId}:`,
-              {
-                from_feed_likes: item.likes,
-                to_recipe_likes: recipeResult.data.likes,
-                from_feed_liked: item.liked,
-                to_recipe_liked: recipeResult.data.is_liked_by_user,
-                from_feed_saved: item.saved,
-                to_recipe_saved: recipeResult.data.is_saved_by_user,
-                from_feed_comments: item.commentsCount,
-                to_recipe_comments: recipeResult.data.comments_count,
-                final_comment_count: finalCommentCount,
-                comments_sync_decision: shouldSyncComments
-                  ? 'SYNC'
-                  : 'KEEP_FEED',
-              },
-            );
-
             return {
               ...item,
               likes: recipeResult.data.likes,
               liked: recipeResult.data.is_liked_by_user,
               saved: recipeResult.data.is_saved_by_user,
-              commentsCount: finalCommentCount, // Smart comment sync
+              commentsCount: Math.max(item.commentsCount || 0, recipeResult.data.comments_count || 0),
             };
           }
           return item;
         });
       });
-    }
-  }, [recipeResult.data, recipeId, queryClient]);
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
+  }, [recipeResult.data?.likes, recipeResult.data?.is_liked_by_user, recipeResult.data?.is_saved_by_user, recipeResult.data?.comments_count, recipeId, queryClient]);
 
   // REVERSE SYNC: Update recipe details when feed data changes (for like/save mutations from feed)
   useEffect(() => {
@@ -783,29 +776,8 @@ export const useRecipeDetails = (
 
     if (hasPantryMatch) {
       // Use new unified pantry_match structure
-      console.log(
-        `[useRecipeDetails] Using NEW pantry_match for recipe ${recipeId}:`,
-        {
-          match_percentage: pantryMatch.match_percentage,
-          matchedCount: pantryMatch.matched_ingredients.length,
-          missingCount: pantryMatch.missing_ingredients.length,
-          totalCount:
-            pantryMatch.matched_ingredients.length +
-            pantryMatch.missing_ingredients.length,
-        },
-      );
-
       return recipeResult.data; // Already includes pantry_match and backward compatibility fields
     }
-    // Fallback to separate pantry query (old working method)
-    console.log(
-      `[useRecipeDetails] Using FALLBACK pantry query for recipe ${recipeId}:`,
-      {
-        pantryResult_available: !!pantryResult.data,
-        matchedCount: pantryResult.data?.matched_ingredients?.length || 0,
-        missingCount: pantryResult.data?.missing_ingredients?.length || 0,
-      },
-    );
 
     return {
       ...recipeResult.data,

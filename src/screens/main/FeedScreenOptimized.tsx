@@ -603,7 +603,7 @@ export const FeedScreenOptimized = React.memo(() => {
           <Text style={styles.errorText}>
             Error loading feed: {feedError.message}
           </Text>
-          <Text style={styles.retryText} onPress={() => refetchFeed({})}>
+          <Text style={styles.retryText} onPress={() => refetchFeed({ cancelRefetch: true })}>
             Tap to retry
           </Text>
         </View>
@@ -653,8 +653,8 @@ export const FeedScreenOptimized = React.memo(() => {
                 // eslint-disable-next-line no-param-reassign
                 layout.size = itemHeight;
               }}
-              removeClippedSubviews
               decelerationRate="fast"
+              // VIDEO-FRIENDLY: Removed removeClippedSubviews to prevent video playback issues
             />
           </View>
         )}

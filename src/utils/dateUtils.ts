@@ -115,7 +115,7 @@ export const getShortRelativeTime = (timestamp: string | undefined): string => {
  */
 export const getMostRecentActivity = (
   created_at: string | undefined,
-  updated_at: string | undefined
+  updated_at: string | undefined,
 ): {
   timestamp: string;
   label: string;
@@ -134,7 +134,10 @@ export const getMostRecentActivity = (
     const updatedDate = updated_at ? parseISO(updated_at) : null;
 
     // If no updated_at or updated_at is same as created_at, show as "Added"
-    if (!updatedDate || Math.abs(updatedDate.getTime() - createdDate.getTime()) < 1000) {
+    if (
+      !updatedDate ||
+      Math.abs(updatedDate.getTime() - createdDate.getTime()) < 1000
+    ) {
       return {
         timestamp: created_at,
         label: 'Added',

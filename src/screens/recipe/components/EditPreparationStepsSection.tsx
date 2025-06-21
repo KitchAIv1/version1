@@ -28,11 +28,11 @@ const StepRow: React.FC<{
     <View style={styles.stepNumber}>
       <Text style={styles.stepNumberText}>{index + 1}</Text>
     </View>
-    
+
     <TextInput
       placeholder={`Step ${index + 1} instructions`}
       value={step}
-      onChangeText={(value) => onStepChange(index, value)}
+      onChangeText={value => onStepChange(index, value)}
       style={styles.stepInput}
       multiline
       numberOfLines={3}
@@ -40,19 +40,16 @@ const StepRow: React.FC<{
       maxLength={500}
       textAlignVertical="top"
     />
-    
+
     <TouchableOpacity
       onPress={() => onRemoveStep(index)}
-      style={[
-        styles.removeButton,
-        !canRemove && styles.removeButtonDisabled,
-      ]}
+      style={[styles.removeButton, !canRemove && styles.removeButtonDisabled]}
       disabled={!canRemove}
       activeOpacity={0.7}>
       <Feather
         name="trash-2"
         size={18}
-        color={canRemove ? "#ef4444" : "#d1d5db"}
+        color={canRemove ? '#ef4444' : '#d1d5db'}
       />
     </TouchableOpacity>
   </View>
@@ -60,50 +57,52 @@ const StepRow: React.FC<{
 
 StepRow.displayName = 'StepRow';
 
-export const EditPreparationStepsSection: React.FC<EditPreparationStepsSectionProps> = React.memo(({
-  preparationSteps,
-  stepCount,
-  onStepChange,
-  onAddStep,
-  onRemoveStep,
-}) => {
-  const canRemoveSteps = preparationSteps.length > 1;
+export const EditPreparationStepsSection: React.FC<EditPreparationStepsSectionProps> =
+  React.memo(
+    ({
+      preparationSteps,
+      stepCount,
+      onStepChange,
+      onAddStep,
+      onRemoveStep,
+    }) => {
+      const canRemoveSteps = preparationSteps.length > 1;
 
-  return (
-    <OptimizedCollapsibleCard 
-      title={`Preparation Steps (${stepCount})`} 
-      icon="list-ordered"
-    >
-      <View style={styles.stepsContainer}>
-        {preparationSteps.map((step, index) => (
-          <StepRow
-            key={index}
-            step={step}
-            index={index}
-            onStepChange={onStepChange}
-            onRemoveStep={onRemoveStep}
-            canRemove={canRemoveSteps}
-          />
-        ))}
-        
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={onAddStep}
-          activeOpacity={0.8}>
-          <Feather name="plus-circle" size={20} color="#10B981" />
-          <Text style={styles.addButtonText}>Add Step</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.helpContainer}>
-          <Feather name="info" size={14} color="#6b7280" />
-          <Text style={styles.helpText}>
-            Write clear, detailed instructions for each step
-          </Text>
-        </View>
-      </View>
-    </OptimizedCollapsibleCard>
+      return (
+        <OptimizedCollapsibleCard
+          title={`Preparation Steps (${stepCount})`}
+          icon="list-ordered">
+          <View style={styles.stepsContainer}>
+            {preparationSteps.map((step, index) => (
+              <StepRow
+                key={index}
+                step={step}
+                index={index}
+                onStepChange={onStepChange}
+                onRemoveStep={onRemoveStep}
+                canRemove={canRemoveSteps}
+              />
+            ))}
+
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={onAddStep}
+              activeOpacity={0.8}>
+              <Feather name="plus-circle" size={20} color="#10B981" />
+              <Text style={styles.addButtonText}>Add Step</Text>
+            </TouchableOpacity>
+
+            <View style={styles.helpContainer}>
+              <Feather name="info" size={14} color="#6b7280" />
+              <Text style={styles.helpText}>
+                Write clear, detailed instructions for each step
+              </Text>
+            </View>
+          </View>
+        </OptimizedCollapsibleCard>
+      );
+    },
   );
-});
 
 EditPreparationStepsSection.displayName = 'EditPreparationStepsSection';
 
@@ -182,4 +181,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default EditPreparationStepsSection; 
+export default EditPreparationStepsSection;

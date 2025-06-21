@@ -154,20 +154,7 @@ export default function IngredientsTab() {
     }
   };
 
-  console.log(
-    `IngredientsTab rendering with groceryList length: ${groceryList.length}`,
-  );
-
-  // Debug the pantry match data structure
-  if (recipeDetails) {
-    console.log('[IngredientsTab] Pantry match debug:', {
-      matched_ingredients: recipeDetails.matched_ingredients,
-      missing_ingredient_names: recipeDetails.missing_ingredient_names,
-      missing_ingredients: recipeDetails.missing_ingredients,
-      pantry_match: recipeDetails.pantry_match,
-      ingredients_count: recipeDetails.ingredients?.length || 0,
-    });
-  }
+  // Performance optimization: Remove render logging to prevent log spam
 
   if (isLoading) {
     return (

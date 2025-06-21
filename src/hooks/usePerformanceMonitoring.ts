@@ -54,7 +54,7 @@ export const performanceBenchmarks: PerformanceBenchmarks = {
  */
 const getPerformanceRating = (
   value: number,
-  benchmark: { excellent: number; good: number; acceptable: number }
+  benchmark: { excellent: number; good: number; acceptable: number },
 ): PerformanceRating => {
   if (value <= benchmark.excellent) return 'excellent';
   if (value <= benchmark.good) return 'good';
@@ -65,7 +65,9 @@ const getPerformanceRating = (
 /**
  * Calculate overall performance rating
  */
-const calculateOverallRating = (ratings: Record<string, PerformanceRating>): PerformanceRating => {
+const calculateOverallRating = (
+  ratings: Record<string, PerformanceRating>,
+): PerformanceRating => {
   const values = Object.values(ratings);
   const excellentCount = values.filter(r => r === 'excellent').length;
   const goodCount = values.filter(r => r === 'good').length;
@@ -73,7 +75,8 @@ const calculateOverallRating = (ratings: Record<string, PerformanceRating>): Per
 
   if (excellentCount >= values.length * 0.7) return 'excellent';
   if (goodCount + excellentCount >= values.length * 0.7) return 'good';
-  if (acceptableCount + goodCount + excellentCount >= values.length * 0.7) return 'acceptable';
+  if (acceptableCount + goodCount + excellentCount >= values.length * 0.7)
+    return 'acceptable';
   return 'poor';
 };
 
@@ -86,21 +89,26 @@ export const usePerformanceMonitoring = () => {
   const startTimeRef = useRef<number>(0);
 
   // Track screen load time
-  const trackScreenLoad = useCallback((screenName: string, startTime?: number) => {
-    const loadTime = Date.now() - (startTime || startTimeRef.current);
-    
-    setMetrics(prev => ({ ...prev, screenLoadTime: loadTime }));
+  const trackScreenLoad = useCallback(
+    (screenName: string, startTime?: number) => {
+      const loadTime = Date.now() - (startTime || startTimeRef.current);
 
-    // Log performance data (can be sent to analytics)
-    console.log(`[Performance] Screen "${screenName}" loaded in ${loadTime}ms`);
-    
-    return loadTime;
-  }, []);
+      setMetrics(prev => ({ ...prev, screenLoadTime: loadTime }));
+
+      // Log performance data (can be sent to analytics)
+      console.log(
+        `[Performance] Screen "${screenName}" loaded in ${loadTime}ms`,
+      );
+
+      return loadTime;
+    },
+    [],
+  );
 
   // Track render performance
   const trackRenderPerformance = useCallback(() => {
     const startTime = performance.now();
-    
+
     requestAnimationFrame(() => {
       const renderTime = performance.now() - startTime;
       setMetrics(prev => ({ ...prev, renderTime }));
@@ -108,34 +116,49 @@ export const usePerformanceMonitoring = () => {
   }, []);
 
   // Track navigation time
-  const trackNavigation = useCallback((fromScreen: string, toScreen: string, startTime?: number) => {
-    const navigationTime = Date.now() - (startTime || startTimeRef.current);
-    
-    setMetrics(prev => ({ ...prev, navigationTime }));
-    console.log(`[Performance] Navigation from "${fromScreen}" to "${toScreen}" took ${navigationTime}ms`);
-    
-    return navigationTime;
-  }, []);
+  const trackNavigation = useCallback(
+    (fromScreen: string, toScreen: string, startTime?: number) => {
+      const navigationTime = Date.now() - (startTime || startTimeRef.current);
+
+      setMetrics(prev => ({ ...prev, navigationTime }));
+      console.log(
+        `[Performance] Navigation from "${fromScreen}" to "${toScreen}" took ${navigationTime}ms`,
+      );
+
+      return navigationTime;
+    },
+    [],
+  );
 
   // Track search response time
-  const trackSearchResponse = useCallback((query: string, resultCount: number, startTime?: number) => {
-    const responseTime = Date.now() - (startTime || startTimeRef.current);
-    
-    setMetrics(prev => ({ ...prev, searchResponseTime: responseTime }));
-    console.log(`[Performance] Search for "${query}" returned ${resultCount} results in ${responseTime}ms`);
-    
-    return responseTime;
-  }, []);
+  const trackSearchResponse = useCallback(
+    (query: string, resultCount: number, startTime?: number) => {
+      const responseTime = Date.now() - (startTime || startTimeRef.current);
+
+      setMetrics(prev => ({ ...prev, searchResponseTime: responseTime }));
+      console.log(
+        `[Performance] Search for "${query}" returned ${resultCount} results in ${responseTime}ms`,
+      );
+
+      return responseTime;
+    },
+    [],
+  );
 
   // Track API response time
-  const trackApiResponse = useCallback((endpoint: string, startTime?: number) => {
-    const responseTime = Date.now() - (startTime || startTimeRef.current);
-    
-    setMetrics(prev => ({ ...prev, apiResponseTime: responseTime }));
-    console.log(`[Performance] API call to "${endpoint}" completed in ${responseTime}ms`);
-    
-    return responseTime;
-  }, []);
+  const trackApiResponse = useCallback(
+    (endpoint: string, startTime?: number) => {
+      const responseTime = Date.now() - (startTime || startTimeRef.current);
+
+      setMetrics(prev => ({ ...prev, apiResponseTime: responseTime }));
+      console.log(
+        `[Performance] API call to "${endpoint}" completed in ${responseTime}ms`,
+      );
+
+      return responseTime;
+    },
+    [],
+  );
 
   // Start timing
   const startTiming = useCallback(() => {
@@ -150,38 +173,41 @@ export const usePerformanceMonitoring = () => {
   }, []);
 
   // Validate performance against benchmarks
-  const validatePerformance = useCallback((customMetrics?: Partial<PerformanceMetrics>) => {
-    const metricsToValidate = { ...metrics, ...customMetrics };
-    
-    const results: Record<string, PerformanceRating> = {};
-    
-    if (metricsToValidate.screenLoadTime !== undefined) {
-      results.screenLoad = getPerformanceRating(
-        metricsToValidate.screenLoadTime,
-        performanceBenchmarks.screenLoadTime
-      );
-    }
-    
-    if (metricsToValidate.searchResponseTime !== undefined) {
-      results.searchResponse = getPerformanceRating(
-        metricsToValidate.searchResponseTime,
-        performanceBenchmarks.searchResponseTime
-      );
-    }
-    
-    if (metricsToValidate.memoryUsage !== undefined) {
-      results.memoryUsage = getPerformanceRating(
-        metricsToValidate.memoryUsage,
-        performanceBenchmarks.memoryUsage
-      );
-    }
+  const validatePerformance = useCallback(
+    (customMetrics?: Partial<PerformanceMetrics>) => {
+      const metricsToValidate = { ...metrics, ...customMetrics };
 
-    return {
-      overall: calculateOverallRating(results),
-      details: results,
-      metrics: metricsToValidate,
-    };
-  }, [metrics]);
+      const results: Record<string, PerformanceRating> = {};
+
+      if (metricsToValidate.screenLoadTime !== undefined) {
+        results.screenLoad = getPerformanceRating(
+          metricsToValidate.screenLoadTime,
+          performanceBenchmarks.screenLoadTime,
+        );
+      }
+
+      if (metricsToValidate.searchResponseTime !== undefined) {
+        results.searchResponse = getPerformanceRating(
+          metricsToValidate.searchResponseTime,
+          performanceBenchmarks.searchResponseTime,
+        );
+      }
+
+      if (metricsToValidate.memoryUsage !== undefined) {
+        results.memoryUsage = getPerformanceRating(
+          metricsToValidate.memoryUsage,
+          performanceBenchmarks.memoryUsage,
+        );
+      }
+
+      return {
+        overall: calculateOverallRating(results),
+        details: results,
+        metrics: metricsToValidate,
+      };
+    },
+    [metrics],
+  );
 
   return {
     metrics,
@@ -206,10 +232,10 @@ export const useScreenLoadTracking = (screenName: string) => {
 
   useEffect(() => {
     startTiming();
-    
+
     // Track when component mounts
     const loadTime = trackScreenLoad(screenName, mountTimeRef.current);
-    
+
     return () => {
       // Cleanup if needed
     };
@@ -230,9 +256,16 @@ export const useSearchPerformanceTracking = () => {
     startTiming();
   }, [startTiming]);
 
-  const endSearch = useCallback((query: string, resultCount: number) => {
-    return trackSearchResponse(query, resultCount, searchStartTimeRef.current);
-  }, [trackSearchResponse]);
+  const endSearch = useCallback(
+    (query: string, resultCount: number) => {
+      return trackSearchResponse(
+        query,
+        resultCount,
+        searchStartTimeRef.current,
+      );
+    },
+    [trackSearchResponse],
+  );
 
   return { startSearch, endSearch };
 };
@@ -248,15 +281,18 @@ export const useApiPerformanceTracking = () => {
     apiCallsRef.current.set(callId, Date.now());
   }, []);
 
-  const endApiCall = useCallback((callId: string, endpoint: string) => {
-    const startTime = apiCallsRef.current.get(callId);
-    if (startTime) {
-      const responseTime = trackApiResponse(endpoint, startTime);
-      apiCallsRef.current.delete(callId);
-      return responseTime;
-    }
-    return 0;
-  }, [trackApiResponse]);
+  const endApiCall = useCallback(
+    (callId: string, endpoint: string) => {
+      const startTime = apiCallsRef.current.get(callId);
+      if (startTime) {
+        const responseTime = trackApiResponse(endpoint, startTime);
+        apiCallsRef.current.delete(callId);
+        return responseTime;
+      }
+      return 0;
+    },
+    [trackApiResponse],
+  );
 
   return { startApiCall, endApiCall };
 };
@@ -273,7 +309,11 @@ export const useMemoryMonitoring = () => {
       // In a real app, you'd use a native module to get actual memory usage
       // For now, we'll simulate it or use available browser APIs
       try {
-        if (typeof global !== 'undefined' && global.performance && (global.performance as any).memory) {
+        if (
+          typeof global !== 'undefined' &&
+          global.performance &&
+          (global.performance as any).memory
+        ) {
           const memoryInfo = (global.performance as any).memory;
           const usage = memoryInfo.usedJSHeapSize / 1024 / 1024; // MB
           setMemoryUsage(usage);
@@ -307,25 +347,30 @@ export const useMemoryMonitoring = () => {
  * Hook for app state performance monitoring
  */
 export const useAppStatePerformanceMonitoring = () => {
-  const [appStateChanges, setAppStateChanges] = useState<Array<{
-    state: AppStateStatus;
-    timestamp: number;
-  }>>([]);
+  const [appStateChanges, setAppStateChanges] = useState<
+    Array<{
+      state: AppStateStatus;
+      timestamp: number;
+    }>
+  >([]);
 
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       setAppStateChanges(prev => [
         ...prev.slice(-9), // Keep last 10 entries
-        { state: nextAppState, timestamp: Date.now() }
+        { state: nextAppState, timestamp: Date.now() },
       ]);
 
       // Log performance impact of app state changes
       console.log(`[Performance] App state changed to: ${nextAppState}`);
     };
 
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    const subscription = AppState.addEventListener(
+      'change',
+      handleAppStateChange,
+    );
     return () => subscription?.remove();
   }, []);
 
   return { appStateChanges };
-}; 
+};

@@ -26,9 +26,12 @@ const OptimizedStepItem = React.memo<{
   onStepChange: (index: number, value: string) => void;
   onRemoveStep: (index: number) => void;
 }>(({ step, index, onStepChange, onRemoveStep }) => {
-  const handleStepChange = useCallback((value: string) => {
-    onStepChange(index, value);
-  }, [index, onStepChange]);
+  const handleStepChange = useCallback(
+    (value: string) => {
+      onStepChange(index, value);
+    },
+    [index, onStepChange],
+  );
 
   const handleRemove = useCallback(() => {
     onRemoveStep(index);
@@ -79,37 +82,36 @@ const OptimizedAddStepButton = React.memo<{
 OptimizedAddStepButton.displayName = 'OptimizedAddStepButton';
 
 // Main PreparationStepsSection Component
-export const PreparationStepsSection = React.memo<PreparationStepsSectionProps>(({
-  preparationSteps,
-  stepCount,
-  onStepChange,
-  onAddStep,
-  onRemoveStep,
-}) => {
-  // Memoize the steps list to prevent unnecessary re-renders
-  const memoizedSteps = useMemo(() => 
-    preparationSteps.map((step, index) => (
-      <OptimizedStepItem
-        key={`step-${index}`}
-        step={step}
-        index={index}
-        onStepChange={onStepChange}
-        onRemoveStep={onRemoveStep}
-      />
-    )), [preparationSteps, onStepChange, onRemoveStep]);
+export const PreparationStepsSection = React.memo<PreparationStepsSectionProps>(
+  ({ preparationSteps, stepCount, onStepChange, onAddStep, onRemoveStep }) => {
+    // Memoize the steps list to prevent unnecessary re-renders
+    const memoizedSteps = useMemo(
+      () =>
+        preparationSteps.map((step, index) => (
+          <OptimizedStepItem
+            key={`step-${index}`}
+            step={step}
+            index={index}
+            onStepChange={onStepChange}
+            onRemoveStep={onRemoveStep}
+          />
+        )),
+      [preparationSteps, onStepChange, onRemoveStep],
+    );
 
-  const cardTitle = useMemo(() => 
-    `Preparation Steps (${stepCount})`, [stepCount]);
+    const cardTitle = useMemo(
+      () => `Preparation Steps (${stepCount})`,
+      [stepCount],
+    );
 
-  return (
-    <OptimizedCollapsibleCard
-      title={cardTitle}
-      icon="list">
-      {memoizedSteps}
-      <OptimizedAddStepButton onAddStep={onAddStep} />
-    </OptimizedCollapsibleCard>
-  );
-});
+    return (
+      <OptimizedCollapsibleCard title={cardTitle} icon="list">
+        {memoizedSteps}
+        <OptimizedAddStepButton onAddStep={onAddStep} />
+      </OptimizedCollapsibleCard>
+    );
+  },
+);
 
 PreparationStepsSection.displayName = 'PreparationStepsSection';
 
@@ -174,4 +176,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default PreparationStepsSection; 
+export default PreparationStepsSection;

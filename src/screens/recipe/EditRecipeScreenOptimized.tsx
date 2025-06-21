@@ -43,27 +43,27 @@ import {
 
 // Lazy-loaded components for better performance
 const OptimizedCollapsibleCard = React.lazy(() =>
-  import('./components/OptimizedCollapsibleCard').then((module) => ({
+  import('./components/OptimizedCollapsibleCard').then(module => ({
     default: module.OptimizedCollapsibleCard,
   })),
 );
 const EditRecipeDetailsSection = React.lazy(() =>
-  import('./components/EditRecipeDetailsSection').then((module) => ({
+  import('./components/EditRecipeDetailsSection').then(module => ({
     default: module.EditRecipeDetailsSection,
   })),
 );
 const EditIngredientsSection = React.lazy(() =>
-  import('./components/EditIngredientsSection').then((module) => ({
+  import('./components/EditIngredientsSection').then(module => ({
     default: module.EditIngredientsSection,
   })),
 );
 const EditPreparationStepsSection = React.lazy(() =>
-  import('./components/EditPreparationStepsSection').then((module) => ({
+  import('./components/EditPreparationStepsSection').then(module => ({
     default: module.EditPreparationStepsSection,
   })),
 );
 const EditThumbnailSection = React.lazy(() =>
-  import('./components/EditThumbnailSection').then((module) => ({
+  import('./components/EditThumbnailSection').then(module => ({
     default: module.EditThumbnailSection,
   })),
 );
@@ -105,16 +105,16 @@ const useOptimizedEditFormState = (initialData?: RecipeEditableData) => {
 
   const [preparationSteps, setPreparationSteps] = useState<string[]>(['']);
   const [dietTags, setDietTags] = useState<string[]>([]);
-  const [currentThumbnailUrl, setCurrentThumbnailUrl] = useState<
-    string | null
-  >(null);
+  const [currentThumbnailUrl, setCurrentThumbnailUrl] = useState<string | null>(
+    null,
+  );
   const [newLocalThumbnailUri, setNewLocalThumbnailUri] = useState<
     string | null
   >(null);
   const [compressionInfo, setCompressionInfo] = useState<string>('');
 
   const updateFormData = useCallback((field: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData(prev => ({ ...prev, [field]: value }));
   }, []);
 
   const populateFromInitialData = useCallback((data: RecipeEditableData) => {
@@ -188,7 +188,7 @@ const OptimizedDietTags = React.memo<{
 }>(({ dietTags, onTagToggle }) => {
   const memoizedTags = useMemo(
     () =>
-      DIET_TAGS_OPTIONS.map((tag) => ({
+      DIET_TAGS_OPTIONS.map(tag => ({
         tag,
         isSelected: dietTags.includes(tag),
       })),
@@ -214,10 +214,7 @@ const OptimizedDietTags = React.memo<{
                 />
               )}
               <Text
-                style={[
-                  styles.tagText,
-                  isSelected && styles.tagTextSelected,
-                ]}>
+                style={[styles.tagText, isSelected && styles.tagTextSelected]}>
                 {tag}
               </Text>
             </TouchableOpacity>
@@ -295,10 +292,7 @@ const OptimizedSaveButton = React.memo<{
     {isUpdating && uploadProgress > 0 && uploadProgress < 1 && (
       <View style={styles.progressBarContainer}>
         <View
-          style={[
-            styles.progressBar,
-            { width: `${uploadProgress * 100}%` },
-          ]}
+          style={[styles.progressBar, { width: `${uploadProgress * 100}%` }]}
         />
         <Text style={styles.progressText}>
           {`Saving... ${(uploadProgress * 100).toFixed(0)}%`}
@@ -338,6 +332,7 @@ export const EditRecipeScreenOptimized: React.FC<EditRecipeScreenProps> = ({
     getIngredientsForSave,
     clearCachesAfterSave,
     isLoading: isLoadingParsedIngredients,
+    ensureIngredientSync,
   } = useSafeRecipeEdit(recipeId, user?.id);
 
   // Optimized form state
@@ -379,14 +374,17 @@ export const EditRecipeScreenOptimized: React.FC<EditRecipeScreenProps> = ({
   // Effect to sync parsed ingredients to display format
   useEffect(() => {
     if (parsedIngredients && parsedIngredients.length > 0) {
-      const displayIngredients = parsedIngredients.map((parsed) => ({
+      const displayIngredients = parsedIngredients.map(parsed => ({
         name: parsed.ingredient || '',
         quantity: parsed.quantity || '',
         unit: parsed.unit || '',
       }));
       setIngredients(displayIngredients);
+      
+      // SAFETY: Ensure sync is maintained after setting display ingredients
+      ensureIngredientSync(displayIngredients);
     }
-  }, [parsedIngredients, setIngredients]);
+  }, [parsedIngredients, setIngredients, ensureIngredientSync]);
 
   // Memoized handlers
   const handleIngredientChange = useCallback(
@@ -395,20 +393,47 @@ export const EditRecipeScreenOptimized: React.FC<EditRecipeScreenProps> = ({
       newIngredients[index] = { ...newIngredients[index], [field]: value };
       setIngredients(newIngredients);
 
-      // Also update the parsed ingredients to keep them in sync
+      // CRITICAL FIX: Ensure parsedIngredients array is properly sized and synchronized
       const newParsedIngredients = [...parsedIngredients];
-      if (newParsedIngredients[index]) {
-        if (field === 'name') newParsedIngredients[index].ingredient = value;
-        if (field === 'quantity') newParsedIngredients[index].quantity = value;
-        if (field === 'unit') newParsedIngredients[index].unit = value;
-        updateIngredients(newParsedIngredients);
+      
+      // SAFETY: Ensure the array is large enough for the current index
+      while (newParsedIngredients.length <= index) {
+        newParsedIngredients.push({
+          quantity: '',
+          unit: '',
+          ingredient: '',
+          original: '',
+        });
       }
+
+      // Ensure we have a valid parsed ingredient at this index
+      if (!newParsedIngredients[index]) {
+        newParsedIngredients[index] = {
+          quantity: '',
+          unit: '',
+          ingredient: '',
+          original: '',
+        };
+      }
+
+      // Also update the parsed ingredients to keep them in sync
+      if (field === 'name') newParsedIngredients[index].ingredient = value;
+      if (field === 'quantity') newParsedIngredients[index].quantity = value;
+      if (field === 'unit') newParsedIngredients[index].unit = value;
+
+      // DEBUG: Log the synchronization for troubleshooting
+      if (__DEV__) {
+        console.log(`[EditRecipeOptimized] Ingredient sync - Index: ${index}, Field: ${field}, Value: ${value}`);
+        console.log(`[EditRecipeOptimized] Updated parsed ingredient:`, newParsedIngredients[index]);
+      }
+
+      updateIngredients(newParsedIngredients);
     },
     [ingredients, parsedIngredients, setIngredients, updateIngredients],
   );
 
   const handleAddIngredient = useCallback(() => {
-    setIngredients((prev) => [...prev, { name: '', quantity: '', unit: '' }]);
+    setIngredients(prev => [...prev, { name: '', quantity: '', unit: '' }]);
     addParsedIngredient();
   }, [setIngredients, addParsedIngredient]);
 
@@ -418,7 +443,7 @@ export const EditRecipeScreenOptimized: React.FC<EditRecipeScreenProps> = ({
         setIngredients([{ name: '', quantity: '', unit: '' }]);
         return;
       }
-      setIngredients((prev) =>
+      setIngredients(prev =>
         prev.filter((_, index) => index !== indexToRemove),
       );
       removeParsedIngredient(indexToRemove);
@@ -428,7 +453,7 @@ export const EditRecipeScreenOptimized: React.FC<EditRecipeScreenProps> = ({
 
   const handleStepChange = useCallback(
     (index: number, value: string) => {
-      setPreparationSteps((prev) => {
+      setPreparationSteps(prev => {
         const newSteps = [...prev];
         newSteps[index] = value;
         return newSteps;
@@ -438,12 +463,12 @@ export const EditRecipeScreenOptimized: React.FC<EditRecipeScreenProps> = ({
   );
 
   const handleAddStep = useCallback(() => {
-    setPreparationSteps((prev) => [...prev, '']);
+    setPreparationSteps(prev => [...prev, '']);
   }, [setPreparationSteps]);
 
   const handleRemoveStep = useCallback(
     (indexToRemove: number) => {
-      setPreparationSteps((prev) => {
+      setPreparationSteps(prev => {
         if (prev.length === 1) {
           return [''];
         }
@@ -455,8 +480,8 @@ export const EditRecipeScreenOptimized: React.FC<EditRecipeScreenProps> = ({
 
   const handleTagToggle = useCallback(
     (tag: string) => {
-      setDietTags((prev) =>
-        prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
+      setDietTags(prev =>
+        prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag],
       );
     },
     [setDietTags],
@@ -558,156 +583,182 @@ export const EditRecipeScreenOptimized: React.FC<EditRecipeScreenProps> = ({
     [],
   );
 
-  const handleSaveRecipe = useCallback(
-    async () => {
-      if (!initialRecipeData) {
-        Alert.alert('Error', 'Original recipe data not loaded.');
-        return;
-      }
-      if (!validateForm()) return;
+  const handleSaveRecipe = useCallback(async () => {
+    if (!initialRecipeData) {
+      Alert.alert('Error', 'Original recipe data not loaded.');
+      return;
+    }
+    if (!validateForm()) return;
 
-      setIsUpdating(true);
+    setIsUpdating(true);
+    setUploadProgress(0);
+    let finalThumbnailUrl = currentThumbnailUrl;
+
+    const callId = `recipe_save_${Date.now()}`;
+    startApiCall(callId);
+
+    try {
+      // Handle thumbnail upload if a new one was selected
+      if (
+        newLocalThumbnailUri &&
+        newLocalThumbnailUri !== initialRecipeData.thumbnail_url
+      ) {
+        setUploadProgress(0.25);
+
+        // Get the compressed image data
+        let base64Data: string;
+        try {
+          const compressionResult = await compressImageWithPreset(
+            newLocalThumbnailUri,
+            'HIGH_QUALITY',
+          );
+          if (!compressionResult.base64) {
+            throw new Error('Failed to get base64 data from compressed image');
+          }
+          base64Data = compressionResult.base64;
+        } catch (compressionError) {
+          base64Data = await convertUriToBase64(newLocalThumbnailUri);
+        }
+
+        const fileExt = 'jpg';
+        const fileName = `recipe-thumb-${recipeId}-${Date.now()}.${fileExt}`;
+        const contentType = 'image/jpeg';
+        const filePath = `${user?.id || 'public'}/${fileName}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('recipe-thumbnails')
+          .upload(filePath, decode(base64Data), {
+            cacheControl: '3600',
+            upsert: true,
+            contentType,
+          });
+
+        if (uploadError) {
+          throw new Error(
+            `Failed to upload thumbnail: ${JSON.stringify(uploadError)}`,
+          );
+        }
+
+        setUploadProgress(0.5);
+        if (uploadData) {
+          const { data: publicUrlData } = supabase.storage
+            .from('recipe-thumbnails')
+            .getPublicUrl(filePath);
+          finalThumbnailUrl = publicUrlData.publicUrl;
+        }
+      }
+
+      // Prepare data for RPC call
+      const updatedRecipePayload = {
+        p_recipe_id: initialRecipeData.recipe_id,
+        p_title: formData.title.trim(),
+        p_description: formData.description.trim(),
+        p_video_url: initialRecipeData.video_url,
+        p_thumbnail_url: finalThumbnailUrl,
+        p_ingredients: getIngredientsForSave(),
+        p_diet_tags: dietTags,
+        p_preparation_steps: preparationSteps.filter(
+          step => step.trim() !== '',
+        ),
+        p_prep_time_minutes: parseInt(formData.prepTimeMinutes) || null,
+        p_cook_time_minutes: parseInt(formData.cookTimeMinutes) || null,
+        p_servings: parseInt(formData.servings) || null,
+        p_is_public: formData.isPublic,
+      };
+
+      // 🔍 BACKEND TEAM REQUEST: Debug auth context before RPC call
+      console.log('=== AUTH DEBUG INFO (Backend Team Request - Optimized) ===');
+      console.log('🔐 Current auth.user():', await supabase.auth.getUser());
+      console.log('🔐 Expected user_id:', '75a26b47-9b41-490b-af01-d00926cb0bbb');
+      console.log('🔐 useAuth() user:', user);
+      console.log('🔐 useAuth() user.id:', user?.id);
+      console.log('📦 updatedRecipePayload:', JSON.stringify(updatedRecipePayload, null, 2));
+      
+      // 🔍 DEBUG: Check ingredient data before save
+      console.log('🥕 INGREDIENT DEBUG (Optimized):');
+      console.log('🥕 Parsed ingredients:', JSON.stringify(parsedIngredients, null, 2));
+      console.log('🥕 Serialized for save:', JSON.stringify(getIngredientsForSave(), null, 2));
+      
+      console.log('=== END AUTH DEBUG ===');
+
+      setUploadProgress(0.75);
+
+      // Call the update RPC
+      const { error: updateRpcError } = await supabase.rpc(
+        'update_recipe_details',
+        updatedRecipePayload,
+      );
+      
+      // 🔍 BACKEND TEAM REQUEST: Log RPC errors in detail
+      if (updateRpcError) {
+        console.error('=== RPC ERROR DEBUG (Backend Team Request - Optimized) ===');
+        console.error('❌ RPC Error Details:', updateRpcError);
+        console.error('❌ Error Code:', updateRpcError.code);
+        console.error('❌ Error Message:', updateRpcError.message);
+        console.error('❌ Error Details:', updateRpcError.details);
+        console.error('❌ Error Hint:', updateRpcError.hint);
+        console.error('=== END RPC ERROR DEBUG ===');
+        throw updateRpcError;
+      }
+
+      setUploadProgress(1);
+      Alert.alert('Success', 'Recipe updated successfully!');
+
+      // GENTLE CACHE REFRESH: Invalidate without removing data
+      console.log('[EditRecipeOptimized] Using gentle cache refresh approach...');
+      
+      // Invalidate the specific recipe caches to trigger refetch
+      queryClient.invalidateQueries({
+        queryKey: ['recipeDetails', recipeId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['editableRecipeDetails', recipeId],
+      });
+      
+      // Invalidate profile data for recipe lists
+      if (user) {
+        queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
+      }
+
+      // Small delay before navigation to allow cache invalidation to start
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      navigation.goBack();
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Could not update recipe.');
+    } finally {
+      setIsUpdating(false);
       setUploadProgress(0);
-      let finalThumbnailUrl = currentThumbnailUrl;
-
-      const callId = `recipe_save_${Date.now()}`;
-      startApiCall(callId);
-
-      try {
-        // Handle thumbnail upload if a new one was selected
-        if (
-          newLocalThumbnailUri &&
-          newLocalThumbnailUri !== initialRecipeData.thumbnail_url
-        ) {
-          setUploadProgress(0.25);
-
-          // Get the compressed image data
-          let base64Data: string;
-          try {
-            const compressionResult = await compressImageWithPreset(
-              newLocalThumbnailUri,
-              'HIGH_QUALITY',
-            );
-            if (!compressionResult.base64) {
-              throw new Error(
-                'Failed to get base64 data from compressed image',
-              );
-            }
-            base64Data = compressionResult.base64;
-          } catch (compressionError) {
-            base64Data = await convertUriToBase64(newLocalThumbnailUri);
-          }
-
-          const fileExt = 'jpg';
-          const fileName = `recipe-thumb-${recipeId}-${Date.now()}.${fileExt}`;
-          const contentType = 'image/jpeg';
-          const filePath = `${user?.id || 'public'}/${fileName}`;
-
-          const { data: uploadData, error: uploadError } =
-            await supabase.storage
-              .from('recipe-thumbnails')
-              .upload(filePath, decode(base64Data), {
-                cacheControl: '3600',
-                upsert: true,
-                contentType,
-              });
-
-          if (uploadError) {
-            throw new Error(
-              `Failed to upload thumbnail: ${JSON.stringify(uploadError)}`,
-            );
-          }
-
-          setUploadProgress(0.5);
-          if (uploadData) {
-            const { data: publicUrlData } = supabase.storage
-              .from('recipe-thumbnails')
-              .getPublicUrl(filePath);
-            finalThumbnailUrl = publicUrlData.publicUrl;
-          }
-        }
-
-        // Prepare data for RPC call
-        const updatedRecipePayload = {
-          p_recipe_id: initialRecipeData.recipe_id,
-          p_title: formData.title.trim(),
-          p_description: formData.description.trim(),
-          p_video_url: initialRecipeData.video_url,
-          p_thumbnail_url: finalThumbnailUrl,
-          p_ingredients: getIngredientsForSave(),
-          p_diet_tags: dietTags,
-          p_preparation_steps: preparationSteps.filter(
-            (step) => step.trim() !== '',
-          ),
-          p_prep_time_minutes: parseInt(formData.prepTimeMinutes) || null,
-          p_cook_time_minutes: parseInt(formData.cookTimeMinutes) || null,
-          p_servings: parseInt(formData.servings) || null,
-          p_is_public: formData.isPublic,
-        };
-
-        setUploadProgress(0.75);
-
-        // Call the update RPC
-        const { error: updateRpcError } = await supabase.rpc(
-          'update_recipe_details',
-          updatedRecipePayload,
-        );
-        if (updateRpcError) throw updateRpcError;
-
-        setUploadProgress(1);
-        Alert.alert('Success', 'Recipe updated successfully!');
-
-        // Clear caches
-        await clearCachesAfterSave();
-
-        // Invalidate queries
-        queryClient.invalidateQueries({
-          queryKey: ['editableRecipeDetails', recipeId],
-        });
-        queryClient.invalidateQueries({
-          queryKey: ['recipeDetails', recipeId],
-        });
-        if (user) {
-          queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
-        }
-
-        navigation.goBack();
-      } catch (error: any) {
-        Alert.alert('Error', error.message || 'Could not update recipe.');
-      } finally {
-        setIsUpdating(false);
-        setUploadProgress(0);
-        endApiCall(callId, 'recipe_save');
-      }
-    },
-    [
-      initialRecipeData,
-      validateForm,
-      currentThumbnailUrl,
-      newLocalThumbnailUri,
-      formData,
-      dietTags,
-      preparationSteps,
-      getIngredientsForSave,
-      convertUriToBase64,
-      recipeId,
-      user,
-      clearCachesAfterSave,
-      queryClient,
-      navigation,
-      startApiCall,
-      endApiCall,
-    ],
-  );
+      endApiCall(callId, 'recipe_save');
+    }
+  }, [
+    initialRecipeData,
+    validateForm,
+    currentThumbnailUrl,
+    newLocalThumbnailUri,
+    formData,
+    dietTags,
+    preparationSteps,
+    getIngredientsForSave,
+    convertUriToBase64,
+    recipeId,
+    user,
+    clearCachesAfterSave,
+    queryClient,
+    navigation,
+    startApiCall,
+    endApiCall,
+    parsedIngredients,
+  ]);
 
   // Memoized counts for performance
   const ingredientCount = useMemo(
-    () => ingredients.filter((i) => i.name.trim()).length,
+    () => ingredients.filter(i => i.name.trim()).length,
     [ingredients],
   );
 
   const stepCount = useMemo(
-    () => preparationSteps.filter((s) => s.trim()).length,
+    () => preparationSteps.filter(s => s.trim()).length,
     [preparationSteps],
   );
 
@@ -789,15 +840,12 @@ export const EditRecipeScreenOptimized: React.FC<EditRecipeScreenProps> = ({
         </Suspense>
 
         {/* Diet Tags Section */}
-        <OptimizedDietTags
-          dietTags={dietTags}
-          onTagToggle={handleTagToggle}
-        />
+        <OptimizedDietTags dietTags={dietTags} onTagToggle={handleTagToggle} />
 
         {/* Visibility Section */}
         <OptimizedVisibility
           isPublic={formData.isPublic}
-          onToggle={(value) => updateFormData('isPublic', value)}
+          onToggle={value => updateFormData('isPublic', value)}
         />
       </View>
 
@@ -955,4 +1003,4 @@ const styles = StyleSheet.create({
 
 EditRecipeScreenOptimized.displayName = 'EditRecipeScreenOptimized';
 
-export default EditRecipeScreenOptimized; 
+export default EditRecipeScreenOptimized;

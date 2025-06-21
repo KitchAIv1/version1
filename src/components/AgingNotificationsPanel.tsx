@@ -11,6 +11,7 @@ import {
   ListRenderItem,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   AgingNotification,
   useMarkNotificationRead,
@@ -20,7 +21,6 @@ import {
 } from '../hooks/useAgingNotifications';
 import { AGE_GROUP_CONFIG } from '../hooks/useStockAging';
 import { useAuth } from '../providers/AuthProvider';
-import { useQueryClient } from '@tanstack/react-query';
 
 // Move styles to top to fix "styles used before defined" errors
 const styles = StyleSheet.create({
@@ -202,23 +202,30 @@ interface NotificationItemProps {
 const NotificationItem = memo<NotificationItemProps>(
   ({ notification, onMarkRead, onDismiss, onViewItem }) => {
     // Handle both flat structure (actual backend) and nested metadata (legacy)
-    const item_name = notification.item_name || notification.metadata?.item_name || 'Unknown item';
-    const days_old = notification.days_old ?? notification.metadata?.days_old ?? 0;
-    const stock_item_id = notification.stock_item_id || notification.metadata?.stock_item_id;
-    
+    const item_name =
+      notification.item_name ||
+      notification.metadata?.item_name ||
+      'Unknown item';
+    const days_old =
+      notification.days_old ?? notification.metadata?.days_old ?? 0;
+    const stock_item_id =
+      notification.stock_item_id || notification.metadata?.stock_item_id;
+
     // Calculate age_group based on days_old (since backend doesn't provide it)
-    const age_group = notification.metadata?.age_group || 
+    const age_group =
+      notification.metadata?.age_group ||
       (days_old > 14 ? 'red' : days_old >= 7 ? 'yellow' : 'green');
-    
+
     // Generate title and message if missing
     const title = notification.title || `${item_name} is aging`;
-    const message = notification.message || 
-      (age_group === 'red' 
+    const message =
+      notification.message ||
+      (age_group === 'red'
         ? `${item_name} is ${days_old} days old and may be spoiled`
-        : age_group === 'yellow' 
-        ? `${item_name} is ${days_old} days old and should be used soon`
-        : `${item_name} is ${days_old} days old and still fresh`);
-    
+        : age_group === 'yellow'
+          ? `${item_name} is ${days_old} days old and should be used soon`
+          : `${item_name} is ${days_old} days old and still fresh`);
+
     const ageConfig = AGE_GROUP_CONFIG[age_group];
 
     const handleMarkRead = useCallback(() => {
@@ -256,8 +263,8 @@ const NotificationItem = memo<NotificationItemProps>(
                 age_group === 'red'
                   ? 'alert-circle'
                   : age_group === 'yellow'
-                  ? 'warning'
-                  : 'checkmark-circle'
+                    ? 'warning'
+                    : 'checkmark-circle'
               }
               size={16}
               color={ageConfig.color}
@@ -265,12 +272,8 @@ const NotificationItem = memo<NotificationItemProps>(
           </View>
 
           <View style={styles.notificationContent}>
-            <Text style={styles.notificationTitle}>
-              {title}
-            </Text>
-            <Text style={styles.notificationMessage}>
-              {message}
-            </Text>
+            <Text style={styles.notificationTitle}>{title}</Text>
+            <Text style={styles.notificationMessage}>{message}</Text>
             <Text style={styles.notificationMetadata}>
               {item_name} • {days_old} days old • {ageConfig.label}
             </Text>
@@ -378,7 +381,9 @@ const AgingNotificationsPanel: React.FC<AgingNotificationsPanelProps> = ({
             <Text style={styles.headerTitle}>Aging Alerts</Text>
             {notifications.length > 0 && (
               <View style={styles.unreadBadge}>
-                <Text style={styles.unreadBadgeText}>{notifications.length}</Text>
+                <Text style={styles.unreadBadgeText}>
+                  {notifications.length}
+                </Text>
               </View>
             )}
           </View>
@@ -407,8 +412,9 @@ const AgingNotificationsPanel: React.FC<AgingNotificationsPanelProps> = ({
         {/* Help Text */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            💡 Tip: Red items are 15+ days old and should be used immediately. Yellow
-            items are 7-14 days old and should be used soon. Green items are fresh (0-6 days).
+            💡 Tip: Red items are 15+ days old and should be used immediately.
+            Yellow items are 7-14 days old and should be used soon. Green items
+            are fresh (0-6 days).
           </Text>
         </View>
       </View>

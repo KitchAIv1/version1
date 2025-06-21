@@ -13,7 +13,10 @@ import {
 } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Tabs, MaterialTabBar } from 'react-native-collapsible-tab-view';
-import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
+import {
+  useSafeAreaInsets,
+  SafeAreaView,
+} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -23,15 +26,13 @@ import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
 // Optimized imports
 import { useAuth } from '../../providers/AuthProvider';
 import { useScreenLoadTracking } from '../../hooks/usePerformanceMonitoring';
-import { ProfileSkeleton, RecipeGridSkeleton } from '../../components/skeletons';
+import {
+  ProfileSkeleton,
+  RecipeGridSkeleton,
+} from '../../components/skeletons';
 import { OptimizedFlatList } from '../../components/optimized/OptimizedFlatList';
 import { supabase } from '../../services/supabase';
 import { MainStackParamList } from '../../navigation/types';
-
-// Lazy-loaded components for better performance - fix default exports
-const ProfileRecipeCard = React.lazy(() => import('../../components/ProfileRecipeCard'));
-const ActivityFeed = React.lazy(() => import('../../components/ActivityFeed'));
-const MealPlannerV2Screen = React.lazy(() => import('./meal_planner_v2/MealPlannerV2Screen'));
 
 // Import these directly since they may not have default exports
 import { FollowButton } from '../../components/FollowButton';
@@ -39,6 +40,15 @@ import { NotificationBell } from '../../components/NotificationBell';
 import { NotificationDrawer } from '../../components/NotificationDrawer';
 import { ToastNotification } from '../../components/ToastNotification';
 import { TierDisplay } from '../../components/TierDisplay';
+
+// Lazy-loaded components for better performance - fix default exports
+const ProfileRecipeCard = React.lazy(
+  () => import('../../components/ProfileRecipeCard'),
+);
+const ActivityFeed = React.lazy(() => import('../../components/ActivityFeed'));
+const MealPlannerV2Screen = React.lazy(
+  () => import('./meal_planner_v2/MealPlannerV2Screen'),
+);
 
 // Types
 interface VideoPostData {
@@ -84,7 +94,7 @@ const useOptimizedProfile = (targetUserId?: string) => {
 
       const { data: rawData, error: rpcError } = await supabase.rpc(
         'get_profile_details',
-        { p_user_id: userId }
+        { p_user_id: userId },
       );
 
       if (rpcError) {
@@ -92,37 +102,73 @@ const useOptimizedProfile = (targetUserId?: string) => {
         throw rpcError;
       }
       if (!rawData) {
-        console.error('[useOptimizedProfile] No data received from RPC for user:', userId);
+        console.error(
+          '[useOptimizedProfile] No data received from RPC for user:',
+          userId,
+        );
         throw new Error('Profile data not found.');
       }
 
       const profileDataBackend = rawData as any;
 
       // Optimized data processing with better error handling
-      const processedUploadedVideos: VideoPostData[] = Array.isArray(profileDataBackend.recipes)
+      const processedUploadedVideos: VideoPostData[] = Array.isArray(
+        profileDataBackend.recipes,
+      )
         ? profileDataBackend.recipes
             .map((recipe: any, index: number) => ({
               recipe_id: recipe.recipe_id || recipe.id || `recipe_${index}`,
-              recipe_name: recipe.title || recipe.recipe_name || recipe.name || 'Untitled Recipe',
+              recipe_name:
+                recipe.title ||
+                recipe.recipe_name ||
+                recipe.name ||
+                'Untitled Recipe',
               video_url: recipe.video_url || recipe.videoUrl || '',
-              thumbnail_url: recipe.thumbnail_url || recipe.thumbnailUrl || null,
-              created_at: recipe.created_at || recipe.createdAt || new Date().toISOString(),
-              creator_user_id: recipe.creator_user_id || recipe.creatorUserId || recipe.user_id || userId,
+              thumbnail_url:
+                recipe.thumbnail_url || recipe.thumbnailUrl || null,
+              created_at:
+                recipe.created_at ||
+                recipe.createdAt ||
+                new Date().toISOString(),
+              creator_user_id:
+                recipe.creator_user_id ||
+                recipe.creatorUserId ||
+                recipe.user_id ||
+                userId,
             }))
-            .filter((recipe: VideoPostData) => recipe.recipe_id && recipe.recipe_name)
+            .filter(
+              (recipe: VideoPostData) => recipe.recipe_id && recipe.recipe_name,
+            )
         : [];
 
-      const processedSavedRecipes: VideoPostData[] = Array.isArray(profileDataBackend.saved_recipes)
+      const processedSavedRecipes: VideoPostData[] = Array.isArray(
+        profileDataBackend.saved_recipes,
+      )
         ? profileDataBackend.saved_recipes
             .map((recipe: any, index: number) => ({
-              recipe_id: recipe.recipe_id || recipe.id || `saved_recipe_${index}`,
-              recipe_name: recipe.title || recipe.recipe_name || recipe.name || 'Untitled Recipe',
+              recipe_id:
+                recipe.recipe_id || recipe.id || `saved_recipe_${index}`,
+              recipe_name:
+                recipe.title ||
+                recipe.recipe_name ||
+                recipe.name ||
+                'Untitled Recipe',
               video_url: recipe.video_url || recipe.videoUrl || '',
-              thumbnail_url: recipe.thumbnail_url || recipe.thumbnailUrl || null,
-              created_at: recipe.created_at || recipe.createdAt || new Date().toISOString(),
-              creator_user_id: recipe.creator_user_id || recipe.creatorUserId || recipe.user_id || userId,
+              thumbnail_url:
+                recipe.thumbnail_url || recipe.thumbnailUrl || null,
+              created_at:
+                recipe.created_at ||
+                recipe.createdAt ||
+                new Date().toISOString(),
+              creator_user_id:
+                recipe.creator_user_id ||
+                recipe.creatorUserId ||
+                recipe.user_id ||
+                userId,
             }))
-            .filter((recipe: VideoPostData) => recipe.recipe_id && recipe.recipe_name)
+            .filter(
+              (recipe: VideoPostData) => recipe.recipe_id && recipe.recipe_name,
+            )
         : [];
 
       return {
@@ -170,12 +216,15 @@ const useOptimizedActivityFeed = (userId?: string) => {
 };
 
 const useOptimizedAccessControl = () => {
-  return useMemo(() => ({
-    getUsageDisplay: () => ({
-      tierDisplay: 'FREEMIUM',
-      usagePercentage: 0,
+  return useMemo(
+    () => ({
+      getUsageDisplay: () => ({
+        tierDisplay: 'FREEMIUM',
+        usagePercentage: 0,
+      }),
     }),
-  }), []);
+    [],
+  );
 };
 
 // Memoized components
@@ -187,28 +236,37 @@ const OptimizedAvatar = React.memo<{
     return (
       <Image
         source={{ uri: avatarUrl }}
-        style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}
+        style={[
+          styles.avatar,
+          { width: size, height: size, borderRadius: size / 2 },
+        ]}
         loadingIndicatorSource={{
           uri: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
         }}
       />
     );
   }
-  
+
   return (
-    <View style={[styles.avatarPlaceholder, { width: size, height: size, borderRadius: size / 2 }]}>
+    <View
+      style={[
+        styles.avatarPlaceholder,
+        { width: size, height: size, borderRadius: size / 2 },
+      ]}>
       <Icon name="person" size={size * 0.45} color="#a3a3a3" />
     </View>
   );
 });
 OptimizedAvatar.displayName = 'OptimizedAvatar';
 
-const OptimizedStat = React.memo<{ label: string; value: number }>(({ label, value }) => (
-  <View style={styles.statContainer}>
-    <Text style={styles.statValue}>{value}</Text>
-    <Text style={styles.statLabel}>{label}</Text>
-  </View>
-));
+const OptimizedStat = React.memo<{ label: string; value: number }>(
+  ({ label, value }) => (
+    <View style={styles.statContainer}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  ),
+);
 OptimizedStat.displayName = 'OptimizedStat';
 
 const OptimizedAvatarRow = React.memo<{
@@ -244,10 +302,14 @@ const OptimizedBio = React.memo<{
               : styles.tierBadgeFreemium,
           ]}
           onPress={onTierBadgePress}
-          activeOpacity={0.7}
-        >
+          activeOpacity={0.7}>
           {tierDisplay === 'PREMIUM' || tierDisplay.includes('CREATOR') ? (
-            <Icon name="star" size={12} color="#333" style={styles.tierBadgeIcon} />
+            <Icon
+              name="star"
+              size={12}
+              color="#333"
+              style={styles.tierBadgeIcon}
+            />
           ) : null}
           <Text
             style={[
@@ -255,8 +317,7 @@ const OptimizedBio = React.memo<{
               tierDisplay === 'PREMIUM' || tierDisplay.includes('CREATOR')
                 ? styles.tierBadgeTextPremium
                 : styles.tierBadgeTextFreemium,
-            ]}
-          >
+            ]}>
             {tierDisplay.includes('CREATOR') ? 'Creator' : tierDisplay}
           </Text>
         </TouchableOpacity>
@@ -285,28 +346,35 @@ const OptimizedTabContent = React.memo<{
       <Suspense fallback={<View style={styles.cardSkeleton} />}>
         <ProfileRecipeCard
           item={item}
-          onPress={() => navigation.navigate('RecipeDetail', { id: item.recipe_id })}
+          onPress={() =>
+            navigation.navigate('RecipeDetail', { id: item.recipe_id })
+          }
           context={context}
         />
       </Suspense>
     ),
-    [navigation, context]
+    [navigation, context],
   );
 
   const keyExtractor = useCallback(
     (item: VideoPostData) =>
       context === 'savedRecipes' ? `saved-${item.recipe_id}` : item.recipe_id,
-    [context]
+    [context],
   );
 
   const emptyComponent = useMemo(
     () => (
       <View style={styles.emptyContainer}>
-        <Feather name="archive" size={48} color="#cbd5e1" style={styles.emptyIcon} />
+        <Feather
+          name="archive"
+          size={48}
+          color="#cbd5e1"
+          style={styles.emptyIcon}
+        />
         <Text style={styles.emptyText}>{emptyLabel}</Text>
       </View>
     ),
-    [emptyLabel]
+    [emptyLabel],
   );
 
   return (
@@ -319,7 +387,7 @@ const OptimizedTabContent = React.memo<{
       ListEmptyComponent={emptyComponent}
       contentContainerStyle={styles.gridContentContainer}
       style={styles.fullScreenTabContent}
-      removeClippedSubviews={true}
+      removeClippedSubviews
       maxToRenderPerBatch={6}
       windowSize={8}
       initialNumToRender={4}
@@ -364,8 +432,12 @@ export const ProfileScreenOptimized = React.memo(() => {
   const { getUsageDisplay } = useOptimizedAccessControl();
   const usageData = getUsageDisplay();
 
-  const { data: notifications = [] } = useOptimizedNotifications(isOwnProfile ? user?.id : undefined);
-  const { data: activityData = [] } = useOptimizedActivityFeed(isOwnProfile ? user?.id : undefined);
+  const { data: notifications = [] } = useOptimizedNotifications(
+    isOwnProfile ? user?.id : undefined,
+  );
+  const { data: activityData = [] } = useOptimizedActivityFeed(
+    isOwnProfile ? user?.id : undefined,
+  );
 
   // State
   const [showTierModal, setShowTierModal] = useState(false);
@@ -374,8 +446,14 @@ export const ProfileScreenOptimized = React.memo(() => {
   const [toastNotification, setToastNotification] = useState<any>(null);
 
   // Memoized values
-  const unreadCount = useMemo(() => notifications.length, [notifications.length]);
-  const postsCount = useMemo(() => profile?.videos?.length || 0, [profile?.videos?.length]);
+  const unreadCount = useMemo(
+    () => notifications.length,
+    [notifications.length],
+  );
+  const postsCount = useMemo(
+    () => profile?.videos?.length || 0,
+    [profile?.videos?.length],
+  );
 
   // Optimized handlers
   const handleAddRecipePress = useCallback(() => {
@@ -387,24 +465,20 @@ export const ProfileScreenOptimized = React.memo(() => {
   }, []);
 
   const handleSignOut = useCallback(async () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await supabase.auth.signOut();
-            } catch (error) {
-              console.error('[ProfileScreen] Sign out error:', error);
-            }
-          },
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await supabase.auth.signOut();
+          } catch (error) {
+            console.error('[ProfileScreen] Sign out error:', error);
+          }
         },
-      ]
-    );
+      },
+    ]);
   }, []);
 
   const handleNotificationBellPress = useCallback(() => {
@@ -427,7 +501,9 @@ export const ProfileScreenOptimized = React.memo(() => {
     try {
       await Promise.all([
         refetchProfile(),
-        queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] }),
+        queryClient.invalidateQueries({
+          queryKey: ['notifications', user?.id],
+        }),
         queryClient.invalidateQueries({ queryKey: ['activityFeed', user?.id] }),
       ]);
     } catch (error) {
@@ -446,98 +522,121 @@ export const ProfileScreenOptimized = React.memo(() => {
         tintColor={ACTIVE_COLOR}
       />
     ),
-    [isRefreshing, onRefresh]
+    [isRefreshing, onRefresh],
   );
 
   // Memoized header component
-  const renderProfileInfo = useCallback(() => (
-    <View style={styles.profileInfoContainer}>
-      {isOwnProfile ? (
-        <View style={styles.scrollableHeader}>
-          <View style={styles.headerSpacer} />
-          <Text style={styles.scrollableHeaderTitle}>Kitch Hub</Text>
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.iconBtn} onPress={handleAddRecipePress}>
-              <Icon name="add-box" size={26} color="#10b981" />
+  const renderProfileInfo = useCallback(
+    () => (
+      <View style={styles.profileInfoContainer}>
+        {isOwnProfile ? (
+          <View style={styles.scrollableHeader}>
+            <View style={styles.headerSpacer} />
+            <Text style={styles.scrollableHeaderTitle}>Kitch Hub</Text>
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                style={styles.iconBtn}
+                onPress={handleAddRecipePress}>
+                <Icon name="add-box" size={26} color="#10b981" />
+              </TouchableOpacity>
+              <NotificationBell
+                unreadCount={unreadCount}
+                onPress={handleNotificationBellPress}
+                size={26}
+                color="#1f2937"
+                style={styles.iconBtn}
+              />
+              <TouchableOpacity style={styles.iconBtn} onPress={handleSignOut}>
+                <Icon name="menu" size={26} color="#1f2937" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.scrollableHeader}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}>
+              <Icon name="arrow-back" size={24} color="#1f2937" />
             </TouchableOpacity>
-            <NotificationBell
-              unreadCount={unreadCount}
-              onPress={handleNotificationBellPress}
-              size={26}
-              color="#1f2937"
+            <Text style={styles.scrollableHeaderTitle}>
+              @{profile?.username}
+            </Text>
+            <TouchableOpacity
               style={styles.iconBtn}
-            />
-            <TouchableOpacity style={styles.iconBtn} onPress={handleSignOut}>
-              <Icon name="menu" size={26} color="#1f2937" />
+              onPress={() =>
+                Alert.alert(
+                  'Share Profile',
+                  'Share functionality to be implemented.',
+                )
+              }>
+              <Icon name="share" size={24} color="#1f2937" />
             </TouchableOpacity>
           </View>
-        </View>
-      ) : (
-        <View style={styles.scrollableHeader}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Icon name="arrow-back" size={24} color="#1f2937" />
-          </TouchableOpacity>
-          <Text style={styles.scrollableHeaderTitle}>@{profile?.username}</Text>
-          <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={() => Alert.alert('Share Profile', 'Share functionality to be implemented.')}
-          >
-            <Icon name="share" size={24} color="#1f2937" />
-          </TouchableOpacity>
-        </View>
-      )}
-
-      <OptimizedAvatarRow profile={profile!} postsCount={postsCount} />
-      <OptimizedBio
-        profile={profile!}
-        onTierBadgePress={handleTierBadgePress}
-        tierDisplay={usageData.tierDisplay}
-        showTierBadge={isOwnProfile}
-      />
-
-      <View style={styles.buttonRow}>
-        {isOwnProfile ? (
-          <>
-            <TouchableOpacity style={styles.editButton} onPress={handleEditProfilePress}>
-              <Text style={styles.editButtonText}>Edit Profile</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.shareButton}
-              onPress={() => Alert.alert('Share Profile', 'Share functionality to be implemented.')}
-            >
-              <Text style={styles.shareButtonText}>Share Profile</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <FollowButton
-              targetUserId={profile?.user_id || targetUserId || ''}
-              style={styles.editButton}
-            />
-            <TouchableOpacity
-              style={styles.shareButton}
-              onPress={() => Alert.alert('Share Profile', 'Share functionality to be implemented.')}
-            >
-              <Text style={styles.shareButtonText}>Share Profile</Text>
-            </TouchableOpacity>
-          </>
         )}
+
+        <OptimizedAvatarRow profile={profile!} postsCount={postsCount} />
+        <OptimizedBio
+          profile={profile!}
+          onTierBadgePress={handleTierBadgePress}
+          tierDisplay={usageData.tierDisplay}
+          showTierBadge={isOwnProfile}
+        />
+
+        <View style={styles.buttonRow}>
+          {isOwnProfile ? (
+            <>
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={handleEditProfilePress}>
+                <Text style={styles.editButtonText}>Edit Profile</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.shareButton}
+                onPress={() =>
+                  Alert.alert(
+                    'Share Profile',
+                    'Share functionality to be implemented.',
+                  )
+                }>
+                <Text style={styles.shareButtonText}>Share Profile</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <FollowButton
+                targetUserId={profile?.user_id || targetUserId || ''}
+                style={styles.editButton}
+              />
+              <TouchableOpacity
+                style={styles.shareButton}
+                onPress={() =>
+                  Alert.alert(
+                    'Share Profile',
+                    'Share functionality to be implemented.',
+                  )
+                }>
+                <Text style={styles.shareButtonText}>Share Profile</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
       </View>
-    </View>
-  ), [
-    isOwnProfile,
-    profile,
-    postsCount,
-    usageData.tierDisplay,
-    unreadCount,
-    handleAddRecipePress,
-    handleNotificationBellPress,
-    handleSignOut,
-    handleEditProfilePress,
-    handleTierBadgePress,
-    navigation,
-    targetUserId,
-  ]);
+    ),
+    [
+      isOwnProfile,
+      profile,
+      postsCount,
+      usageData.tierDisplay,
+      unreadCount,
+      handleAddRecipePress,
+      handleNotificationBellPress,
+      handleSignOut,
+      handleEditProfilePress,
+      handleTierBadgePress,
+      navigation,
+      targetUserId,
+    ],
+  );
 
   // Loading state with skeleton
   if (profileLoading && !profile) {
@@ -555,7 +654,9 @@ export const ProfileScreenOptimized = React.memo(() => {
 
   // Error state
   if (isError || !profile) {
-    const message = profileFetchError?.message || 'Failed to load profile. Please try again later.';
+    const message =
+      profileFetchError?.message ||
+      'Failed to load profile. Please try again later.';
     return (
       <View style={styles.container}>
         <View style={styles.fixedGreenHeader}>
@@ -585,7 +686,7 @@ export const ProfileScreenOptimized = React.memo(() => {
             renderHeader={renderProfileInfo}
             headerHeight={undefined}
             allowHeaderOverscroll={false}
-            renderTabBar={(props) => (
+            renderTabBar={props => (
               <MaterialTabBar
                 {...props}
                 activeColor={ACTIVE_COLOR}
@@ -595,8 +696,7 @@ export const ProfileScreenOptimized = React.memo(() => {
                 style={styles.materialTabBar}
                 getLabelText={(name: string) => name}
               />
-            )}
-          >
+            )}>
             <Tabs.Tab name="My Recipes" label="My Recipes">
               <OptimizedTabContent
                 data={profile.videos}
@@ -614,14 +714,18 @@ export const ProfileScreenOptimized = React.memo(() => {
               />
             </Tabs.Tab>
             <Tabs.Tab name="Planner" label="Planner">
-              <Tabs.ScrollView style={styles.fullScreenTabContent} refreshControl={refreshControl}>
+              <Tabs.ScrollView
+                style={styles.fullScreenTabContent}
+                refreshControl={refreshControl}>
                 <Suspense fallback={<RecipeGridSkeleton itemCount={4} />}>
                   <MealPlannerV2Screen />
                 </Suspense>
               </Tabs.ScrollView>
             </Tabs.Tab>
             <Tabs.Tab name="Activity" label="Activity">
-              <Tabs.ScrollView style={styles.fullScreenTabContent} refreshControl={refreshControl}>
+              <Tabs.ScrollView
+                style={styles.fullScreenTabContent}
+                refreshControl={refreshControl}>
                 <Suspense fallback={<RecipeGridSkeleton itemCount={4} />}>
                   <ActivityFeed
                     data={activityData}
@@ -637,7 +741,7 @@ export const ProfileScreenOptimized = React.memo(() => {
             renderHeader={renderProfileInfo}
             headerHeight={undefined}
             allowHeaderOverscroll={false}
-            renderTabBar={(props) => (
+            renderTabBar={props => (
               <MaterialTabBar
                 {...props}
                 activeColor={ACTIVE_COLOR}
@@ -647,8 +751,7 @@ export const ProfileScreenOptimized = React.memo(() => {
                 style={styles.materialTabBar}
                 getLabelText={(name: string) => name}
               />
-            )}
-          >
+            )}>
             <Tabs.Tab name="Recipes" label="Recipes">
               <OptimizedTabContent
                 data={profile.videos}
@@ -664,20 +767,17 @@ export const ProfileScreenOptimized = React.memo(() => {
       {/* Tier Modal */}
       <Modal
         visible={showTierModal}
-        transparent={true}
+        transparent
         animationType="slide"
-        onRequestClose={() => setShowTierModal(false)}
-      >
+        onRequestClose={() => setShowTierModal(false)}>
         <View style={styles.modalOverlay}>
           <Animated.View
             entering={SlideInDown.duration(300)}
             exiting={SlideOutDown.duration(200)}
-            style={styles.modalContent}
-          >
+            style={styles.modalContent}>
             <TouchableOpacity
               style={styles.closeButton}
-              onPress={() => setShowTierModal(false)}
-            >
+              onPress={() => setShowTierModal(false)}>
               <Icon name="close" size={24} color="#666" />
             </TouchableOpacity>
             <TierDisplay />
@@ -695,7 +795,7 @@ export const ProfileScreenOptimized = React.memo(() => {
       {/* Toast Notification */}
       {toastNotification && (
         <ToastNotification
-          visible={true}
+          visible
           notification={toastNotification}
           onDismiss={() => setToastNotification(null)}
         />
@@ -1016,4 +1116,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ProfileScreenOptimized; 
+export default ProfileScreenOptimized;

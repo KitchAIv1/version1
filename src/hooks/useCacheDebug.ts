@@ -189,11 +189,10 @@ export const useCacheDebug = (userId?: string) => {
 
         for (const key of recipeKeys) {
           await queryClient.invalidateQueries({ queryKey: key });
-          queryClient.removeQueries({ queryKey: key });
-          console.log(`[CacheDebug] Cleared recipe cache key:`, key);
+          console.log(`[CacheDebug] Invalidated recipe cache key:`, key);
         }
 
-        return { success: true, message: `Recipe ${recipeId} cache cleared` };
+        return { success: true, message: `Recipe ${recipeId} cache invalidated` };
       } catch (error) {
         console.error('[CacheDebug] Failed to clear recipe cache:', error);
         return {
@@ -215,31 +214,36 @@ export const useCacheDebug = (userId?: string) => {
           '[CacheDebug] Starting complete sync after recipe operation...',
         );
 
-        // 1. Clear feed cache
-        await clearFeedCache();
-
-        // 2. Clear profile cache (My Recipes, Saved Recipes)
-        await clearProfileCache();
-
-        // 3. Clear specific recipe cache if provided
+        // 1. Clear specific recipe cache first if provided (most important)
         if (recipeId) {
           await clearRecipeSpecificCache(recipeId);
         }
 
-        // 4. Force refresh all related queries
-        await queryClient.refetchQueries({
-          predicate: query => {
-            const key = query.queryKey[0] as string;
-            return (
-              key.includes('recipe') ||
-              key.includes('feed') ||
-              key.includes('saved') ||
-              key.includes('profile') ||
-              key.includes('my_recipes') ||
-              key.includes('user_recipes')
-            );
-          },
-        });
+        // 2. Clear feed cache (invalidate, don't remove)
+        await queryClient.invalidateQueries({ queryKey: ['feed'] });
+
+        // 3. Clear profile cache (My Recipes, Saved Recipes)
+        await clearProfileCache();
+
+        // 4. Add a small delay to allow navigation to complete before refetching
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // 5. Force refresh only the most critical queries
+        if (recipeId && userId) {
+          // Refetch the specific recipe details
+          await queryClient.refetchQueries({
+            queryKey: ['recipeDetails', recipeId, userId],
+            exact: true,
+          });
+        }
+
+        // 6. Refetch profile data for saved/my recipes lists
+        if (userId) {
+          await queryClient.refetchQueries({
+            queryKey: ['profile', userId],
+            exact: true,
+          });
+        }
 
         console.log('[CacheDebug] Complete sync completed successfully');
         return { success: true, message: 'Complete sync completed' };
@@ -251,7 +255,7 @@ export const useCacheDebug = (userId?: string) => {
         };
       }
     },
-    [clearFeedCache, clearProfileCache, clearRecipeSpecificCache, queryClient],
+    [clearRecipeSpecificCache, clearProfileCache, queryClient, userId],
   );
 
   /**

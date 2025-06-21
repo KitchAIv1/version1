@@ -20,7 +20,11 @@ interface Ingredient {
 interface IngredientsSectionProps {
   ingredients: Ingredient[];
   ingredientCount: number;
-  onIngredientChange: (index: number, field: keyof Ingredient, value: string) => void;
+  onIngredientChange: (
+    index: number,
+    field: keyof Ingredient,
+    value: string,
+  ) => void;
   onAddIngredient: () => void;
   onRemoveIngredient: (index: number) => void;
 }
@@ -29,20 +33,33 @@ interface IngredientsSectionProps {
 const OptimizedIngredientItem = React.memo<{
   ingredient: Ingredient;
   index: number;
-  onIngredientChange: (index: number, field: keyof Ingredient, value: string) => void;
+  onIngredientChange: (
+    index: number,
+    field: keyof Ingredient,
+    value: string,
+  ) => void;
   onRemoveIngredient: (index: number) => void;
 }>(({ ingredient, index, onIngredientChange, onRemoveIngredient }) => {
-  const handleNameChange = useCallback((value: string) => {
-    onIngredientChange(index, 'name', value);
-  }, [index, onIngredientChange]);
+  const handleNameChange = useCallback(
+    (value: string) => {
+      onIngredientChange(index, 'name', value);
+    },
+    [index, onIngredientChange],
+  );
 
-  const handleQuantityChange = useCallback((value: string) => {
-    onIngredientChange(index, 'quantity', value);
-  }, [index, onIngredientChange]);
+  const handleQuantityChange = useCallback(
+    (value: string) => {
+      onIngredientChange(index, 'quantity', value);
+    },
+    [index, onIngredientChange],
+  );
 
-  const handleUnitChange = useCallback((value: string) => {
-    onIngredientChange(index, 'unit', value);
-  }, [index, onIngredientChange]);
+  const handleUnitChange = useCallback(
+    (value: string) => {
+      onIngredientChange(index, 'unit', value);
+    },
+    [index, onIngredientChange],
+  );
 
   const handleRemove = useCallback(() => {
     onRemoveIngredient(index);
@@ -72,9 +89,7 @@ const OptimizedIngredientItem = React.memo<{
         style={styles.inputUnit}
         placeholderTextColor="#999"
       />
-      <TouchableOpacity
-        onPress={handleRemove}
-        style={styles.removeButton}>
+      <TouchableOpacity onPress={handleRemove} style={styles.removeButton}>
         <Feather name="x-circle" size={24} color="#ff6347" />
       </TouchableOpacity>
     </View>
@@ -102,37 +117,42 @@ const OptimizedAddButton = React.memo<{
 OptimizedAddButton.displayName = 'OptimizedAddButton';
 
 // Main IngredientsSection Component
-export const IngredientsSection = React.memo<IngredientsSectionProps>(({
-  ingredients,
-  ingredientCount,
-  onIngredientChange,
-  onAddIngredient,
-  onRemoveIngredient,
-}) => {
-  // Memoize the ingredient list to prevent unnecessary re-renders
-  const memoizedIngredients = useMemo(() => 
-    ingredients.map((ingredient, index) => (
-      <OptimizedIngredientItem
-        key={`ingredient-${index}`}
-        ingredient={ingredient}
-        index={index}
-        onIngredientChange={onIngredientChange}
-        onRemoveIngredient={onRemoveIngredient}
-      />
-    )), [ingredients, onIngredientChange, onRemoveIngredient]);
+export const IngredientsSection = React.memo<IngredientsSectionProps>(
+  ({
+    ingredients,
+    ingredientCount,
+    onIngredientChange,
+    onAddIngredient,
+    onRemoveIngredient,
+  }) => {
+    // Memoize the ingredient list to prevent unnecessary re-renders
+    const memoizedIngredients = useMemo(
+      () =>
+        ingredients.map((ingredient, index) => (
+          <OptimizedIngredientItem
+            key={`ingredient-${index}`}
+            ingredient={ingredient}
+            index={index}
+            onIngredientChange={onIngredientChange}
+            onRemoveIngredient={onRemoveIngredient}
+          />
+        )),
+      [ingredients, onIngredientChange, onRemoveIngredient],
+    );
 
-  const cardTitle = useMemo(() => 
-    `Ingredients (${ingredientCount})`, [ingredientCount]);
+    const cardTitle = useMemo(
+      () => `Ingredients (${ingredientCount})`,
+      [ingredientCount],
+    );
 
-  return (
-    <OptimizedCollapsibleCard
-      title={cardTitle}
-      icon="shopping-bag">
-      {memoizedIngredients}
-      <OptimizedAddButton onAddIngredient={onAddIngredient} />
-    </OptimizedCollapsibleCard>
-  );
-});
+    return (
+      <OptimizedCollapsibleCard title={cardTitle} icon="shopping-bag">
+        {memoizedIngredients}
+        <OptimizedAddButton onAddIngredient={onAddIngredient} />
+      </OptimizedCollapsibleCard>
+    );
+  },
+);
 
 IngredientsSection.displayName = 'IngredientsSection';
 
@@ -194,4 +214,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default IngredientsSection; 
+export default IngredientsSection;

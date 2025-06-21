@@ -7,9 +7,11 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { paperTheme } from './theme/paperTheme';
 import { AuthProvider } from './src/providers/AuthProvider';
 import { GroceryProvider } from './src/providers/GroceryProvider';
+import { NetworkProvider } from './src/providers/NetworkProvider';
 import AppNavigator from './src/navigation/AppNavigator';
+import GlobalOfflineIndicator from './src/components/GlobalOfflineIndicator';
 
-// Create a client with optimized caching configuration
+// Create a client with optimized caching and global retry configuration
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -17,8 +19,9 @@ const queryClient = new QueryClient({
       staleTime: 5 * 60 * 1000,
       // Cache data for 30 minutes
       gcTime: 30 * 60 * 1000,
-      // Retry failed requests 1 time
-      retry: 1,
+      // Global retry configuration - 3 retries with exponential backoff
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
       // Use stale data while fetching new data
       refetchOnMount: true,
       // Don't refetch on window focus by default (reduces unnecessary network calls)
@@ -32,16 +35,19 @@ export default function App() {
     // Wrap with GestureHandlerRootView
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
-        <PaperProvider theme={paperTheme}>
-          <AuthProvider>
-            <GroceryProvider>
-              <NavigationContainer>
-                <AppNavigator />
-                <StatusBar style="auto" />
-              </NavigationContainer>
-            </GroceryProvider>
-          </AuthProvider>
-        </PaperProvider>
+        <NetworkProvider queryClient={queryClient}>
+          <PaperProvider theme={paperTheme}>
+            <AuthProvider>
+              <GroceryProvider>
+                <NavigationContainer>
+                  <AppNavigator />
+                  <GlobalOfflineIndicator />
+                  <StatusBar style="auto" />
+                </NavigationContainer>
+              </GroceryProvider>
+            </AuthProvider>
+          </PaperProvider>
+        </NetworkProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>
   );

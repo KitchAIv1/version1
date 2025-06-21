@@ -14,14 +14,14 @@ const ACTIVE_COLOR = '#10b981';
 // Helper function to detect mixed batches
 const isMixedBatches = (item: StockAgingItem): boolean => {
   const result = !!(
-    item.quantity_added !== null && 
-    item.quantity_added !== undefined && 
+    item.quantity_added !== null &&
+    item.quantity_added !== undefined &&
     item.quantity_added !== 0 &&
     item.previous_quantity !== null &&
     item.previous_quantity !== undefined &&
     item.previous_quantity > 0
   );
-  
+
   // Debug logging for clementines
   if (item.item_name === 'clementines') {
     console.log('[isMixedBatches] 🍊 Clementines detection debug:', {
@@ -39,7 +39,7 @@ const isMixedBatches = (item: StockAgingItem): boolean => {
       final_result: result,
     });
   }
-  
+
   return result;
 };
 
@@ -270,7 +270,7 @@ export const PantryItemWithAging = memo<PantryItemWithAgingProps>(
     );
 
     // Create accessibility text
-    const accessibilityText = hasMixedBatches 
+    const accessibilityText = hasMixedBatches
       ? `${MIXED_BATCHES_CONFIG.label} - ${MIXED_BATCHES_CONFIG.description}`
       : `${AGE_GROUP_CONFIG[item.age_group].label} - ${item.age_description}`;
 
@@ -314,7 +314,10 @@ export const PantryItemWithAging = memo<PantryItemWithAgingProps>(
                 ]}
                 accessibilityLabel={accessibilityText}>
                 <Text
-                  style={[styles.ageBadgeText, { color: badgeConfig.textColor }]}
+                  style={[
+                    styles.ageBadgeText,
+                    { color: badgeConfig.textColor },
+                  ]}
                   accessibilityLabel={badgeConfig.label}>
                   {badgeConfig.label}
                 </Text>
@@ -329,7 +332,8 @@ export const PantryItemWithAging = memo<PantryItemWithAgingProps>(
               </Text>
               {hasMixedBatches ? (
                 <Text style={styles.metaText}>
-                  <Ionicons name="layers-outline" size={12} /> Multiple additions detected
+                  <Ionicons name="layers-outline" size={12} /> Multiple
+                  additions detected
                 </Text>
               ) : (
                 <Text style={styles.metaText}>
@@ -365,7 +369,10 @@ export const PantryItemWithAging = memo<PantryItemWithAgingProps>(
 
         {/* Age Group Visual Indicator Bar */}
         <View
-          style={[styles.ageIndicatorBar, { backgroundColor: badgeConfig.color }]}
+          style={[
+            styles.ageIndicatorBar,
+            { backgroundColor: badgeConfig.color },
+          ]}
           accessibilityLabel={`Indicator: ${badgeConfig.description || badgeConfig.label}`}
         />
       </TouchableOpacity>

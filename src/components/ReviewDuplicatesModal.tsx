@@ -10,7 +10,10 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { DuplicateGroup, DuplicateItem } from '../services/DuplicateDetectionService';
+import {
+  DuplicateGroup,
+  DuplicateItem,
+} from '../services/DuplicateDetectionService';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -58,7 +61,10 @@ const ReviewDuplicatesModal: React.FC<ReviewDuplicatesModalProps> = ({
 
   const handleMergeSelected = () => {
     if (selectedItems.size < 2) {
-      Alert.alert('Selection Required', 'Please select at least 2 items to merge.');
+      Alert.alert(
+        'Selection Required',
+        'Please select at least 2 items to merge.',
+      );
       return;
     }
 
@@ -76,8 +82,8 @@ const ReviewDuplicatesModal: React.FC<ReviewDuplicatesModalProps> = ({
     const itemNames = [...new Set(itemsToMerge.map(item => item.item_name))];
     if (itemNames.length > 1) {
       Alert.alert(
-        'Invalid Selection', 
-        'You can only merge items with the same name. Please select items from a single group.'
+        'Invalid Selection',
+        'You can only merge items with the same name. Please select items from a single group.',
       );
       return;
     }
@@ -112,25 +118,24 @@ const ReviewDuplicatesModal: React.FC<ReviewDuplicatesModalProps> = ({
             setSelectedItems(new Set());
           },
         },
-      ]
+      ],
     );
   };
 
   const renderDuplicateGroup = (group: DuplicateGroup) => {
     const isExpanded = expandedGroups.has(group.itemName);
-    
+
     return (
       <View key={group.itemName} style={styles.groupContainer}>
         {/* Group Header */}
         <TouchableOpacity
           style={styles.groupHeader}
-          onPress={() => toggleGroupExpansion(group.itemName)}
-        >
+          onPress={() => toggleGroupExpansion(group.itemName)}>
           <View style={styles.groupHeaderLeft}>
-            <Ionicons 
-              name={isExpanded ? "chevron-down" : "chevron-forward"} 
-              size={20} 
-              color="#666" 
+            <Ionicons
+              name={isExpanded ? 'chevron-down' : 'chevron-forward'}
+              size={20}
+              color="#666"
             />
             <Text style={styles.groupTitle}>{group.itemName}</Text>
             <View style={styles.countBadge}>
@@ -150,12 +155,13 @@ const ReviewDuplicatesModal: React.FC<ReviewDuplicatesModalProps> = ({
                 {/* Selection Checkbox */}
                 <TouchableOpacity
                   style={styles.checkbox}
-                  onPress={() => toggleItemSelection(item.id)}
-                >
+                  onPress={() => toggleItemSelection(item.id)}>
                   <Ionicons
-                    name={selectedItems.has(item.id) ? "checkbox" : "square-outline"}
+                    name={
+                      selectedItems.has(item.id) ? 'checkbox' : 'square-outline'
+                    }
                     size={20}
-                    color={selectedItems.has(item.id) ? "#2563eb" : "#999"}
+                    color={selectedItems.has(item.id) ? '#2563eb' : '#999'}
                   />
                 </TouchableOpacity>
 
@@ -168,7 +174,9 @@ const ReviewDuplicatesModal: React.FC<ReviewDuplicatesModalProps> = ({
                     📍 {item.storage_location}
                   </Text>
                   {item.description && (
-                    <Text style={styles.itemDescription}>{item.description}</Text>
+                    <Text style={styles.itemDescription}>
+                      {item.description}
+                    </Text>
                   )}
                 </View>
 
@@ -176,14 +184,12 @@ const ReviewDuplicatesModal: React.FC<ReviewDuplicatesModalProps> = ({
                 <View style={styles.itemActions}>
                   <TouchableOpacity
                     style={styles.actionButton}
-                    onPress={() => onEditItem(item)}
-                  >
+                    onPress={() => onEditItem(item)}>
                     <Ionicons name="pencil" size={16} color="#666" />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.actionButton}
-                    onPress={() => onDeleteItem(item)}
-                  >
+                    onPress={() => onDeleteItem(item)}>
                     <Ionicons name="trash" size={16} color="#ef4444" />
                   </TouchableOpacity>
                 </View>
@@ -200,8 +206,7 @@ const ReviewDuplicatesModal: React.FC<ReviewDuplicatesModalProps> = ({
       visible={isVisible}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
+      onRequestClose={onClose}>
       <View style={styles.modalContainer}>
         {/* Header */}
         <View style={styles.header}>
@@ -243,15 +248,13 @@ const ReviewDuplicatesModal: React.FC<ReviewDuplicatesModalProps> = ({
             <View style={styles.actionButtons}>
               <TouchableOpacity
                 style={styles.mergeButton}
-                onPress={handleMergeSelected}
-              >
+                onPress={handleMergeSelected}>
                 <Ionicons name="git-merge" size={16} color="#fff" />
                 <Text style={styles.mergeButtonText}>Merge</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.deleteButton}
-                onPress={handleDeleteSelected}
-              >
+                onPress={handleDeleteSelected}>
                 <Ionicons name="trash" size={16} color="#fff" />
                 <Text style={styles.deleteButtonText}>Delete</Text>
               </TouchableOpacity>
@@ -453,4 +456,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ReviewDuplicatesModal; 
+export default ReviewDuplicatesModal;
