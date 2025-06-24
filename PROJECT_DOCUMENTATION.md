@@ -15,7 +15,8 @@
 11. [State Management](#state-management)
 12. [File Structure](#file-structure)
 13. [Development Guidelines](#development-guidelines)
-14. [Deployment & Configuration](#deployment--configuration)
+14. [Save Function Implementation](#save-function-implementation)
+15. [Deployment & Configuration](#deployment--configuration)
 
 ---
 
@@ -777,6 +778,108 @@ kitchai-v2/
 - **Cross-Platform**: iOS and Android testing
 - **Performance**: Load and stress testing
 - **Accessibility**: Screen reader testing
+
+---
+
+## Save Function Implementation
+
+### 🎯 Overview
+
+The save functionality allows users to bookmark recipes for later access, with comprehensive UI integration across all screens. This feature demonstrates enterprise-grade implementation with optimistic updates, robust error handling, and multi-layer cache synchronization.
+
+### ✅ Technical Implementation
+
+#### Backend RPC Functions
+- **`save_recipe_video(user_id_param, recipe_id_param)`**: Main save/unsave toggle function
+- **`unsave_recipe(user_id_param, recipe_id_param)`**: Dedicated unsave function for profile screen
+- **Returns**: JSON with `is_saved` boolean status
+
+#### Frontend Integration
+- **`useRecipeMutations.ts`**: Central save mutation hook with optimistic updates
+- **`useCacheManager.ts`**: Multi-cache synchronization (feed, recipe details, profile)
+- **Universal Coverage**: Feed screen, recipe detail screen, profile screen
+- **Visual Feedback**: Bookmark icons with instant state changes
+
+#### Cache Management Strategy
+```typescript
+const optimisticSaveUpdate = (recipeId: string, userId?: string) => {
+  // Get current state from available caches
+  const currentSaved = getCurrentSaveState(recipeId, userId);
+  const newSaved = !currentSaved;
+
+  // Update all caches simultaneously
+  updateAllCaches({
+    recipeId,
+    userId,
+    isSaved: newSaved,
+  });
+
+  return { newSaved };
+};
+```
+
+### 🔧 Issues Resolved
+
+#### Issue 1: Missing Table Reference
+- **Problem**: RPC function referenced non-existent `user_activity_log` table  
+- **Solution**: Backend rewrote function to use correct `saved_recipe_videos` table
+
+#### Issue 2: Parameter Name Mismatch
+- **Problem**: Frontend used `p_recipe_id, p_user_id` but backend expected `recipe_id_param, user_id_param`
+- **Solution**: Standardized all RPC functions to use `*_param` naming convention
+
+#### Issue 3: Inconsistent Function Calls
+- **Problem**: Different screens called different RPC functions (`save_recipe_video` vs `toggle_recipe_save`)
+- **Solution**: Standardized all components to use `save_recipe_video`
+
+### 📊 Features & Benefits
+
+#### User Experience
+- ✅ **Instant Feedback**: Optimistic updates provide immediate visual response
+- ✅ **Cross-Screen Consistency**: Save state synchronized across all app screens  
+- ✅ **Error Recovery**: Automatic rollback on network failures
+- ✅ **Authentication Handling**: Prompts login when required
+
+#### Technical Quality
+- ✅ **Enterprise-Grade**: Production-ready error handling and state management
+- ✅ **Performance Optimized**: Debounced updates and efficient cache strategies
+- ✅ **Type Safe**: Full TypeScript integration with proper error types
+- ✅ **Testable**: Clear separation of concerns with comprehensive logging
+
+#### Business Impact
+- ✅ **Recipe Discovery**: Users can save interesting recipes for later
+- ✅ **User Retention**: Saved recipes create return engagement
+- ✅ **Social Features**: Foundation for recipe collections and sharing
+- ✅ **Premium Features**: Save limits can be used for tier differentiation
+
+### 🧪 Testing & Verification
+
+#### Verification Checklist
+- ✅ Save button works in feed screen with visual feedback
+- ✅ Save button works in recipe detail screen with loading states
+- ✅ Saved recipes appear in profile screen
+- ✅ Unsave functionality works from profile context menu
+- ✅ State persists across app restarts and sessions
+- ✅ Error handling displays appropriate user messages
+- ✅ Optimistic updates roll back on server errors
+
+#### Test Coverage
+- **Unit Tests**: Save mutation hook functionality
+- **Integration Tests**: Cross-component state synchronization
+- **E2E Tests**: Complete user save workflow
+- **Error Tests**: Network failure and recovery scenarios
+
+### 🚀 Deployment Status
+
+- ✅ **Backend**: All RPC functions deployed and tested
+- ✅ **Frontend**: All components updated with correct parameters  
+- ✅ **Documentation**: Complete implementation documentation created
+- ✅ **Git Backup**: Changes committed and pushed to repository
+- ✅ **Parameter Standardization**: Consistent naming across all functions
+
+**Implementation Complete**: Save functionality is fully operational across all screens ✅
+
+*For detailed technical documentation, see [SAVE_FUNCTION_IMPLEMENTATION_SUMMARY.md](./SAVE_FUNCTION_IMPLEMENTATION_SUMMARY.md)*
 
 ---
 

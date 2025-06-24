@@ -33,8 +33,8 @@ remove_like	user_id_param uuid, recipe_id_param uuid	boolean	Unlike a recipe
 toggle_recipe_like	user_id_param uuid, recipe_id_param uuid	json	Like / Unlike toggle
 add_recipe_comment	p_recipe_id uuid, p_user_id uuid, p_comment_text text	jsonb	Insert comment & bump counter
 delete_recipe_comment	p_comment_id uuid, p_user_id uuid	void	Remove user’s comment
-save_recipe_video	p_user_id uuid, p_recipe_id uuid	jsonb	Save/unsave toggle
-unsave_recipe_video	p_user_id uuid, p_recipe_id uuid	void	Unsaves only
+save_recipe_video	user_id_param uuid, recipe_id_param uuid	jsonb	Save/unsave toggle
+unsave_recipe	user_id_param uuid, recipe_id_param uuid	jsonb	Unsave/remove save
 increment_video_metric	video_uuid uuid, metric text, increment_by int default 1	void	Generic video metric counter
 
 
