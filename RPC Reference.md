@@ -87,8 +87,13 @@ update_profile (v1)	p_user_id uuid …	void	Admin-like variant
 update_profile (v2)	p_avatar_url text …	void	Self (auth.uid) variant
 update_profile (v3)	p_avatar_url text, p_bio text, p_username text	void	Prior schema variant
 update_onboarding_info	p_role text, p_onboarded boolean = true	void	Mark onboarding done
-get_profile_details	p_user_id uuid	jsonb	Public profile w/ recipes & saves
+get_profile_details	p_user_id uuid	jsonb	Retrieves user profile details including follower and following counts, recipes, and saved recipes. Returns: user_id, username, avatar_url, bio, role, tier, onboarded, followers (integer), following (integer), recipes (jsonb array), saved_recipes (jsonb array)
 get_user_profile	p_user_id uuid	TABLE	Slim rowset
+get_follow_status	follower_id_param uuid, followed_id_param uuid	jsonb	Check if user follows another
+follow_user	follower_id_param uuid, followed_id_param uuid	jsonb	Follow user & update counts
+unfollow_user	follower_id_param uuid, followed_id_param uuid	jsonb	Unfollow user & update counts
+get_user_followers	user_id_param uuid, limit_param int	TABLE	Get user's followers list
+get_user_following	user_id_param uuid, limit_param int	TABLE	Get user's following list
 
 
 ⸻
