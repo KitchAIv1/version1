@@ -28,8 +28,8 @@ export const useLikeMutation = (userId?: string) => {
       const { data: rpcData, error } = await supabase.rpc(
         'toggle_recipe_like',
         {
-          user_id_param: userId,
           recipe_id_param: recipeId,
+          user_id_param: userId,
         },
       );
 
@@ -129,8 +129,8 @@ export const useSaveMutation = (userId?: string) => {
 
       // Use the existing save_recipe_video RPC function
       const { data: rpcData, error } = await supabase.rpc('save_recipe_video', {
-        p_recipe_id: recipeId,
-        p_user_id: userId,
+        recipe_id_param: recipeId,
+        user_id_param: userId,
       });
 
       if (error) {

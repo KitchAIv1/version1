@@ -183,14 +183,14 @@ export const useCacheManager = () => {
       if (
         serverResponse &&
         typeof serverResponse === 'object' &&
-        'liked' in serverResponse &&
+        ('liked' in serverResponse || 'is_liked' in serverResponse) &&
         'likes_count' in serverResponse
       ) {
         updateAllCaches({
           recipeId,
           userId,
           likes: serverResponse.likes_count,
-          isLiked: serverResponse.liked,
+          isLiked: serverResponse.liked ?? serverResponse.is_liked,
         });
         return true;
       }

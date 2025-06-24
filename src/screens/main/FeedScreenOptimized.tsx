@@ -200,8 +200,8 @@ const useOptimizedMutations = (userId?: string) => {
 
         // API call
         const { error } = await supabase.rpc('toggle_recipe_like', {
-          p_user_id: userId,
-          p_recipe_id: recipeId,
+          user_id_param: userId,
+          recipe_id_param: recipeId,
         });
 
         if (error) throw error;
@@ -244,9 +244,9 @@ const useOptimizedMutations = (userId?: string) => {
         );
 
         // API call
-        const { error } = await supabase.rpc('toggle_recipe_save', {
-          p_user_id: userId,
-          p_recipe_id: recipeId,
+        const { error } = await supabase.rpc('save_recipe_video', {
+          user_id_param: userId,
+          recipe_id_param: recipeId,
         });
 
         if (error) throw error;
