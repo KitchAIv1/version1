@@ -83,9 +83,7 @@ Profile & User Management
 Function	Args	Returns	Notes
 create_user_profile	—	trigger	Auto-profile on auth.users insert
 handle_new_user	—	trigger	Minimal profile seed
-update_profile (v1)	p_user_id uuid …	void	Admin-like variant
-update_profile (v2)	p_avatar_url text …	void	Self (auth.uid) variant
-update_profile (v3)	p_avatar_url text, p_bio text, p_username text	void	Prior schema variant
+update_profile	p_user_id uuid, p_avatar_url text, p_bio text, p_username text, p_role text, p_onboarded boolean, p_diet_tags text[]	void	Updates user profile with provided fields, including avatar_url in auth.users. Parameters: p_user_id (UUID of user to update), p_avatar_url (updated avatar URL), p_bio (updated bio text), p_username (updated username), p_role (updated role), p_onboarded (updated onboarded status), p_diet_tags (updated array of diet preferences). Returns: VOID
 update_onboarding_info	p_role text, p_onboarded boolean = true	void	Mark onboarding done
 get_profile_details	p_user_id uuid	jsonb	Retrieves user profile details including follower and following counts, recipes, and saved recipes. Returns: user_id, username, avatar_url, bio, role, tier, onboarded, followers (integer), following (integer), recipes (jsonb array), saved_recipes (jsonb array)
 get_user_profile	p_user_id uuid	TABLE	Slim rowset
