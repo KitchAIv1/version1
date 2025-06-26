@@ -805,7 +805,7 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
               source={{
                 uri:
                   recipeDetails.thumbnail_url ||
-                  'https://btpmaqffdmxhugvybgfn.supabase.co/storage/v1/object/public/app-assets/kitch-ai-recipe-default.jpg',
+                  'https://btpmaqffdmxhugvybgfn.supabase.co/storage/v1/object/public/recipe-thumbnails/porkstirfry.jpeg',
               }}
               style={styles.aiRecipeImage}
               resizeMode="cover"

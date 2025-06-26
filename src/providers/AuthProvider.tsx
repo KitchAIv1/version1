@@ -207,24 +207,39 @@ export const AuthProvider: React.FC<PropsWithChildren<object>> = ({
       }
 
       if (rpcData) {
-        console.log('AuthProvider: Profile data fetched via RPC:', rpcData);
+        console.log('🔍 DEBUG: Raw RPC response:', rpcData);
+        console.log('🔍 DEBUG: rpcData.profile exists:', !!rpcData.profile);
+        console.log('🔍 DEBUG: rpcData.profile.role value:', rpcData.profile?.role);
+        console.log('🔍 DEBUG: rpcData.profile.onboarded value:', rpcData.profile?.onboarded);
+        console.log('🔍 DEBUG: typeof rpcData.profile.onboarded:', typeof rpcData.profile?.onboarded);
+        console.log('🔍 DEBUG: rpcData.profile.tier value:', rpcData.profile?.tier);
+        console.log('🔍 DEBUG: JSON.stringify(rpcData):', JSON.stringify(rpcData));
+        
+        // Extract profile data from the nested structure
+        const profileData = rpcData.profile || {};
+        
+        console.log('AuthProvider: Profile data fetched via RPC:', profileData);
         console.log('AuthProvider: RPC Data Details:');
-        console.log('  - username:', rpcData.username);
-        console.log('  - role:', rpcData.role);
-        console.log('  - tier:', rpcData.tier);
-        console.log('  - onboarded:', rpcData.onboarded);
-        console.log('  - bio:', rpcData.bio);
-        console.log('  - avatar_url:', rpcData.avatar_url);
+        console.log('  - username:', profileData.username);
+        console.log('  - role:', profileData.role);
+        console.log('  - tier:', profileData.tier);
+        console.log('  - onboarded:', profileData.onboarded);
+        console.log('  - bio:', profileData.bio);
+        console.log('  - avatar_url:', profileData.avatar_url);
 
         const newProfile = {
-          username: rpcData.username || null,
-          role: rpcData.role || null,
-          onboarded: rpcData.onboarded || false,
-          avatar_url: rpcData.avatar_url || null,
-          bio: rpcData.bio || null,
-          tier: rpcData.tier || 'FREEMIUM', // Default to FREEMIUM if not set
+          username: profileData.username || null,
+          role: profileData.role || null,
+          onboarded: profileData.onboarded || false,
+          avatar_url: profileData.avatar_url || null,
+          bio: profileData.bio || null,
+          tier: profileData.tier || 'FREEMIUM', // Default to FREEMIUM if not set
         };
 
+        console.log('🔍 DEBUG: Final processed profile:', newProfile);
+        console.log('🔍 DEBUG: getEffectiveTier() returns:', newProfile.role?.toLowerCase() === 'creator' ? 'PREMIUM' : newProfile.tier || 'FREEMIUM');
+        console.log('🔍 DEBUG: isCreator() returns:', newProfile.role?.toLowerCase() === 'creator');
+        
         console.log('AuthProvider: Processed Profile Object:', newProfile);
         console.log(
           'AuthProvider: getEffectiveTier() will return:',

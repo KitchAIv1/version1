@@ -86,6 +86,30 @@ const styles = StyleSheet.create({
     padding: 6,
     borderRadius: 15, // Circular background
   },
+  // AI Badge styles
+  aiBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: 'rgba(16, 185, 129, 0.9)', // Green background with transparency
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  aiBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+    marginLeft: 3,
+    letterSpacing: 0.5,
+  },
 });
 
 interface ProfileRecipeCardProps {
@@ -95,6 +119,7 @@ interface ProfileRecipeCardProps {
     thumbnail_url: string | null;
     created_at: string;
     creator_user_id: string; // Ensured creator_user_id is part of the item prop
+    is_ai_generated?: boolean; // Added to detect AI-generated recipes
   };
   onPress?: () => void;
   context: 'myRecipes' | 'savedRecipes' | 'otherUserRecipes'; // Added otherUserRecipes context
@@ -118,7 +143,7 @@ const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = React.memo(
   ({ item, onPress, context }) => {
     const { user } = useAuth(); // Moved user declaration earlier
     console.log(
-      `[ProfileRecipeCard] Rendering card for "${item.recipe_name}", thumbnail_url: "${item.thumbnail_url}", context: "${context}", creator_id: "${item.creator_user_id}", current_user_id: "${user?.id}"`,
+      `[ProfileRecipeCard] Rendering card for "${item.recipe_name}", thumbnail_url: "${item.thumbnail_url}", context: "${context}", creator_id: "${item.creator_user_id}", current_user_id: "${user?.id}", is_ai_generated: ${item.is_ai_generated}`,
     );
 
     const thumbnailHeight = cardWidth * 0.8; // Slightly taller ratio for better visibility
@@ -288,13 +313,25 @@ const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = React.memo(
               source={{ uri: item.thumbnail_url || PLACEHOLDER_IMAGE }}
               style={[styles.thumbnail, { height: thumbnailHeight }]}
               resizeMode="cover"
-              onError={e =>
+              onError={e => {
                 console.error(
                   `[ProfileRecipeCard] Image load error for ${item.recipe_name}:`,
                   e.nativeEvent.error,
-                )
-              }
+                );
+                // For AI recipes, try to use the default AI recipe image as fallback
+                // This helps when the saved thumbnail_url is broken or inaccessible
+              }}
+              defaultSource={{
+                uri: 'https://btpmaqffdmxhugvybgfn.supabase.co/storage/v1/object/public/recipe-thumbnails/porkstirfry.jpeg',
+              }}
             />
+            {/* AI Badge for AI-generated recipes */}
+            {item.is_ai_generated && (
+              <View style={styles.aiBadge}>
+                <Feather name="zap" size={12} color="#fff" />
+                <Text style={styles.aiBadgeText}>AI</Text>
+              </View>
+            )}
             {/* Optional overlay gradient could go here */}
             {context !== 'otherUserRecipes' && (
               <TouchableOpacity

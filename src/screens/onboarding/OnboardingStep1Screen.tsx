@@ -53,11 +53,16 @@ function OnboardingStep1Screen() {
 
       if (!existingProfile) {
         console.log('Profile not found for id:', user.id, 'creating a new one');
+        // Generate a unique username to avoid duplicates
+        const baseUsername = user.email?.split('@')[0] || 'user';
+        const timestamp = Date.now().toString().slice(-6); // Last 6 digits of timestamp
+        const uniqueUsername = `${baseUsername}_${timestamp}`;
+
         const { data: newProfile, error: createError } = await supabase
           .from('profiles')
           .insert({
             id: user.id, // Assuming user.id is the UUID for profiles.id
-            username: user.email || `user-${user.id.substring(0, 8)}`, // Fallback for username
+            username: uniqueUsername,
             bio: 'Welcome to KitchHub!', // Default bio
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -79,24 +84,24 @@ function OnboardingStep1Screen() {
         console.log('Profile created successfully:', existingProfile);
       }
 
-      // Update the existing profile
+      // Update the existing profile using RPC function (ensures proper tier assignment)
       console.log(
         'Updating profile with role:',
         selectedRole,
         'onboarded:',
         true,
-        'for profile id:',
-        existingProfile.id,
+        'for user ID:',
+        user.id,
       );
-      const { data: updateData, error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          role: selectedRole,
-          onboarded: true,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existingProfile.id) // Use existingProfile.id which is confirmed
-        .select();
+      const { data: updateData, error: updateError } = await supabase.rpc(
+        'update_profile',
+        {
+          p_user_id: user.id,
+          p_role: selectedRole,
+          p_onboarded: true,
+          // Don't set p_username - let it keep the existing username from signup
+        }
+      );
 
       if (updateError) {
         console.error('Failed to update profile (1st attempt):', updateError);
@@ -110,15 +115,15 @@ function OnboardingStep1Screen() {
           retries++;
           console.log(`Retrying profile update (${retries}/${maxRetries})...`);
           await new Promise(resolve => setTimeout(resolve, 1000));
-          const { data: retryData, error: retryError } = await supabase
-            .from('profiles')
-            .update({
-              role: selectedRole,
-              onboarded: true,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', existingProfile.id)
-            .select();
+          const { data: retryData, error: retryError } = await supabase.rpc(
+            'update_profile',
+            {
+              p_user_id: user.id,
+              p_role: selectedRole,
+              p_onboarded: true,
+              // Don't set p_username - let it keep the existing username from signup
+            }
+          );
 
           if (retryError) {
             console.error(`Retry ${retries} failed:`, retryError);

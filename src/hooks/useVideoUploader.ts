@@ -332,13 +332,13 @@ export const useVideoUploader = ({
       }
 
       console.log(
-        `Invoking Edge Function 'video-processor-test2' for fileName: ${videoFileName} with metadata:`,
+        `Invoking Edge Function 'video-processor' for fileName: ${videoFileName} with metadata:`,
         finalMetadata,
       );
       setUploadProgress(publicThumbnailUrl ? 0.8 : 0.75); // Before EF invoke
 
       const { data: functionResponse, error: functionError } =
-        await supabase.functions.invoke('video-processor-test2', {
+        await supabase.functions.invoke('video-processor', {
           body: {
             fileName: videoFileName,
             metadata: finalMetadata, // Pass the potentially updated metadata

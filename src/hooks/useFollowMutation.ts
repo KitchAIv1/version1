@@ -28,8 +28,8 @@ export const useFollowMutation = (currentUserId?: string) => {
       const rpcFunction = action === 'follow' ? 'follow_user' : 'unfollow_user';
 
       const { data, error } = await supabase.rpc(rpcFunction, {
-        p_follower_id: currentUserId,
-        p_followed_id: targetUserId,
+        follower_id_param: currentUserId,
+        followed_id_param: targetUserId,
       });
 
       if (error) {
@@ -92,8 +92,8 @@ export const useFollowStatus = (
       );
 
       const { data, error } = await supabase.rpc('get_follow_status', {
-        p_follower_id: currentUserId,
-        p_followed_id: targetUserId,
+        follower_id_param: currentUserId,
+        followed_id_param: targetUserId,
       });
 
       if (error) {
@@ -101,7 +101,8 @@ export const useFollowStatus = (
         return { isFollowing: false };
       }
 
-      return { isFollowing: data || false };
+      // Backend returns JSON with is_following property
+      return { isFollowing: data?.is_following || false };
     },
     enabled:
       !!currentUserId && !!targetUserId && currentUserId !== targetUserId,
@@ -120,8 +121,8 @@ export const useFollowersList = (userId?: string, limit: number = 50) => {
       console.log(`[useFollowersList] Fetching followers for user ${userId}`);
 
       const { data, error } = await supabase.rpc('get_user_followers', {
-        p_user_id: userId,
-        p_limit: limit,
+        user_id_param: userId,
+        limit_param: limit,
       });
 
       if (error) {
@@ -146,8 +147,8 @@ export const useFollowingList = (userId?: string, limit: number = 50) => {
       console.log(`[useFollowingList] Fetching following for user ${userId}`);
 
       const { data, error } = await supabase.rpc('get_user_following', {
-        p_user_id: userId,
-        p_limit: limit,
+        user_id_param: userId,
+        limit_param: limit,
       });
 
       if (error) {

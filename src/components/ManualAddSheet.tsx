@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   input: {
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
@@ -153,6 +153,11 @@ const styles = StyleSheet.create({
     paddingVertical: Platform.OS === 'ios' ? 12 : 10,
     fontSize: 16,
     color: '#333',
+    // Fix iOS autofill yellow background
+    ...(Platform.OS === 'ios' && {
+      autoCompleteType: 'off',
+      textContentType: 'none',
+    }),
   },
   textArea: {
     height: 80,
@@ -198,7 +203,7 @@ const pickerSelectStyles = StyleSheet.create({
     borderRadius: 8,
     color: '#333',
     paddingRight: 30,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#ffffff',
   },
   inputAndroid: {
     fontSize: 16,
@@ -209,7 +214,7 @@ const pickerSelectStyles = StyleSheet.create({
     borderRadius: 8,
     color: '#333',
     paddingRight: 30,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#ffffff',
   },
   placeholder: {
     color: '#bbb',
@@ -346,7 +351,7 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
   }, [isEditMode, initialItemData?.id, initialItemData?.updated_at, isVisible]);
 
   useEffect(() => {
-    if (initialItemData && isEditMode) {
+    if (initialItemData && isEditMode && isVisible) {
       setItemName(initialItemData.item_name);
       // Safely handle quantity - ensure it's a number and convert to string
       const { quantity } = initialItemData;
@@ -358,15 +363,16 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
       setStorageLocation(
         initialItemData.storage_location || getDefaultLocation(),
       );
-    } else if (!isVisible || !isEditMode) {
-      // Reset form when modal is closed or in add mode
+    } else if (!isEditMode && isVisible) {
+      // Only reset form when opening in add mode
       setItemName('');
       setQuantity('1');
       setUnit(unitOptions[0]?.value || 'units');
       setDescription('');
       setStorageLocation(getDefaultLocation());
+      setIsSaving(false); // Ensure saving state is reset
     }
-  }, [initialItemData, isVisible, isEditMode, unitOptions, getDefaultLocation]);
+  }, [isVisible, isEditMode]); // Simplified dependencies
 
   const handleSubmit = async () => {
     if (!itemName.trim()) {
@@ -612,7 +618,11 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
                   onChangeText={setItemName}
                   placeholder="e.g., All-Purpose Flour"
                   placeholderTextColor="#bbb"
-                  editable={!isSaving}
+                  editable={true}
+                  autoComplete="off"
+                  textContentType="none"
+                  autoCorrect={false}
+                  autoCapitalize="words"
                 />
               </View>
 
@@ -626,7 +636,10 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
                     placeholder="e.g., 2"
                     placeholderTextColor="#bbb"
                     keyboardType="numeric"
-                    editable={!isSaving}
+                    editable={true}
+                    autoComplete="off"
+                    textContentType="none"
+                    autoCorrect={false}
                   />
                 </View>
 
@@ -671,7 +684,11 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
                   placeholderTextColor="#bbb"
                   multiline
                   numberOfLines={3}
-                  editable={!isSaving}
+                  editable={true}
+                  autoComplete="off"
+                  textContentType="none"
+                  autoCorrect={true}
+                  autoCapitalize="sentences"
                 />
               </View>
 

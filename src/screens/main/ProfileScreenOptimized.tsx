@@ -58,6 +58,7 @@ interface VideoPostData {
   thumbnail_url: string | null;
   created_at: string;
   creator_user_id: string;
+  is_ai_generated?: boolean; // Added to support AI recipe indicators
 }
 
 interface ProfileData {
@@ -135,6 +136,7 @@ const useOptimizedProfile = (targetUserId?: string) => {
                 recipe.creatorUserId ||
                 recipe.user_id ||
                 userId,
+              is_ai_generated: recipe.is_ai_generated || false, // Include AI flag
             }))
             .filter(
               (recipe: VideoPostData) => recipe.recipe_id && recipe.recipe_name,
@@ -165,6 +167,7 @@ const useOptimizedProfile = (targetUserId?: string) => {
                 recipe.creatorUserId ||
                 recipe.user_id ||
                 userId,
+              is_ai_generated: recipe.is_ai_generated || false, // Include AI flag
             }))
             .filter(
               (recipe: VideoPostData) => recipe.recipe_id && recipe.recipe_name,

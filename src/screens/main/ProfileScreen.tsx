@@ -60,6 +60,7 @@ interface VideoPostData {
   thumbnail_url: string | null;
   created_at: string;
   creator_user_id: string; // Added creator's user ID
+  is_ai_generated?: boolean; // Added to support AI recipe indicators
 }
 
 interface ProfileData {
@@ -110,128 +111,64 @@ const useProfile = (targetUserId?: string) => {
       }
 
       const profileDataBackend = rawData as any;
+      console.log('[useProfile] New backend structure received:', {
+        hasProfile: !!profileDataBackend.profile,
+        hasRecipes: !!profileDataBackend.recipes,
+        hasSavedRecipes: !!profileDataBackend.saved_recipes,
+        profileKeys: profileDataBackend.profile ? Object.keys(profileDataBackend.profile) : [],
+        recipesCount: Array.isArray(profileDataBackend.recipes) ? profileDataBackend.recipes.length : 0,
+        savedRecipesCount: Array.isArray(profileDataBackend.saved_recipes) ? profileDataBackend.saved_recipes.length : 0,
+      });
 
-      // Map uploaded recipes with robust field mapping and fallbacks
+      // Extract profile data from new structure
+      const profileInfo = profileDataBackend.profile || {};
+
+      // Process uploaded recipes with new structure
       let processedUploadedVideos: VideoPostData[] = [];
       if (Array.isArray(profileDataBackend.recipes)) {
         processedUploadedVideos = profileDataBackend.recipes.map(
-          (recipe: any, index: number) => {
-            const mappedRecipe = {
-              recipe_id: recipe.recipe_id || recipe.id || `recipe_${index}`,
-              recipe_name:
-                recipe.title ||
-                recipe.recipe_name ||
-                recipe.name ||
-                'Untitled Recipe',
-              video_url: recipe.video_url || recipe.videoUrl || '',
-              thumbnail_url:
-                recipe.thumbnail_url || recipe.thumbnailUrl || null,
-              created_at:
-                recipe.created_at ||
-                recipe.createdAt ||
-                new Date().toISOString(),
-              creator_user_id:
-                recipe.creator_user_id ||
-                recipe.creatorUserId ||
-                recipe.user_id ||
-                userId,
-            };
-
-            return mappedRecipe;
-          },
-        );
-
-        // Validate processed data
-        const validRecipes = processedUploadedVideos.filter((recipe, index) => {
-          const isValid = recipe.recipe_id && recipe.recipe_name;
-          if (!isValid) {
-            console.warn(
-              `[useProfile] Filtering out invalid recipe at index ${index}:`,
-              recipe,
-            );
-          }
-          return isValid;
-        });
-
-        processedUploadedVideos = validRecipes;
-      } else {
-        console.warn(
-          '[useProfile] profileDataBackend.recipes is not an array or is missing:',
-          {
-            type: typeof profileDataBackend.recipes,
-            value: profileDataBackend.recipes,
-            userId,
-          },
-        );
+          (recipe: any, index: number) => ({
+            recipe_id: recipe.recipe_id || `recipe_${index}`,
+            recipe_name: recipe.title || 'Untitled Recipe',
+            video_url: recipe.video_url || '',
+            thumbnail_url: recipe.thumbnail_url || null,
+            created_at: recipe.created_at || new Date().toISOString(),
+            creator_user_id: recipe.creator_user_id || userId,
+            is_ai_generated: recipe.is_ai_generated || false, // ✅ AI flag preserved
+          }),
+                 ).filter((recipe: VideoPostData) => recipe.recipe_id && recipe.recipe_name);
+         
+         console.log(`[useProfile] Processed ${processedUploadedVideos.length} uploaded recipes`);
       }
 
-      // Map saved recipes (from backend 'saved_recipes' to frontend 'saved_recipes')
+      // Process saved recipes with new structure
       let processedSavedRecipes: VideoPostData[] = [];
       if (Array.isArray(profileDataBackend.saved_recipes)) {
         processedSavedRecipes = profileDataBackend.saved_recipes.map(
-          (recipe: any, index: number) => {
-            const mappedRecipe = {
-              recipe_id:
-                recipe.recipe_id || recipe.id || `saved_recipe_${index}`,
-              recipe_name:
-                recipe.title ||
-                recipe.recipe_name ||
-                recipe.name ||
-                'Untitled Recipe',
-              video_url: recipe.video_url || recipe.videoUrl || '',
-              thumbnail_url:
-                recipe.thumbnail_url || recipe.thumbnailUrl || null,
-              created_at:
-                recipe.created_at ||
-                recipe.createdAt ||
-                new Date().toISOString(),
-              creator_user_id:
-                recipe.creator_user_id ||
-                recipe.creatorUserId ||
-                recipe.user_id ||
-                userId,
-            };
-
-            return mappedRecipe;
-          },
-        );
-
-        // Validate processed saved recipes
-        const validSavedRecipes = processedSavedRecipes.filter(
-          (recipe, index) => {
-            const isValid = recipe.recipe_id && recipe.recipe_name;
-            if (!isValid) {
-              console.warn(
-                `[useProfile] Filtering out invalid saved recipe at index ${index}:`,
-                recipe,
-              );
-            }
-            return isValid;
-          },
-        );
-
-        processedSavedRecipes = validSavedRecipes;
-      } else {
-        console.warn(
-          '[useProfile] profileDataBackend.saved_recipes is not an array or is missing:',
-          {
-            type: typeof profileDataBackend.saved_recipes,
-            value: profileDataBackend.saved_recipes,
-            userId,
-          },
-        );
+          (recipe: any, index: number) => ({
+            recipe_id: recipe.recipe_id || `saved_recipe_${index}`,
+            recipe_name: recipe.title || 'Untitled Recipe',
+            video_url: recipe.video_url || '',
+            thumbnail_url: recipe.thumbnail_url || null,
+            created_at: recipe.created_at || new Date().toISOString(),
+            creator_user_id: recipe.creator_user_id || userId,
+            is_ai_generated: recipe.is_ai_generated || false, // ✅ AI flag preserved
+          }),
+                 ).filter((recipe: VideoPostData) => recipe.recipe_id && recipe.recipe_name);
+         
+         console.log(`[useProfile] Processed ${processedSavedRecipes.length} saved recipes`);
       }
 
-      // Construct the final ProfileData object for the frontend
+      // Construct the final ProfileData object using new backend structure
       const processedFrontendData: ProfileData = {
-        username: profileDataBackend.username,
-        avatar_url: profileDataBackend.avatar_url,
-        followers: profileDataBackend.followers ?? 0,
-        following: profileDataBackend.following ?? 0,
-        bio: profileDataBackend.bio,
-        videos: processedUploadedVideos, // Use the processed uploaded videos
-        saved_recipes: processedSavedRecipes, // Use the processed saved recipes
-        user_id: userId, // Add user_id for follow functionality
+        username: profileInfo.username || 'Unknown User',
+        avatar_url: profileInfo.avatar_url || null,
+        followers: profileInfo.followers || 0,
+        following: profileInfo.following || 0,
+        bio: profileInfo.bio || null,
+        videos: processedUploadedVideos,
+        saved_recipes: processedSavedRecipes,
+        user_id: userId,
       };
 
       return processedFrontendData;

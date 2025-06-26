@@ -30,6 +30,11 @@ interface MainStackProps {
 
 const MainStack: React.FC<MainStackProps> = ({ userOnboarded }) => {
   const initialRoute = userOnboarded ? 'MainTabs' : 'OnboardingStep1';
+  
+  console.log('🔍 [MainStack] CRITICAL DEBUG:');
+  console.log('🔍 [MainStack] userOnboarded prop:', userOnboarded);
+  console.log('🔍 [MainStack] typeof userOnboarded:', typeof userOnboarded);
+  console.log('🔍 [MainStack] initialRoute set to:', initialRoute);
 
   return (
     <Stack.Navigator

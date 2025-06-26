@@ -359,6 +359,9 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
                 item.metadata.recipe_thumbnail || item.metadata.thumbnail_url,
             }}
             style={styles.recipeThumbnail}
+            defaultSource={{
+              uri: 'https://btpmaqffdmxhugvybgfn.supabase.co/storage/v1/object/public/recipe-thumbnails/porkstirfry.jpeg',
+            }}
           />
         )}
       </View>

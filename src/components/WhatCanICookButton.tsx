@@ -39,8 +39,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   disabledButton: {
-    backgroundColor: '#f3f4f6',
-    borderColor: '#e5e7eb',
+    backgroundColor: '#10b981',
+    opacity: 0.7,
+    borderColor: '#10b981',
     shadowOpacity: 0,
     elevation: 0,
   },
@@ -61,13 +62,19 @@ const styles = StyleSheet.create({
     textShadowRadius: 3,
   },
   disabledText: {
-    color: '#9ca3af',
+    color: '#ffffff',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   requirementText: {
     fontSize: 11,
-    color: '#9ca3af',
+    color: '#ffffff',
     marginLeft: 4,
     fontStyle: 'italic',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });
 

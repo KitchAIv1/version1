@@ -20,7 +20,20 @@ export const useAccessControl = () => {
 
   // Check if user can perform pantry scan
   const canPerformScan = useCallback((): boolean => {
-    if (isCreator() || getEffectiveTier() === 'PREMIUM') {
+    const isCreatorResult = isCreator();
+    const effectiveTier = getEffectiveTier();
+    const shouldHaveUnlimitedAccess = isCreatorResult || effectiveTier === 'PREMIUM';
+    
+    console.log('[useAccessControl] canPerformScan DEBUG:', {
+      isCreator: isCreatorResult,
+      effectiveTier: effectiveTier,
+      shouldHaveUnlimitedAccess: shouldHaveUnlimitedAccess,
+      usageLimits: usageLimits,
+      scanCount: usageLimits?.scan_count || 0,
+      limit: FREEMIUM_SCAN_LIMIT
+    });
+
+    if (shouldHaveUnlimitedAccess) {
       return true;
     }
 
@@ -29,7 +42,20 @@ export const useAccessControl = () => {
 
   // Check if user can generate AI recipe
   const canGenerateAIRecipe = useCallback((): boolean => {
-    if (isCreator() || getEffectiveTier() === 'PREMIUM') {
+    const isCreatorResult = isCreator();
+    const effectiveTier = getEffectiveTier();
+    const shouldHaveUnlimitedAccess = isCreatorResult || effectiveTier === 'PREMIUM';
+    
+    console.log('[useAccessControl] canGenerateAIRecipe DEBUG:', {
+      isCreator: isCreatorResult,
+      effectiveTier: effectiveTier,
+      shouldHaveUnlimitedAccess: shouldHaveUnlimitedAccess,
+      usageLimits: usageLimits,
+      aiRecipeCount: usageLimits?.ai_recipe_count || 0,
+      limit: FREEMIUM_AI_RECIPE_LIMIT
+    });
+
+    if (shouldHaveUnlimitedAccess) {
       return true;
     }
 
@@ -258,10 +284,24 @@ export const useAccessControl = () => {
           }
         }
 
+        // Extract the recipe data from the response
+        let recipesData;
+        if (parsedData.success && parsedData.data) {
+          recipesData = parsedData.data; // Extract the actual recipes array
+        } else if (Array.isArray(parsedData)) {
+          recipesData = parsedData; // Direct array response
+        } else {
+          console.error('[useAccessControl] Unexpected response format:', parsedData);
+          Alert.alert('Error', 'Unexpected response format from AI service');
+          return null;
+        }
+
+        console.log('[useAccessControl] Extracted recipes data:', recipesData);
+
         // Refresh usage limits after successful generation
         await refreshUsageLimits(user.id);
 
-        return parsedData; // Should be array of 3 recipes with recipe_id
+        return recipesData; // Should be array of 3 recipes with recipe_id
       } catch (error: any) {
         console.error('[useAccessControl] AI recipe generation error:', error);
         Alert.alert('Error', error.message || 'Failed to generate AI recipe');
@@ -275,7 +315,16 @@ export const useAccessControl = () => {
 
   // Get usage display data
   const getUsageDisplay = useCallback(() => {
-    if (isCreator()) {
+    const isCreatorResult = isCreator();
+    const effectiveTier = getEffectiveTier();
+    
+    console.log('[useAccessControl] getUsageDisplay DEBUG:', {
+      isCreator: isCreatorResult,
+      effectiveTier: effectiveTier,
+      usageLimits: usageLimits
+    });
+
+    if (isCreatorResult) {
       return {
         tierDisplay: 'CREATOR (PREMIUM)',
         showUsage: false,
@@ -283,8 +332,6 @@ export const useAccessControl = () => {
         aiRecipeUsage: '',
       };
     }
-
-    const effectiveTier = getEffectiveTier();
 
     if (effectiveTier === 'PREMIUM') {
       return {

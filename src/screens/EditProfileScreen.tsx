@@ -126,6 +126,9 @@ function EditProfileScreen({ navigation, route }: any) {
         p_diet_tags: processedFoodPreferences,
       };
 
+      console.log('[EDIT_PROFILE] Profile update payload:', profileUpdatePayload);
+      console.log('[EDIT_PROFILE] Original profile role:', profile?.role);
+
       const { data, error } = await supabase.rpc(
         'update_profile',
         profileUpdatePayload,

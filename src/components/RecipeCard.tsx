@@ -422,6 +422,9 @@ export default function RecipeCard({
                 source={{ uri: item.thumbnail_url }}
                 style={StyleSheet.absoluteFill}
                 resizeMode="cover"
+                defaultSource={{
+                  uri: 'https://btpmaqffdmxhugvybgfn.supabase.co/storage/v1/object/public/recipe-thumbnails/porkstirfry.jpeg',
+                }}
               />
             ) : (
               <View style={[StyleSheet.absoluteFill, { backgroundColor: '#333', justifyContent: 'center', alignItems: 'center' }]}>
@@ -431,8 +434,6 @@ export default function RecipeCard({
             )}
           </View>
         )}
-
-
 
         <View style={topOverlayContainerStyle}>
           {item.pantryMatchPct !== undefined ? (
