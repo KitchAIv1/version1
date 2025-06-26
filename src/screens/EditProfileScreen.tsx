@@ -145,14 +145,36 @@ function EditProfileScreen({ navigation, route }: any) {
         {
           text: 'OK',
           onPress: async () => {
-            await queryClient.invalidateQueries({
-              queryKey: ['profile', user.id],
-            });
-            await queryClient.invalidateQueries({ queryKey: ['feed'] });
-            if (refreshProfile) {
-              await refreshProfile(user.id);
+            // SIMPLE DEBOUNCED FIX: Prevent cascade from rapid profile edits
+            console.log('[EDIT_PROFILE] Debounced refresh starting...');
+            
+            try {
+              // Only refresh AuthProvider - let everything else settle naturally
+              if (refreshProfile) {
+                await refreshProfile(user.id);
+                
+                // Longer delay for stability after multiple rapid edits
+                await new Promise(resolve => setTimeout(resolve, 1000));
+              }
+              
+              // CRITICAL: Invalidate ProfileScreen cache so avatar updates
+              queryClient.invalidateQueries({ 
+                queryKey: ['profile', user.id] 
+              });
+              
+              console.log('[EDIT_PROFILE] Debounced refresh completed');
+              
+            } catch (updateError) {
+              console.error('[EDIT_PROFILE] Error during state updates:', updateError);
             }
-            navigation.goBack();
+            
+            // Navigation with proper fallback
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              // Fallback: navigate to MainTabs and specifically to Profile tab
+              navigation.navigate('MainTabs', { screen: 'Profile' });
+            }
           },
         },
       ]);

@@ -28,6 +28,7 @@ import { supabase } from '../../services/supabase';
 import { useAuth } from '../../providers/AuthProvider';
 import { useCacheManager } from '../../hooks/useCacheManager';
 import { useCommentCountSync } from '../../hooks/useCommentCountSync';
+import { registerFeedRefresh } from '../../navigation/MainTabs';
 
 // Import "What Can I Cook?" components
 import InsufficientItemsModal from '../../components/modals/InsufficientItemsModal';
@@ -123,6 +124,65 @@ export default function FeedScreen() {
   useEffect(() => {
     logMemoryPeriodically();
   }, [logMemoryPeriodically]);
+
+  // 🔝 REGISTER FEED REFRESH: Connect tab press to scroll-to-top
+  useEffect(() => {
+    const handleFeedRefresh = () => {
+      console.log("🔝 Tab press detected - scrolling to top (TikTok-style)");
+      
+      if (flashListRef.current) {
+        setCurrentIndex(0);
+        try {
+          flashListRef.current.scrollToIndex({
+            index: 0,
+            animated: true,
+          });
+        } catch (error) {
+          // Fallback to scrollToOffset if scrollToIndex fails
+          console.warn("ScrollToIndex failed, using scrollToOffset:", error);
+          flashListRef.current.scrollToOffset({
+            offset: 0,
+            animated: true,
+          });
+        }
+      }
+    };
+
+    // Register the refresh function with MainTabs
+    registerFeedRefresh(handleFeedRefresh);
+    
+    // Cleanup on unmount
+    return () => {
+      registerFeedRefresh(() => {});
+    };
+  }, []);
+  // 🔝 TIKTOK-STYLE SCROLL TO TOP: Auto scroll when feed refreshes
+  useEffect(() => {
+    if (feedData && feedData.length > 0 && flashListRef.current) {
+      // Check if this is a refresh (not initial load)
+      const prevData = prevFeedItemsRef.current;
+      const isRefresh = prevData && prevData.length > 0 && 
+                       feedData.length > 0 && 
+                       prevData[0]?.id !== feedData[0]?.id;
+      
+      if (isRefresh) {
+        console.log('🔝 Feed refreshed - auto-scrolling to top (TikTok-style)');
+        // Reset current index to 0
+        setCurrentIndex(0);
+        
+        // Scroll to top with smooth animation
+        setTimeout(() => {
+          flashListRef.current?.scrollToIndex({
+            index: 0,
+            animated: true,
+          });
+        }, 100); // Small delay to ensure FlashList is ready
+      }
+      
+      // Update previous data reference
+      prevFeedItemsRef.current = feedData;
+    }
+  }, [feedData]);
 
   // MEMORY OPTIMIZATION: SafeViewLogger handles cleanup automatically
   useEffect(() => {

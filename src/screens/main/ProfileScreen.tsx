@@ -12,6 +12,7 @@ import {
   RefreshControlProps,
   Modal,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import { useQuery, QueryKey, useQueryClient } from '@tanstack/react-query';
 import { Tabs, MaterialTabBar } from 'react-native-collapsible-tab-view';
@@ -20,7 +21,7 @@ import {
   SafeAreaView,
 } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { useNavigation, useRoute } from '@react-navigation/native'; // Import useNavigation and useRoute
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native'; // Added useFocusEffect import
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // Import navigation type
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -79,7 +80,10 @@ interface ProfileScreenParams {
   userId?: string; // Optional userId to view other users' profiles
 }
 
-const ACTIVE_COLOR = '#22c55e'; // Defined active color
+const screenWidth = Dimensions.get('window').width;
+const screenHeight = Dimensions.get('window').height;
+const HEADER_HEIGHT = screenHeight * 0.35; // 35% of screen height
+const ACTIVE_COLOR = '#10b981'; // Green color for active elements
 
 // -----------------------------------------------------------------------------
 // Hooks (data)
@@ -185,8 +189,12 @@ const useProfile = (targetUserId?: string) => {
 // -----------------------------------------------------------------------------
 // Components
 // -----------------------------------------------------------------------------
-const AvatarRow: React.FC<{ profile: ProfileData; postsCount: number }> =
-  React.memo(({ profile, postsCount }) => {
+const AvatarRow: React.FC<{ 
+  profile: ProfileData; 
+  postsCount: number;
+  onFollowersPress: () => void;
+  onFollowingPress: () => void;
+}> = React.memo(({ profile, postsCount, onFollowersPress, onFollowingPress }) => {
     return (
       <View style={styles.avatarRow}>
         {profile.avatar_url ? (
@@ -204,21 +212,49 @@ const AvatarRow: React.FC<{ profile: ProfileData; postsCount: number }> =
         )}
         <View style={styles.statsRow}>
           <Stat label="Posts" value={postsCount} />
-          <Stat label="Followers" value={profile.followers ?? 0} />
-          <Stat label="Following" value={profile.following ?? 0} />
+          <Stat 
+            label="Followers" 
+            value={profile.followers ?? 0} 
+            onPress={onFollowersPress}
+            isClickable={true}
+          />
+          <Stat 
+            label="Following" 
+            value={profile.following ?? 0} 
+            onPress={onFollowingPress}
+            isClickable={true}
+          />
         </View>
       </View>
     );
   });
 
-const Stat: React.FC<{ label: string; value: number }> = React.memo(
-  ({ label, value }) => (
-    <View style={{ alignItems: 'center' }}>
+const Stat: React.FC<{ 
+  label: string; 
+  value: number; 
+  onPress?: () => void;
+  isClickable?: boolean;
+}> = React.memo(({ label, value, onPress, isClickable = false }) => {
+  if (isClickable && onPress) {
+    return (
+      <TouchableOpacity 
+        style={styles.statContainer} 
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.statValue}>{value}</Text>
+        <Text style={styles.statLabel}>{label}</Text>
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <View style={styles.statContainer}>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
-  ),
-);
+  );
+});
 
 const Bio: React.FC<{
   profile: ProfileData;
@@ -267,7 +303,7 @@ const Bio: React.FC<{
   </View>
 ));
 
-// Lazy Tab Content Component
+// LazyTabContent component for tab content
 const LazyTabContent: React.FC<{
   data: VideoPostData[];
   context: 'myRecipes' | 'savedRecipes' | 'otherUserRecipes';
@@ -275,44 +311,49 @@ const LazyTabContent: React.FC<{
   refreshControl?: React.ReactElement<RefreshControlProps>;
 }> = React.memo(({ data, context, emptyLabel, refreshControl }) => {
   const navigation = useNavigation<ProfileNavigationProp>();
+  
+  const handleRecipePress = useCallback((recipeId: string) => {
+    navigation.navigate('RecipeDetail', { id: recipeId });
+  }, [navigation]);
 
-  const renderItem = React.useCallback(
-    ({ item }: { item: VideoPostData }) => (
-      <ProfileRecipeCard
-        item={item}
-        onPress={() =>
-          navigation.navigate('RecipeDetail', { id: item.recipe_id })
-        }
-        context={context}
-      />
-    ),
-    [navigation, context],
-  );
-
-  const keyExtractor = React.useCallback(
-    (item: VideoPostData) =>
-      context === 'savedRecipes' ? `saved-${item.recipe_id}` : item.recipe_id,
-    [context],
-  );
+  const renderItem = useCallback(({ item }: { item: VideoPostData }) => (
+    <ProfileRecipeCard
+      key={item.recipe_id}
+      item={item}
+      onPress={() => handleRecipePress(item.recipe_id)}
+      context={context}
+    />
+  ), [context, handleRecipePress]);
 
   return (
     <Tabs.FlatList
       data={data}
       renderItem={renderItem}
-      keyExtractor={keyExtractor}
+      keyExtractor={(item) => item.recipe_id}
       numColumns={2}
-      showsVerticalScrollIndicator={false}
-      ListEmptyComponent={<Empty label={emptyLabel} />}
+      removeClippedSubviews
+      maxToRenderPerBatch={4}
+      windowSize={10}
+      initialNumToRender={6}
       contentContainerStyle={styles.gridContentContainer}
-      style={styles.fullScreenTabContent}
-      removeClippedSubviews // Performance optimization
-      maxToRenderPerBatch={4} // Render 4 items per batch
-      windowSize={10} // Keep 10 items in memory
-      initialNumToRender={6} // Render 6 items initially
+      showsVerticalScrollIndicator={false}
       refreshControl={refreshControl}
+      ListEmptyComponent={() => <Empty label={emptyLabel} />}
     />
   );
 });
+
+// Custom tab bar
+const renderTabBar = (props: any) => (
+  <MaterialTabBar
+    {...props}
+    indicatorStyle={{ backgroundColor: ACTIVE_COLOR }}
+    style={{ backgroundColor: '#fff' }}
+    labelStyle={{ color: '#333', fontWeight: '600' }}
+    activeColor={ACTIVE_COLOR}
+    inactiveColor="#888"
+  />
+);
 
 // -----------------------------------------------------------------------------
 // Screen
@@ -343,6 +384,10 @@ export const ProfileScreen: React.FC = () => {
 
   // Modal state for tier badge
   const [showTierModal, setShowTierModal] = useState(false);
+  const [tabIndex, setTabIndex] = useState(0);
+
+  // NEW: Toast notification state
+  const [toastNotification, setToastNotification] = useState<any>(null);
 
   // Add activity feed hook (only for own profile)
   const {
@@ -357,7 +402,6 @@ export const ProfileScreen: React.FC = () => {
 
   // NEW: Notification state
   const [showNotificationDrawer, setShowNotificationDrawer] = useState(false);
-  const [toastNotification, setToastNotification] = useState<any>(null);
 
   // NEW: Notification hooks
   const { data: notifications = [] } = useNotifications(user?.id);
@@ -374,29 +418,47 @@ export const ProfileScreen: React.FC = () => {
     }
   });
 
+  // Focus effect to refresh profile data when returning to screen
+  useFocusEffect(
+    useCallback(() => {
+      if (isOwnProfile && user?.id) {
+        console.log('[ProfileScreen] Screen focused, refreshing profile data...');
+        
+        // MINIMAL REFRESH: Just refetch, let React Query handle the rest
+        const minimalRefresh = async () => {
+          try {
+            // Only refetch - this is enough to get fresh data
+            await refetchProfile();
+            console.log('[ProfileScreen] Profile refresh completed after focus');
+          } catch (error) {
+            console.error('[ProfileScreen] Focus refresh error:', error);
+          }
+        };
+        
+        // Use a small delay to let any ongoing operations finish first
+        const timeoutId = setTimeout(minimalRefresh, 300);
+        return () => clearTimeout(timeoutId);
+      }
+    }, [isOwnProfile, user?.id, refetchProfile])
+  );
+
   // Refresh handler - refreshes all data sources
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      // Refresh all data sources in parallel
-      const refreshPromises = [
-        refetchProfile(),
-        queryClient.invalidateQueries({ queryKey: ['profile'] }),
-      ];
-
-      await Promise.all(refreshPromises);
-
-      // Refresh activity for own profile separately
+      // SIMPLIFIED REFRESH: Just refetch profile and activity, let React Query handle caching
+      await refetchProfile();
+      
       if (isOwnProfile && refetchActivity) {
         await refetchActivity();
-        queryClient.invalidateQueries({ queryKey: ['userActivityFeed'] });
       }
+      
     } catch (error) {
       console.error('[ProfileScreen] Refresh error:', error);
     } finally {
       setIsRefreshing(false);
     }
-  }, [refetchProfile, refetchActivity, queryClient, isOwnProfile]);
+  }, [refetchProfile, refetchActivity, isOwnProfile]);
 
   // Create RefreshControl component
   const refreshControl = (
@@ -421,6 +483,12 @@ export const ProfileScreen: React.FC = () => {
     navigation.navigate('UpgradeScreen');
   };
   // --- End Navigation Handler for Upgrade ---
+
+  // --- Recipe Navigation Handler --- (Fixed to prevent re-renders)
+  const handleRecipePress = useCallback((recipeId: string) => {
+    navigation.navigate('RecipeDetail', { id: recipeId });
+  }, [navigation]);
+  // --- End Recipe Navigation Handler ---
 
   // --- Tier Badge Press Handler ---
   const handleTierBadgePress = () => {
@@ -483,6 +551,37 @@ export const ProfileScreen: React.FC = () => {
     setToastNotification(null);
   }, []);
 
+  // Navigation handler for "Edit Profile"
+  const handleEditProfilePress = () => {
+    if (!profile) return; // Guard against profile being null/undefined
+    navigation.navigate('EditProfile', {
+      initialProfileData: {
+        bio: profile.bio,
+        avatar_url: profile.avatar_url,
+        username: profile.username,
+      },
+    });
+  };
+
+  // Navigation handlers for followers/following
+  const handleFollowersPress = useCallback(() => {
+    if (!profile) return;
+    navigation.navigate('FollowersDetail', {
+      userId: targetUserId || profile.user_id || user?.id || '',
+      username: profile.username,
+      initialTab: 'followers',
+    });
+  }, [profile, targetUserId, user?.id, navigation]);
+
+  const handleFollowingPress = useCallback(() => {
+    if (!profile) return;
+    navigation.navigate('FollowersDetail', {
+      userId: targetUserId || profile.user_id || user?.id || '',
+      username: profile.username,
+      initialTab: 'following',
+    });
+  }, [profile, targetUserId, user?.id, navigation]);
+
   if (profileLoading) return <ProfileScreenSkeleton />;
 
   if (isError || !profile || typeof profile !== 'object') {
@@ -495,18 +594,6 @@ export const ProfileScreen: React.FC = () => {
       'Failed to load profile. Please try again later.';
     return <ErrorMsg message={message} />;
   }
-
-  // Navigation handler for "Edit Profile"
-  const handleEditProfilePress = () => {
-    if (!profile) return; // Guard against profile being null/undefined
-    navigation.navigate('EditProfile', {
-      initialProfileData: {
-        bio: profile.bio,
-        avatar_url: profile.avatar_url,
-        username: profile.username,
-      },
-    });
-  };
 
   const renderProfileInfo = () => (
     <View style={styles.profileInfoContainer}>
@@ -556,7 +643,12 @@ export const ProfileScreen: React.FC = () => {
         </View>
       )}
 
-      <AvatarRow profile={profile} postsCount={profile.videos?.length || 0} />
+      <AvatarRow 
+        profile={profile} 
+        postsCount={profile.videos?.length || 0}
+        onFollowersPress={handleFollowersPress}
+        onFollowingPress={handleFollowingPress}
+      />
       <Bio
         profile={profile}
         onTierBadgePress={handleTierBadgePress}
@@ -615,43 +707,13 @@ export const ProfileScreen: React.FC = () => {
       {/* Scrollable Content - includes Kitch Hub content above avatar */}
       <View style={styles.tabsContainer}>
         {isOwnProfile ? (
-          // Own Profile: Show all tabs
+          // Own Profile: Show all tabs with collapsible tab view
           <Tabs.Container
             renderHeader={renderProfileInfo}
-            headerHeight={undefined}
-            allowHeaderOverscroll={false}
-            renderTabBar={props => (
-              <MaterialTabBar
-                {...props}
-                activeColor={ACTIVE_COLOR}
-                inactiveColor="#525252"
-                labelStyle={styles.tabLabel}
-                indicatorStyle={styles.tabIndicator}
-                style={styles.materialTabBar}
-                getLabelText={(name: string) => name}
-                // @ts-ignore
-                renderIcon={iconProps => {
-                  let iconName = 'video-library';
-                  if (iconProps.route.name === 'My Recipes')
-                    iconName = 'video-library';
-                  if (iconProps.route.name === 'Saved') iconName = 'bookmark';
-                  if (iconProps.route.name === 'Planner')
-                    iconName = 'calendar-today';
-                  if (iconProps.route.name === 'Activity')
-                    iconName = 'notifications';
-
-                  return (
-                    <Icon
-                      name={iconName}
-                      size={20}
-                      color={iconProps.focused ? ACTIVE_COLOR : '#525252'}
-                      style={{ marginRight: 0, paddingRight: 0 }}
-                    />
-                  );
-                }}
-              />
-            )}>
-            <Tabs.Tab name="My Recipes" label="My Recipes">
+            headerHeight={HEADER_HEIGHT}
+            renderTabBar={renderTabBar}
+            onIndexChange={setTabIndex}>
+            <Tabs.Tab name="myRecipes" label="My Recipes">
               <LazyTabContent
                 data={profile.videos}
                 context="myRecipes"
@@ -659,7 +721,7 @@ export const ProfileScreen: React.FC = () => {
                 refreshControl={refreshControl}
               />
             </Tabs.Tab>
-            <Tabs.Tab name="Saved" label="Saved">
+            <Tabs.Tab name="savedRecipes" label="Saved">
               <LazyTabContent
                 data={profile.saved_recipes}
                 context="savedRecipes"
@@ -667,17 +729,11 @@ export const ProfileScreen: React.FC = () => {
                 refreshControl={refreshControl}
               />
             </Tabs.Tab>
-            <Tabs.Tab name="Planner" label="Planner">
-              <Tabs.ScrollView
-                style={styles.fullScreenTabContent}
-                refreshControl={refreshControl}>
-                <MealPlannerV2Screen />
-              </Tabs.ScrollView>
-            </Tabs.Tab>
-            <Tabs.Tab name="Activity" label="Activity">
-              <Tabs.ScrollView
-                style={styles.fullScreenTabContent}
-                refreshControl={refreshControl}>
+            <Tabs.Tab name="activity" label="Activity">
+              <Tabs.ScrollView 
+                contentContainerStyle={styles.listContentContainer}
+                showsVerticalScrollIndicator={false}
+              >
                 <ActivityFeed
                   data={activityData}
                   isLoading={activityLoading}
@@ -687,38 +743,12 @@ export const ProfileScreen: React.FC = () => {
             </Tabs.Tab>
           </Tabs.Container>
         ) : (
-          // Other User's Profile: Show only public recipes
+          // Other User's Profile: Show only their recipes with collapsible tab view
           <Tabs.Container
             renderHeader={renderProfileInfo}
-            headerHeight={undefined}
-            allowHeaderOverscroll={false}
-            renderTabBar={props => (
-              <MaterialTabBar
-                {...props}
-                activeColor={ACTIVE_COLOR}
-                inactiveColor="#525252"
-                labelStyle={styles.tabLabel}
-                indicatorStyle={styles.tabIndicator}
-                style={styles.materialTabBar}
-                getLabelText={(name: string) => name}
-                // @ts-ignore
-                renderIcon={iconProps => {
-                  let iconName = 'video-library';
-                  if (iconProps.route.name === 'Recipes')
-                    iconName = 'video-library';
-
-                  return (
-                    <Icon
-                      name={iconName}
-                      size={20}
-                      color={iconProps.focused ? ACTIVE_COLOR : '#525252'}
-                      style={{ marginRight: 0, paddingRight: 0 }}
-                    />
-                  );
-                }}
-              />
-            )}>
-            <Tabs.Tab name="Recipes" label="Recipes">
+            headerHeight={HEADER_HEIGHT}
+            renderTabBar={renderTabBar}>
+            <Tabs.Tab name="userRecipes" label="Recipes">
               <LazyTabContent
                 data={profile.videos}
                 context="otherUserRecipes"
@@ -1073,12 +1103,12 @@ const styles = StyleSheet.create({
   },
   fullScreenTabContent: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f5f5f5',
   },
   fullScreenTabContentWithPadding: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-    padding: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 100,
   },
   loaderContainer: {
     flex: 1,
@@ -1279,6 +1309,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
     borderWidth: 1,
     borderColor: '#e9ecef',
+  },
+  statContainer: {
+    alignItems: 'center',
+  },
+  sectionContainer: {
+    padding: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  recipeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  activityContent: {
+    padding: 16,
   },
 });
 

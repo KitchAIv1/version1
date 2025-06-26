@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAccessControl } from '../hooks/useAccessControl';
@@ -9,22 +9,27 @@ interface TierDisplayProps {
   compact?: boolean;
 }
 
-export const TierDisplay: React.FC<TierDisplayProps> = ({
+export const TierDisplay: React.FC<TierDisplayProps> = React.memo(({
   onUpgradePress,
   showUpgradeButton = true,
   compact = false,
 }) => {
   const { getUsageDisplay } = useAccessControl();
-  const usageData = getUsageDisplay();
+  
+  // CRITICAL FIX: Memoize usageData to prevent repeated calls to getUsageDisplay
+  const usageData = useMemo(() => {
+    console.log('[TierDisplay] Computing usage data...');
+    return getUsageDisplay();
+  }, [getUsageDisplay]);
 
-  const getTierColor = () => {
+  const getTierColor = useMemo(() => {
     if (usageData.tierDisplay.includes('PREMIUM')) {
       return '#10b981'; // Green for premium
     }
     return '#f59e0b'; // Amber for freemium
-  };
+  }, [usageData.tierDisplay]);
 
-  const getTierIcon = () => {
+  const getTierIcon = useMemo(() => {
     if (usageData.tierDisplay.includes('CREATOR')) {
       return 'star';
     }
@@ -32,13 +37,13 @@ export const TierDisplay: React.FC<TierDisplayProps> = ({
       return 'diamond';
     }
     return 'person';
-  };
+  }, [usageData.tierDisplay]);
 
   if (compact) {
     return (
-      <View style={[styles.compactContainer, { borderColor: getTierColor() }]}>
-        <Ionicons name={getTierIcon()} size={16} color={getTierColor()} />
-        <Text style={[styles.compactTierText, { color: getTierColor() }]}>
+      <View style={[styles.compactContainer, { borderColor: getTierColor }]}>
+        <Ionicons name={getTierIcon} size={16} color={getTierColor} />
+        <Text style={[styles.compactTierText, { color: getTierColor }]}>
           {usageData.tierDisplay}
         </Text>
       </View>
@@ -51,11 +56,11 @@ export const TierDisplay: React.FC<TierDisplayProps> = ({
       <View
         style={[
           styles.tierContainer,
-          { backgroundColor: `${getTierColor()}15` },
+          { backgroundColor: `${getTierColor}15` },
         ]}>
         <View style={styles.tierHeader}>
-          <Ionicons name={getTierIcon()} size={24} color={getTierColor()} />
-          <Text style={[styles.tierText, { color: getTierColor() }]}>
+          <Ionicons name={getTierIcon} size={24} color={getTierColor} />
+          <Text style={[styles.tierText, { color: getTierColor }]}>
             {usageData.tierDisplay}
           </Text>
         </View>
@@ -99,7 +104,14 @@ export const TierDisplay: React.FC<TierDisplayProps> = ({
       )}
     </View>
   );
-};
+}, (prevProps, nextProps) => {
+  // Only re-render if props actually change
+  return (
+    prevProps.onUpgradePress === nextProps.onUpgradePress &&
+    prevProps.showUpgradeButton === nextProps.showUpgradeButton &&
+    prevProps.compact === nextProps.compact
+  );
+});
 
 const styles = StyleSheet.create({
   container: {

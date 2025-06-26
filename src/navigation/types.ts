@@ -39,6 +39,13 @@ export type EditProfileParams = {
   userId?: string; // User ID might be needed if RPC doesn't use auth.uid()
 };
 
+// Type for the FollowersDetail screen parameters
+export type FollowersDetailParams = {
+  userId: string;
+  username: string;
+  initialTab?: 'followers' | 'following';
+};
+
 // Params for EditRecipeScreen
 export type EditRecipeParams = {
   recipeId: string;
@@ -94,6 +101,7 @@ export type MainStackParamList = {
   OnboardingStep2Creator: undefined; // Added Onboarding Step 2 Creator
   OnboardingFinal: undefined; // Added Onboarding Final Step
   UpgradeScreen: undefined; // Added UpgradeScreen for PREMIUM upgrades
+  FollowersDetail: FollowersDetailParams; // Added FollowersDetail screen
   // "What Can I Cook?" feature screens
   IngredientSelection: IngredientSelectionParams;
   RecipeResults: RecipeResultsParams;

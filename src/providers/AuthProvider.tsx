@@ -168,66 +168,70 @@ export const AuthProvider: React.FC<PropsWithChildren<object>> = ({
   };
 
   const fetchProfileWithRPC = async (userId: string) => {
-    if (!userId) {
-      setProfile({
-        username: null,
-        role: null,
-        onboarded: false,
-        avatar_url: null,
-        bio: null,
-        tier: null,
-      });
-      setUsageLimits(null);
-      return;
-    }
+    console.log(
+      `AuthProvider: Fetching profile via RPC get_profile_details for user ${userId}`,
+    );
     try {
-      console.log(
-        `AuthProvider: Fetching profile via RPC get_profile_details for user ${userId}`,
-      );
-      const { data: rpcData, error: rpcError } = await supabase.rpc(
-        'get_profile_details',
-        { p_user_id: userId },
-      );
+      const { data, error } = await supabase.rpc('get_profile_details', {
+        p_user_id: userId,
+      });
 
-      if (rpcError) {
+      if (error) {
         console.error(
-          'AuthProvider: Error fetching profile via RPC:',
-          rpcError.message,
+          'AuthProvider: Error from get_profile_details RPC:',
+          error,
         );
-        setProfile({
+        throw new Error(error.message || 'Failed to fetch profile.');
+      }
+
+      console.log('AuthProvider: Raw RPC response:', data);
+
+      // NEW: Enhanced null/undefined checks for new users
+      if (!data || data === null || typeof data !== 'object') {
+        console.log(
+          'AuthProvider: No profile data returned from RPC (new user or profile not yet created) - using safe defaults.',
+        );
+        const defaultProfile = {
           username: null,
           role: null,
           onboarded: false,
           avatar_url: null,
           bio: null,
-          tier: null,
-        });
-        setUsageLimits(null);
+          tier: 'FREEMIUM',
+        };
+        setProfile(defaultProfile);
+        await fetchUsageLimits(userId, defaultProfile);
         return;
       }
 
-      if (rpcData) {
-        console.log('🔍 DEBUG: Raw RPC response:', rpcData);
-        console.log('🔍 DEBUG: rpcData.profile exists:', !!rpcData.profile);
-        console.log('🔍 DEBUG: rpcData.profile.role value:', rpcData.profile?.role);
-        console.log('🔍 DEBUG: rpcData.profile.onboarded value:', rpcData.profile?.onboarded);
-        console.log('🔍 DEBUG: typeof rpcData.profile.onboarded:', typeof rpcData.profile?.onboarded);
-        console.log('🔍 DEBUG: rpcData.profile.tier value:', rpcData.profile?.tier);
-        console.log('🔍 DEBUG: JSON.stringify(rpcData):', JSON.stringify(rpcData));
-        
-        // Extract profile data from the nested structure
-        const profileData = rpcData.profile || {};
-        
-        console.log('AuthProvider: Profile data fetched via RPC:', profileData);
-        console.log('AuthProvider: RPC Data Details:');
-        console.log('  - username:', profileData.username);
-        console.log('  - role:', profileData.role);
-        console.log('  - tier:', profileData.tier);
-        console.log('  - onboarded:', profileData.onboarded);
-        console.log('  - bio:', profileData.bio);
-        console.log('  - avatar_url:', profileData.avatar_url);
+      // Extract profile data with additional safety checks
+      const profileData = data.profile || data;
+      
+      if (!profileData || typeof profileData !== 'object') {
+        console.log(
+          'AuthProvider: Invalid profile structure in RPC response - using safe defaults.',
+        );
+        const defaultProfile = {
+          username: null,
+          role: null,
+          onboarded: false,
+          avatar_url: null,
+          bio: null,
+          tier: 'FREEMIUM',
+        };
+        setProfile(defaultProfile);
+        await fetchUsageLimits(userId, defaultProfile);
+        return;
+      }
 
-        const newProfile = {
+      if (profileData) {
+        console.log('🔍 DEBUG: Profile data from RPC:', profileData);
+        console.log('🔍 DEBUG: Type of onboarded:', typeof profileData.onboarded);
+        console.log('🔍 DEBUG: Value of onboarded:', profileData.onboarded);
+        console.log('🔍 DEBUG: Role:', profileData.role);
+        console.log('🔍 DEBUG: Tier:', profileData.tier);
+
+        const newProfile: UserProfile = {
           username: profileData.username || null,
           role: profileData.role || null,
           onboarded: profileData.onboarded || false,

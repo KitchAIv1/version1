@@ -142,9 +142,6 @@ const formatDate = (dateString: string) => {
 const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = React.memo(
   ({ item, onPress, context }) => {
     const { user } = useAuth(); // Moved user declaration earlier
-    console.log(
-      `[ProfileRecipeCard] Rendering card for "${item.recipe_name}", thumbnail_url: "${item.thumbnail_url}", context: "${context}", creator_id: "${item.creator_user_id}", current_user_id: "${user?.id}", is_ai_generated: ${item.is_ai_generated}`,
-    );
 
     const thumbnailHeight = cardWidth * 0.8; // Slightly taller ratio for better visibility
 
@@ -156,8 +153,9 @@ const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = React.memo(
       useNavigation<NativeStackNavigationProp<MainStackParamList>>();
     const queryClient = useQueryClient(); // Added queryClient
 
+    // FIXED: Memoize mutation functions to prevent infinite re-renders
     const deleteRecipeMut = useMutation({
-      mutationFn: async (recipeIdToDelete: string) => {
+      mutationFn: React.useCallback(async (recipeIdToDelete: string) => {
         // This is for hard deleting user's own recipe
         const { error } = await supabase.rpc('delete_recipe', {
           p_recipe_id: recipeIdToDelete,
@@ -167,8 +165,8 @@ const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = React.memo(
           throw new Error(error.message || 'Failed to delete recipe.');
         }
         return recipeIdToDelete;
-      },
-      onSuccess: deletedRecipeId => {
+      }, []),
+      onSuccess: React.useCallback((deletedRecipeId: string) => {
         Alert.alert(
           'Success',
           `Recipe "${item.recipe_name}" has been deleted.`,
@@ -180,31 +178,31 @@ const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = React.memo(
         console.log(
           `Recipe ${deletedRecipeId} deleted, invalidated profile query for user ${user?.id} and feed query.`,
         );
-      },
-      onError: (error: Error) => {
+      }, [item.recipe_name, user?.id, queryClient]),
+      onError: React.useCallback((error: Error) => {
         Alert.alert(
           'Error',
           error.message || 'Could not delete the recipe. Please try again.',
         );
-      },
+      }, []),
     });
 
     const unsaveRecipeMut = useMutation({
-      mutationFn: async (recipeIdToUnsave: string) => {
+      mutationFn: React.useCallback(async (recipeIdToUnsave: string) => {
         if (!user?.id) {
           throw new Error('User not authenticated to unsave recipe.');
         }
         const { error } = await supabase.rpc('unsave_recipe', {
-          p_recipe_id: recipeIdToUnsave,
-          p_user_id: user.id,
+          recipe_id_param: recipeIdToUnsave,
+          user_id_param: user.id,
         });
         if (error) {
           console.error('Error unsaving recipe:', error);
           throw new Error(error.message || 'Failed to unsave recipe.');
         }
         return recipeIdToUnsave;
-      },
-      onSuccess: unsavedRecipeId => {
+      }, [user?.id]),
+      onSuccess: React.useCallback((unsavedRecipeId: string) => {
         Alert.alert(
           'Success',
           `Recipe "${item.recipe_name}" has been unsaved.`,
@@ -212,39 +210,37 @@ const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = React.memo(
         if (user?.id) {
           queryClient.invalidateQueries({ queryKey: ['profile', user.id] }); // Refreshes saved list
         }
-        // Optionally, invalidate feed if saved status affects feed display, though less common
-        // queryClient.invalidateQueries({ queryKey: ['feed'] });
         console.log(
           `Recipe ${unsavedRecipeId} unsaved, invalidated profile query for user ${user?.id}.`,
         );
-      },
-      onError: (error: Error) => {
+      }, [item.recipe_name, user?.id, queryClient]),
+      onError: React.useCallback((error: Error) => {
         Alert.alert(
           'Error',
           error.message || 'Could not unsave the recipe. Please try again.',
         );
-      },
+      }, []),
     });
 
-    const handlePressIn = () => {
+    const handlePressIn = React.useCallback(() => {
       Animated.spring(scaleAnim, {
         toValue: 0.97,
         friction: 7,
         tension: 40,
         useNativeDriver: true,
       }).start();
-    };
+    }, [scaleAnim]);
 
-    const handlePressOut = () => {
+    const handlePressOut = React.useCallback(() => {
       Animated.spring(scaleAnim, {
         toValue: 1,
         friction: 5,
         tension: 40,
         useNativeDriver: true,
       }).start();
-    };
+    }, [scaleAnim]);
 
-    const handleMenuPress = () => {
+    const handleMenuPress = React.useCallback(() => {
       const isMyRecipeContext = context === 'myRecipes';
       const isOwner = item.creator_user_id === user?.id;
 
@@ -297,7 +293,7 @@ const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = React.memo(
         options,
         { cancelable: true },
       );
-    };
+    }, [context, item.creator_user_id, item.recipe_id, item.recipe_name, user?.id, navigation, deleteRecipeMut, unsaveRecipeMut]);
 
     return (
       <TouchableOpacity
@@ -368,6 +364,20 @@ const ProfileRecipeCard: React.FC<ProfileRecipeCardProps> = React.memo(
       </TouchableOpacity>
     );
   },
+  // CRITICAL: Add comparison function to prevent infinite re-renders
+  (prevProps, nextProps) => {
+    // Only re-render if the actual item data, context, or onPress function changes
+    return (
+      prevProps.item.recipe_id === nextProps.item.recipe_id &&
+      prevProps.item.recipe_name === nextProps.item.recipe_name &&
+      prevProps.item.thumbnail_url === nextProps.item.thumbnail_url &&
+      prevProps.item.created_at === nextProps.item.created_at &&
+      prevProps.item.creator_user_id === nextProps.item.creator_user_id &&
+      prevProps.item.is_ai_generated === nextProps.item.is_ai_generated &&
+      prevProps.context === nextProps.context &&
+      prevProps.onPress === nextProps.onPress
+    );
+  }
 );
 
 export default ProfileRecipeCard;

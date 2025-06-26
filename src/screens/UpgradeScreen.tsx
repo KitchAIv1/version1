@@ -56,13 +56,17 @@ export default function UpgradeScreen() {
               const paymentSuccessful = await processPayment();
 
               if (paymentSuccessful) {
+                console.log('[UpgradeScreen] 💳 Payment successful, updating tier for user:', user.id);
+                
                 // Update user tier in database
-                const { error } = await supabase
+                const { error, data } = await supabase
                   .from('profiles')
                   .update({ tier: 'PREMIUM' })
-                  .eq('id', user.id);
+                  .eq('user_id', user.id)
+                  .select();
 
                 if (error) {
+                  console.error('[UpgradeScreen] ❌ Database update failed:', error);
                   Alert.alert(
                     'Error',
                     'Payment processed but failed to update account. Please contact support.',
@@ -70,8 +74,25 @@ export default function UpgradeScreen() {
                   return;
                 }
 
-                // Refresh profile to get updated tier
+                console.log('[UpgradeScreen] ✅ Database updated successfully:', data);
+
+                // Refresh profile to get updated tier with enhanced retry logic
+                console.log('[UpgradeScreen] 🔄 Refreshing profile data...');
+                
+                // First refresh
                 await refreshProfile(user.id);
+                console.log('[UpgradeScreen] First refresh completed');
+                
+                // Wait longer for React state to settle
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Second refresh with verification
+                console.log('[UpgradeScreen] 🔄 Second refresh...');
+                await refreshProfile(user.id);
+                
+                // Wait again and log current state
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                console.log('[UpgradeScreen] ✅ Profile refresh sequence completed');
 
                 Alert.alert(
                   'Upgrade Successful! 🎉',
@@ -79,7 +100,20 @@ export default function UpgradeScreen() {
                   [
                     {
                       text: 'Continue',
-                      onPress: () => navigation.goBack(),
+                      onPress: async () => {
+                        // Force a final refresh before navigation to ensure UI consistency
+                        console.log('[UpgradeScreen] 🔄 Final refresh before navigation...');
+                        await refreshProfile(user.id);
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                        // FIX: Use canGoBack check and proper modal dismissal
+                        if (navigation.canGoBack()) {
+                          navigation.goBack();
+                        } else {
+                          // Fallback: navigate to parent navigator
+                          (navigation as any).getParent()?.goBack();
+                        }
+                      },
                     },
                   ],
                 );

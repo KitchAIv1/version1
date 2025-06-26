@@ -20,9 +20,9 @@ function AppNavigator() {
   }
 
   if (session) {
-    // If there's a session, profile.onboarded should ideally be available.
-    // Default to false if profile is null (e.g., edge case, new user profile creation pending)
-    // or if onboarded property itself is null/undefined.
+    // ENHANCED: Additional safeguards for profile state
+    // If there's a session but no profile yet (e.g., new user), default to not onboarded
+    // This prevents white screen issues during onboarding
     const userOnboarded = profile?.onboarded ?? false;
     
     console.log('🔍 [AppNavigator] CRITICAL DEBUG:');
@@ -31,6 +31,11 @@ function AppNavigator() {
     console.log('🔍 [AppNavigator] typeof profile?.onboarded:', typeof profile?.onboarded);
     console.log('🔍 [AppNavigator] userOnboarded result:', userOnboarded);
     console.log('🔍 [AppNavigator] Will route to:', userOnboarded ? 'MainTabs' : 'OnboardingStep1');
+    
+    // Additional safety check: if profile is completely null/undefined for new users
+    if (profile === null || profile === undefined) {
+      console.log('🔍 [AppNavigator] Profile is null/undefined - treating as new user (not onboarded)');
+    }
     
     console.log(
       `[AppNavigator] Session exists. User onboarded status: ${userOnboarded}, Profile:`,

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
+import * as Haptics from 'expo-haptics';
 import FeedScreen from '../screens/main/FeedScreen';
 // import DiscoverScreen from '../screens/main/DiscoverScreen';
 import PantryScreen from '../screens/main/PantryScreen';
@@ -12,6 +13,19 @@ import GroceryListScreen from '../screens/grocery/GroceryListScreen';
 import { MainTabsParamList } from './types';
 
 const Tab = createBottomTabNavigator<MainTabsParamList>();
+
+// Create a global reference for the feed refresh function
+let feedRefreshFunction: (() => void) | null = null;
+
+export const registerFeedRefresh = (refreshFn: () => void) => {
+  feedRefreshFunction = refreshFn;
+};
+
+export const triggerFeedRefresh = () => {
+  if (feedRefreshFunction) {
+    feedRefreshFunction();
+  }
+};
 
 function MainTabs() {
   const queryClient = useQueryClient();
@@ -72,20 +86,30 @@ function MainTabs() {
                 );
               } else {
                 console.log(
-                  'Feed tab pressed while it is the current tab. Master refresh - TEMPORARILY DISABLED',
+                  '🔄 Feed tab pressed while active - Master refresh triggered (TikTok-style)',
                 );
 
-                // TEMPORARILY DISABLED FOR DEBUGGING
-                /*
-                // Master refresh - invalidate all relevant caches
+                // 📳 Light haptic feedback for premium feel
+                try {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                } catch (e) {
+                  // Haptics might not be available on all devices
+                  console.log('Haptics not available:', e);
+                }
+
+                // ✅ ENHANCED FEED V4 MASTER REFRESH - TikTok-style active tab refresh
+                // Invalidate all relevant caches for fresh content
                 queryClient.invalidateQueries({ queryKey: ['feed'] });
                 queryClient.invalidateQueries({ queryKey: ['pantryData'] });
                 queryClient.invalidateQueries({ queryKey: ['recipeDetails'] });
                 queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
                 queryClient.invalidateQueries({ queryKey: ['groceryList'] });
                 
-                console.log('Master refresh completed - all caches invalidated');
-                */
+                // 🔝 Trigger scroll to top
+                triggerFeedRefresh();
+                
+                console.log('✅ Master refresh completed - Enhanced Feed V4 refreshed with fresh human recipes');
+                console.log('🔝 Feed will auto-scroll to top on data refresh');
               }
             }
 

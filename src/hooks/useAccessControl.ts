@@ -318,11 +318,12 @@ export const useAccessControl = () => {
     const isCreatorResult = isCreator();
     const effectiveTier = getEffectiveTier();
     
-    console.log('[useAccessControl] getUsageDisplay DEBUG:', {
-      isCreator: isCreatorResult,
-      effectiveTier: effectiveTier,
-      usageLimits: usageLimits
-    });
+    // Reduced logging to prevent spam during multiple re-renders
+    // console.log('[useAccessControl] getUsageDisplay DEBUG:', {
+    //   isCreator: isCreatorResult,
+    //   effectiveTier: effectiveTier,
+    //   usageLimits: usageLimits
+    // });
 
     if (isCreatorResult) {
       return {

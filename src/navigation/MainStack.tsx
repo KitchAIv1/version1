@@ -8,6 +8,7 @@ import EditProfileScreen from '../screens/EditProfileScreen'; // Uncommented
 import VideoRecipeUploaderScreen from '../screens/recipe/VideoRecipeUploaderScreen';
 import EditRecipeScreen from '../screens/recipe/EditRecipeScreen'; // Import EditRecipeScreen
 import UpgradeScreen from '../screens/UpgradeScreen'; // Import UpgradeScreen
+import FollowersDetailScreen from '../screens/main/FollowersDetailScreen'; // Import FollowersDetailScreen
 import { MainStackParamList } from './types';
 
 // Import Onboarding Screens
@@ -77,24 +78,34 @@ const MainStack: React.FC<MainStackProps> = ({ userOnboarded }) => {
         name="VideoRecipeUploader"
         component={VideoRecipeUploaderScreen}
         options={{
-          headerShown: true,
-          title: 'Upload Recipe',
+          presentation: 'fullScreenModal',
+          headerShown: false,
+          gestureEnabled: false, // Disable swipe to dismiss for upload process
         }}
       />
       <Stack.Screen
         name="EditRecipe"
         component={EditRecipeScreen}
         options={{
+          presentation: 'modal',
           headerShown: true,
-          title: 'Edit Recipe', // Default title, screen will override
+          title: 'Edit Recipe',
         }}
       />
       <Stack.Screen
         name="UpgradeScreen"
         component={UpgradeScreen}
         options={{
-          headerShown: false, // UpgradeScreen has its own header
-          presentation: 'modal', // Present as modal for better UX
+          presentation: 'modal',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="FollowersDetail"
+        component={FollowersDetailScreen}
+        options={{
+          headerShown: false,
+          presentation: 'modal',
         }}
       />
 
@@ -103,24 +114,24 @@ const MainStack: React.FC<MainStackProps> = ({ userOnboarded }) => {
         name="IngredientSelection"
         component={IngredientSelectionScreen}
         options={{
-          headerShown: false, // Screen has its own header
-          presentation: 'card', // Standard card presentation
+          headerShown: true,
+          title: 'Select Ingredients',
         }}
       />
       <Stack.Screen
         name="RecipeResults"
         component={RecipeResultsScreen}
         options={{
-          headerShown: false, // Screen has its own header
-          presentation: 'card', // Standard card presentation
+          headerShown: true,
+          title: 'Recipe Suggestions',
         }}
       />
       <Stack.Screen
         name="AIRecipeGeneration"
         component={AIRecipeGenerationScreen}
         options={{
-          headerShown: false, // Screen has its own header
-          presentation: 'card', // Standard card presentation
+          headerShown: true,
+          title: 'AI Recipe Generator',
         }}
       />
 
