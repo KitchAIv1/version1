@@ -19,23 +19,35 @@ interface RawFeedItem {
   output_name: string;
   output_video_url: string;
   output_description: string;
-  output_likes: number;
-  output_comments: any; // Adjust type if known
+  output_likes_count: number; // Updated for new RPC
+  output_comments: any;
   output_created_at: string;
-  output_dietary_category_ids: string[]; // Adjust type if known
+  output_dietary_category_ids: string[];
   user_name: string;
   output_is_liked: boolean;
   output_is_saved: boolean;
-  pantry_match?: PantryMatch; // NEW: Replaces output_user_ingredients_count and output_total_ingredients_count
+  pantry_match?: PantryMatch;
   output_feed_type: string;
   output_comments_count: number;
   out_creator_avatar_url: string;
-  // output_cursor is removed as it's not used by the RPC with p_limit
+  is_ai_generated: boolean; // New: Always false in enhanced feed
+  following_creator: boolean; // New: Social signal
+  algorithm_score: number; // New: Algorithm scoring
+  engagement_velocity: number; // New: TikTok-style engagement
 }
 
-// Type for the structure returned by the RPC call (nested under "result")
-interface RpcResponse {
-  result: RawFeedItem[];
+// Type for the enhanced feed V4 response structure
+interface EnhancedFeedResponse {
+  recipes: RawFeedItem[];
+  algorithm_metadata: {
+    ai_recipes_excluded: boolean;
+    human_recipes_only: boolean;
+    algorithm_version: string;
+    personalization_confidence: number;
+    time_context: string;
+    current_hour: number;
+    total_recipes_considered: number;
+  };
 }
 
 // Renamed from FeedPageItem, removed cursor
@@ -78,13 +90,15 @@ export const useFeed = () => {
 
       console.log('[useFeed] Fetching feed data for user:', user.id);
 
-      // Direct Supabase call - let React Query handle retries with proper loading states
+      // 🚀 ENHANCED FEED ALGORITHM V4 - NO AI RECIPES + TikTok-style personalization
       const { data, error } = await supabase.rpc(
-        'get_community_feed_pantry_match_v3',
+        'get_enhanced_feed_v4',
         {
           user_id_param: user.id,
-          p_limit: 50,
-          p_offset: 0,
+          session_context: {},
+          feed_position: 0,
+          time_context: 'general',
+          limit_param: 50,
         },
       );
 
@@ -117,12 +131,23 @@ export const useFeed = () => {
         throw error;
       }
 
-      if (!data || !Array.isArray(data)) {
-        console.warn('[useFeed] No data returned or data is not an array');
+      // 🚀 ENHANCED FEED V4: Handle new response structure
+      if (!data || !data.recipes || !Array.isArray(data.recipes)) {
+        console.warn('[useFeed] No recipes returned or recipes is not an array');
         return [];
       }
 
-      console.log(`[useFeed] Successfully fetched ${data.length} feed items`);
+      const recipes = data.recipes;
+      const metadata = data.algorithm_metadata;
+      
+      console.log(`[useFeed] ✅ Enhanced Feed V4 - Successfully fetched ${recipes.length} human recipes`);
+      console.log('[useFeed] 🎯 Algorithm Metadata:', {
+        ai_recipes_excluded: metadata?.ai_recipes_excluded,
+        human_recipes_only: metadata?.human_recipes_only,
+        algorithm_version: metadata?.algorithm_version,
+        personalization_confidence: metadata?.personalization_confidence,
+        time_context: metadata?.time_context
+      });
 
       // CRITICAL BACKEND AUDIT: Show EVERY piece of like data from the first few items
       console.log('[useFeed] 🚨 CRITICAL BACKEND AUDIT - Raw RPC Response:');

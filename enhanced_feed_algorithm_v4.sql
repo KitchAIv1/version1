@@ -234,43 +234,39 @@ BEGIN
     ),
     
     BalancedFeed AS (
-      SELECT *
-      FROM (
-        -- Personalized content (dynamic weight)
-        SELECT *, 1 as selection_priority 
-        FROM DiversifiedFeed 
-        WHERE feed_type = 'personalized'
-        ORDER BY algorithm_score DESC
-        LIMIT CEIL(limit_param * (diversification_weights->>'personalized')::NUMERIC)
-        
-        UNION ALL
-        
-        -- Trending content
-        SELECT *, 2 as selection_priority
-        FROM DiversifiedFeed 
-        WHERE feed_type = 'trending'
-        ORDER BY engagement_velocity DESC
-        LIMIT CEIL(limit_param * (diversification_weights->>'trending')::NUMERIC)
-        
-        UNION ALL
-        
-        -- Following content (prioritized for human connection)
-        SELECT *, 1 as selection_priority
-        FROM DiversifiedFeed 
-        WHERE feed_type = 'following'
-        ORDER BY algorithm_score DESC
-        LIMIT GREATEST(4, CEIL(limit_param * 0.2)) -- Increased weight for human creators
-        
-        UNION ALL
-        
-        -- Discovery content
-        SELECT *, 3 as selection_priority
-        FROM DiversifiedFeed 
-        WHERE feed_type = 'discovery'
-        ORDER BY freshness_score DESC, RANDOM() -- Add some randomness for discovery
-        LIMIT CEIL(limit_param * (diversification_weights->>'discovery')::NUMERIC)
-        
-      ) balanced
+      -- Personalized content (dynamic weight)
+      SELECT *, 1 as selection_priority 
+      FROM DiversifiedFeed 
+      WHERE feed_type = 'personalized'
+      ORDER BY algorithm_score DESC
+      LIMIT CEIL(limit_param * (diversification_weights->>'personalized')::NUMERIC)
+      
+      UNION ALL
+      
+      -- Trending content
+      SELECT *, 2 as selection_priority
+      FROM DiversifiedFeed 
+      WHERE feed_type = 'trending'
+      ORDER BY engagement_velocity DESC
+      LIMIT CEIL(limit_param * (diversification_weights->>'trending')::NUMERIC)
+      
+      UNION ALL
+      
+      -- Following content (prioritized for human connection)
+      SELECT *, 1 as selection_priority
+      FROM DiversifiedFeed 
+      WHERE feed_type = 'following'
+      ORDER BY algorithm_score DESC
+      LIMIT GREATEST(4, CEIL(limit_param * 0.2)) -- Increased weight for human creators
+      
+      UNION ALL
+      
+      -- Discovery content
+      SELECT *, 3 as selection_priority
+      FROM DiversifiedFeed 
+      WHERE feed_type = 'discovery'
+      ORDER BY freshness_score DESC, RANDOM() -- Add some randomness for discovery
+      LIMIT CEIL(limit_param * (diversification_weights->>'discovery')::NUMERIC)
     ),
     
     ShuffledFeed AS (
