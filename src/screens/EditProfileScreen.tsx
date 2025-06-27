@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Button } from 'react-native-paper';
 import { useQueryClient } from '@tanstack/react-query'; // Import useQueryClient
+import { useProfileStateManager } from '../hooks/useProfileStateManager'; // Import robust state manager
 import Icon from 'react-native-vector-icons/MaterialIcons'; // For CollapsibleCard
 import { AvatarEditorAndBio } from '../components/AvatarEditorAndBio'; // Check path
 // import { COLORS } from '../constants/colors'; // Removed invalid import
@@ -67,6 +68,7 @@ function EditProfileScreen({ navigation, route }: any) {
   // Using any temporarily for navigation/route types
   const queryClient = useQueryClient(); // Get queryClient instance
   const { user, profile, refreshProfile } = useAuth(); // Get user, profile, and refreshProfile from useAuth
+  const { triggerProfileUpdate, cleanup, getUpdateStatus } = useProfileStateManager(); // Robust state manager
   const { initialProfileData = {} } = route.params || {}; // userId from route.params is no longer the primary source for update
 
   const [bio, setBio] = useState('');
@@ -145,34 +147,34 @@ function EditProfileScreen({ navigation, route }: any) {
         {
           text: 'OK',
           onPress: async () => {
-            // SIMPLE DEBOUNCED FIX: Prevent cascade from rapid profile edits
-            console.log('[EDIT_PROFILE] Debounced refresh starting...');
+            // 🎯 ROBUST SOLUTION: Use centralized state manager
+            console.log('[EDIT_PROFILE] Using robust profile state manager...');
             
             try {
-              // Only refresh AuthProvider - let everything else settle naturally
-              if (refreshProfile) {
-                await refreshProfile(user.id);
-                
-                // Longer delay for stability after multiple rapid edits
+              // Check if update is already in progress
+              const { isUpdating } = getUpdateStatus();
+              if (isUpdating) {
+                console.log('[EDIT_PROFILE] Update already in progress, waiting...');
                 await new Promise(resolve => setTimeout(resolve, 1000));
               }
+
+              // Trigger robust profile update with debouncing
+              triggerProfileUpdate(user.id, 100); // Short delay for immediate UI response
               
-              // CRITICAL: Invalidate ProfileScreen cache so avatar updates
+              console.log('[EDIT_PROFILE] Robust update sequence initiated');
+              
+            } catch (updateError) {
+              console.error('[EDIT_PROFILE] Error during robust update:', updateError);
+              // Fallback to manual cache invalidation
               queryClient.invalidateQueries({ 
                 queryKey: ['profile', user.id] 
               });
-              
-              console.log('[EDIT_PROFILE] Debounced refresh completed');
-              
-            } catch (updateError) {
-              console.error('[EDIT_PROFILE] Error during state updates:', updateError);
             }
             
-            // Navigation with proper fallback
+            // Navigate back immediately (don't wait for async operations)
             if (navigation.canGoBack()) {
               navigation.goBack();
             } else {
-              // Fallback: navigate to MainTabs and specifically to Profile tab
               navigation.navigate('MainTabs', { screen: 'Profile' });
             }
           },

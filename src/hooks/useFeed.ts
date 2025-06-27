@@ -143,14 +143,31 @@ export const useFeed = () => {
         });
       });
 
+
+
       // Transform the data to match the expected FeedItem interface
       const transformedData: FeedItem[] = recipes.map((item, index) => {
-        // Use pantry_match structure (simplified for now)
-        const pantryMatchPct = item.pantry_match?.match_percentage || 0;
-        const matchedCount = item.pantry_match?.matched_ingredients?.length || 0;
-        const totalCount = 
-          (item.pantry_match?.matched_ingredients?.length || 0) +
-          (item.pantry_match?.missing_ingredients?.length || 0);
+        // 🔍 CRITICAL FIX: Properly extract pantry match data from V4 RPC
+        const pantryMatch = item.pantry_match;
+        const pantryMatchPct = pantryMatch?.match_percentage || 0;
+        const matchedCount = pantryMatch?.matched_ingredients?.length || 0;
+        const missingCount = pantryMatch?.missing_ingredients?.length || 0;
+        const totalCount = matchedCount + missingCount;
+
+        // 🚨 DEBUG: Log pantry data for recipes that should have matches
+        if (index < 3) {
+          console.log(`[useFeed] 🔍 Recipe ${index + 1} Pantry Debug:`, {
+            recipe_id: item.output_id,
+            title: item.output_name?.substring(0, 30),
+            pantryMatch_object: !!pantryMatch,
+            match_percentage: pantryMatchPct,
+            matched_count: matchedCount,
+            missing_count: missingCount,
+            total_count: totalCount,
+            matched_ingredients: pantryMatch?.matched_ingredients?.slice(0, 3), // First 3 ingredients
+            missing_ingredients: pantryMatch?.missing_ingredients?.slice(0, 3), // First 3 ingredients
+          });
+        }
 
         return {
           id: item.output_id,

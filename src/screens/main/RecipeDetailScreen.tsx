@@ -54,6 +54,7 @@ import { supabase } from '../../services/supabase';
 import { useGroceryManager } from '../../hooks/useGroceryManager';
 import { COLORS } from '../../constants/theme';
 import FloatingTabBar from '../../components/FloatingTabBar';
+import { TikTokVideoControls } from '../../components/TikTokVideoControls';
 import { useDailyMealPlan, MealSlot } from '../../hooks/useDailyMealPlan';
 import AddToMealPlannerModal from '../../components/modals/AddToMealPlannerModal';
 import CommentsModal from '../../components/CommentsModal';
@@ -209,6 +210,9 @@ export default function RecipeDetailScreen() {
 
   const [isMuted, setIsMuted] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [videoPosition, setVideoPosition] = useState(0);
   // Set initial activeTab based on route param or default to Ingredients
   const [activeTab, setActiveTab] = useState(() => {
     if (
@@ -366,6 +370,11 @@ export default function RecipeDetailScreen() {
         }
         // Ensure video respects the current isMuted state upon loading
         await videoRef.current.setIsMutedAsync(isMuted);
+        
+        // Set video duration for TikTok controls
+        if (status.durationMillis) {
+          setVideoDuration(status.durationMillis / 1000);
+        }
       }
       setIsLoaded(true); // This will trigger the focus-aware useEffect to potentially play the video
     } else if (status.error) {
@@ -387,6 +396,34 @@ export default function RecipeDetailScreen() {
       .setIsMutedAsync(!isMuted)
       .catch(e => console.error('setIsMutedAsync error:', e));
     setIsMuted(prevMuted => !prevMuted);
+  };
+
+  const togglePlay = async () => {
+    if (!videoRef.current) return;
+    
+    try {
+      if (isPlaying) {
+        await videoRef.current.pauseAsync();
+        setIsPlaying(false);
+      } else {
+        await videoRef.current.playAsync();
+        setIsPlaying(true);
+      }
+    } catch (error) {
+      console.error('Toggle play error:', error);
+    }
+  };
+
+  const handlePlaybackStatusUpdate = (status: AVPlaybackStatus) => {
+    if (status.isLoaded) {
+      if (status.positionMillis) {
+        setVideoPosition(status.positionMillis / 1000);
+      }
+      if (status.durationMillis && videoDuration === 0) {
+        setVideoDuration(status.durationMillis / 1000);
+      }
+      setIsPlaying(status.isPlaying || false);
+    }
   };
 
   const handleError = (error: string) => {
@@ -745,14 +782,26 @@ export default function RecipeDetailScreen() {
                   ref={videoRef}
                   style={styles.videoPlayer}
                   source={{ uri: recipeDetails.video_url }}
-                  useNativeControls={false} // Using custom controls
+                  useNativeControls={false} // Using custom TikTok-level controls
                   resizeMode={ResizeMode.COVER}
                   isLooping
                   onLoad={handleLoad} // Use the updated handleLoad
                   onError={handleError}
+                  onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
                   progressUpdateIntervalMillis={500}
                   isMuted={isMuted} // Bind to isMuted state
                   // shouldPlay // Consider if autoplay is desired immediately on component mount vs. on load
+                />
+                
+                {/* TikTok-Level Video Controls */}
+                <TikTokVideoControls
+                  videoRef={videoRef}
+                  isPlaying={isPlaying}
+                  isMuted={isMuted}
+                  onToggleMute={toggleMute}
+                  onTogglePlay={togglePlay}
+                  duration={videoDuration}
+                  position={videoPosition}
                 />
               </View>
             );
@@ -766,14 +815,7 @@ export default function RecipeDetailScreen() {
           );
         })()}
 
-        {/* Header Overlays (Mute button, Pantry Match, Actions) */}
-        <TouchableOpacity style={styles.muteButton} onPress={toggleMute}>
-          <Ionicons
-            name={isMuted ? 'volume-mute' : 'volume-high'}
-            size={24}
-            color="white"
-          />
-        </TouchableOpacity>
+        {/* Header Overlays (Cart Icon, View Count) - Mute now handled by TikTok Controls */}
 
         {/* Cart Icon with Badge - Uses groceryList.length */}
         <TouchableOpacity

@@ -13,7 +13,10 @@ import {
   Platform,
   Dimensions,
   Animated,
+  StatusBar,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Feather } from '@expo/vector-icons';
@@ -129,6 +132,7 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
     >();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   // Animation values
   const fadeAnim = useState(new Animated.Value(0))[0];
@@ -264,6 +268,36 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
     );
   };
 
+  // Back button handler with confirmation
+  const handleGoBack = () => {
+    if (title || description || videoUri || thumbnailUri || ingredients.some(i => i.name)) {
+      Alert.alert(
+        'Discard Changes?',
+        'You have unsaved changes. Are you sure you want to go back?',
+        [
+          { text: 'Continue Editing', style: 'cancel' },
+          { 
+            text: 'Discard', 
+            style: 'destructive', 
+            onPress: () => navigation.goBack() 
+          },
+        ]
+      );
+    } else {
+      navigation.goBack();
+    }
+  };
+
+  // Swipe down to dismiss gesture handler
+  const handleSwipeGesture = ({ nativeEvent }: any) => {
+    if (nativeEvent.state === State.END) {
+      if (nativeEvent.translationY > 100 && nativeEvent.velocityY > 500) {
+        // User swiped down far enough and fast enough
+        handleGoBack();
+      }
+    }
+  };
+
   const handlePublish = async () => {
     if (!videoUri) {
       Alert.alert('Validation Error', 'Please select a video.');
@@ -347,20 +381,49 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scrollContentContainer}>
-      <Animated.View
-        style={{
-          opacity: fadeAnim,
-          transform: [{ scale: scaleAnim }],
-        }}>
-        <View style={styles.headerContainer}>
-          <Text style={styles.screenTitle}>Create New Recipe</Text>
-          <Text style={styles.screenSubtitle}>
-            Share your culinary masterpiece with the world
-          </Text>
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      
+      {/* Fixed Header with Safe Area */}
+      <SafeAreaView style={styles.headerSafeArea}>
+        <View style={styles.header}>
+          {/* Back Button */}
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={handleGoBack}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Icon name="arrow-back" size={24} color="#1f2937" />
+          </TouchableOpacity>
+          
+          {/* Header Title */}
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>Create Recipe</Text>
+            <Text style={styles.headerSubtitle}>Share your culinary creation</Text>
+          </View>
+          
+          {/* Save Draft Button (Optional) */}
+          <TouchableOpacity 
+            style={styles.draftButton}
+            onPress={() => {
+              // Could implement save draft functionality
+              Alert.alert('Draft', 'Draft saved locally');
+            }}>
+            <Text style={styles.draftButtonText}>Draft</Text>
+          </TouchableOpacity>
         </View>
+      </SafeAreaView>
+
+      {/* Scrollable Content with Swipe Gesture */}
+      <PanGestureHandler onHandlerStateChange={handleSwipeGesture}>
+        <ScrollView
+          style={styles.scrollContainer}
+          contentContainerStyle={styles.scrollContentContainer}
+          showsVerticalScrollIndicator={false}>
+        <Animated.View
+          style={{
+            opacity: fadeAnim,
+            transform: [{ scale: scaleAnim }],
+          }}>
 
         {/* Media selection area with enhanced styling */}
         <View style={styles.mediaSelectionContainer}>
@@ -700,14 +763,71 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
               }>{`${(uploadProgress * 100).toFixed(0)}%`}</Text>
           </View>
         )}
-      </Animated.View>
-    </ScrollView>
+        </Animated.View>
+        </ScrollView>
+      </PanGestureHandler>
+    </View>
   );
 };
 
 // Enhanced styles
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  headerSafeArea: {
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    paddingTop: 10,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 16,
+    backgroundColor: '#fff',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f8f9fa',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    textAlign: 'center',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  draftButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#f3f4f6',
+    marginLeft: 12,
+  },
+  draftButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  scrollContainer: {
     flex: 1,
     backgroundColor: '#f9fafb',
   },

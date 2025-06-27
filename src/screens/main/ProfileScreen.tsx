@@ -40,7 +40,10 @@ import {
 import { useUserActivityFeed } from '../../hooks/useUserActivityFeed'; // Import the activity feed hook
 import { useAccessControl } from '../../hooks/useAccessControl'; // Import access control hook
 import { TierDisplay } from '../../components/TierDisplay'; // Added TierDisplay import
-import { FollowButton } from '../../components/FollowButton'; // Import FollowButton
+import { FollowButton } from '../../components/FollowButton';
+import { FollowButtonOptimized } from '../../components/FollowButtonOptimized';
+import { useFollowDataPreloader } from '../../hooks/useFollowDataPreloader';
+import { CreatorAccountModal } from '../../components/CreatorAccountModal'; // Import FollowButton
 // import { useCacheDebug } from '../../hooks/useCacheDebug'; // REMOVED - no longer needed
 
 // Import notification components
@@ -88,9 +91,11 @@ const ACTIVE_COLOR = '#10b981'; // Green color for active elements
 // -----------------------------------------------------------------------------
 // Hooks (data)
 // -----------------------------------------------------------------------------
+// 🚀 PERFORMANCE OPTIMIZATION: Enhanced profile hook with better caching
 const useProfile = (targetUserId?: string) => {
   const { user } = useAuth();
-  const userId = targetUserId || user?.id; // Use targetUserId if provided, otherwise current user
+  const userId = targetUserId || user?.id;
+  const isOwnProfile = !targetUserId || targetUserId === user?.id;
 
   return useQuery<ProfileData, Error, ProfileData, QueryKey>({
     queryKey: ['profile', userId],
@@ -138,7 +143,7 @@ const useProfile = (targetUserId?: string) => {
             thumbnail_url: recipe.thumbnail_url || null,
             created_at: recipe.created_at || new Date().toISOString(),
             creator_user_id: recipe.creator_user_id || userId,
-            is_ai_generated: recipe.is_ai_generated || false, // ✅ AI flag preserved
+            is_ai_generated: recipe.is_ai_generated || false,
           }),
                  ).filter((recipe: VideoPostData) => recipe.recipe_id && recipe.recipe_name);
          
@@ -156,7 +161,7 @@ const useProfile = (targetUserId?: string) => {
             thumbnail_url: recipe.thumbnail_url || null,
             created_at: recipe.created_at || new Date().toISOString(),
             creator_user_id: recipe.creator_user_id || userId,
-            is_ai_generated: recipe.is_ai_generated || false, // ✅ AI flag preserved
+            is_ai_generated: recipe.is_ai_generated || false,
           }),
                  ).filter((recipe: VideoPostData) => recipe.recipe_id && recipe.recipe_name);
          
@@ -178,11 +183,12 @@ const useProfile = (targetUserId?: string) => {
       return processedFrontendData;
     },
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
-    gcTime: 10 * 60 * 1000, // 10 minutes - cache retention (renamed from cacheTime)
-    refetchOnWindowFocus: false, // Don't refetch on window focus
-    refetchOnMount: false, // Don't refetch on mount if data exists
-    retry: 2, // Retry failed requests 2 times
+    // 🚀 PERFORMANCE OPTIMIZATION: Extended cache times
+    staleTime: isOwnProfile ? 2 * 60 * 1000 : 10 * 60 * 1000, // Own profile: 2min, Others: 10min
+    gcTime: isOwnProfile ? 5 * 60 * 1000 : 30 * 60 * 1000, // Own profile: 5min, Others: 30min
+    refetchOnWindowFocus: false, // Disabled - causes unnecessary refetches
+    refetchOnMount: false, // Disabled - rely on cache
+    retry: 2,
   });
 };
 
@@ -369,6 +375,13 @@ export const ProfileScreen: React.FC = () => {
   const targetUserId = routeParams?.userId;
   const isOwnProfile = !targetUserId || targetUserId === user?.id;
 
+  // 🎯 PRELOAD FOLLOW DATA (Industry best practice) - TEMPORARILY DISABLED
+  // const profileUserId = targetUserId || user?.id;
+  // const { isPreloaded } = useFollowDataPreloader(profileUserId, {
+  //   priority: 'high', // High priority since user is actively viewing profile
+  //   enabled: !!profileUserId,
+  // });
+
   // Use the profile hook with targetUserId
   const {
     data: profile,
@@ -389,13 +402,16 @@ export const ProfileScreen: React.FC = () => {
   // NEW: Toast notification state
   const [toastNotification, setToastNotification] = useState<any>(null);
 
-  // Add activity feed hook (only for own profile)
+  // 🚀 PERFORMANCE OPTIMIZATION: Conditional data loading
+  // Only load activity feed for own profile and when on activity tab
+  const isActivityTab = tabIndex === 3; // Assuming activity is tab index 3
+  
   const {
     data: activityData,
     isLoading: activityLoading,
     error: activityError,
     refetch: refetchActivity,
-  } = useUserActivityFeed(isOwnProfile ? user?.id : undefined);
+  } = useUserActivityFeed(isOwnProfile && isActivityTab ? user?.id : undefined);
 
   // Pull-to-refresh state and functionality
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -403,12 +419,12 @@ export const ProfileScreen: React.FC = () => {
   // NEW: Notification state
   const [showNotificationDrawer, setShowNotificationDrawer] = useState(false);
 
-  // NEW: Notification hooks
-  const { data: notifications = [] } = useNotifications(user?.id);
+  // 🚀 PERFORMANCE OPTIMIZATION: Only load notifications for own profile
+  const { data: notifications = [] } = useNotifications(isOwnProfile ? user?.id : undefined);
   const unreadCount = useUnreadNotificationCount(notifications);
 
-  // NEW: Setup notification subscription with toast handler
-  useNotificationsSubscription(user?.id, notification => {
+  // 🚀 PERFORMANCE OPTIMIZATION: Only setup subscription for own profile
+  useNotificationsSubscription(isOwnProfile ? user?.id : undefined, notification => {
     // Show toast for urgent notifications
     if (
       notification.priority === 'urgent' ||
@@ -418,29 +434,9 @@ export const ProfileScreen: React.FC = () => {
     }
   });
 
-  // Focus effect to refresh profile data when returning to screen
-  useFocusEffect(
-    useCallback(() => {
-      if (isOwnProfile && user?.id) {
-        console.log('[ProfileScreen] Screen focused, refreshing profile data...');
-        
-        // MINIMAL REFRESH: Just refetch, let React Query handle the rest
-        const minimalRefresh = async () => {
-          try {
-            // Only refetch - this is enough to get fresh data
-            await refetchProfile();
-            console.log('[ProfileScreen] Profile refresh completed after focus');
-          } catch (error) {
-            console.error('[ProfileScreen] Focus refresh error:', error);
-          }
-        };
-        
-        // Use a small delay to let any ongoing operations finish first
-        const timeoutId = setTimeout(minimalRefresh, 300);
-        return () => clearTimeout(timeoutId);
-      }
-    }, [isOwnProfile, user?.id, refetchProfile])
-  );
+  // 🎯 ROBUST SOLUTION: No focus effects needed
+  // The robust profile state manager handles all updates properly
+  // React Query's intelligent caching ensures data freshness when needed
 
   // Refresh handler - refreshes all data sources
   const handleRefresh = useCallback(async () => {
@@ -769,99 +765,102 @@ export const ProfileScreen: React.FC = () => {
         )}
       </View>
 
-      {/* Tier Modal */}
-      <Modal
-        visible={showTierModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowTierModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Icon
-                name={
-                  usageData.tierDisplay === 'PREMIUM' ||
-                  usageData.tierDisplay.includes('CREATOR')
-                    ? 'star'
-                    : 'person'
-                }
-                size={48}
-                color={
-                  usageData.tierDisplay === 'PREMIUM' ||
-                  usageData.tierDisplay.includes('CREATOR')
-                    ? '#FFD700'
-                    : '#10b981'
-                }
-              />
-              <Text style={styles.modalTitle}>
-                {usageData.tierDisplay.includes('CREATOR')
-                  ? 'Creator Account'
-                  : `${usageData.tierDisplay} Account`}
-              </Text>
-            </View>
-
-            {usageData.showUsage ? (
-              <>
-                <Text style={styles.modalMessage}>Monthly Usage</Text>
-
-                <View style={styles.usageStatsContainer}>
-                  <View style={styles.usageStat}>
-                    <Icon name="camera-alt" size={24} color="#6b7280" />
-                    <Text style={styles.usageStatLabel}>Pantry Scans</Text>
-                    <Text style={styles.usageStatValue}>
-                      {usageData.scanUsage}
-                    </Text>
-                  </View>
-
-                  <View style={styles.usageStat}>
-                    <Icon name="lightbulb-outline" size={24} color="#6b7280" />
-                    <Text style={styles.usageStatLabel}>AI Recipes</Text>
-                    <Text style={styles.usageStatValue}>
-                      {usageData.aiRecipeUsage}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text style={styles.modalSubMessage}>
-                  Upgrade to Premium for unlimited access to all features!
+      {/* Enhanced Creator/Tier Modal */}
+      {usageData.tierDisplay.includes('CREATOR') ? (
+        <CreatorAccountModal
+          visible={showTierModal}
+          onClose={() => setShowTierModal(false)}
+          onCreateRecipe={handleAddRecipePress}
+          username={profile?.username || 'Creator'}
+        />
+      ) : (
+        <Modal
+          visible={showTierModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowTierModal(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Icon
+                  name={
+                    usageData.tierDisplay === 'PREMIUM'
+                      ? 'star'
+                      : 'person'
+                  }
+                  size={48}
+                  color={
+                    usageData.tierDisplay === 'PREMIUM'
+                      ? '#FFD700'
+                      : '#10b981'
+                  }
+                />
+                <Text style={styles.modalTitle}>
+                  {`${usageData.tierDisplay} Account`}
                 </Text>
+              </View>
 
-                <View style={styles.modalButtons}>
+              {usageData.showUsage ? (
+                <>
+                  <Text style={styles.modalMessage}>Monthly Usage</Text>
+
+                  <View style={styles.usageStatsContainer}>
+                    <View style={styles.usageStat}>
+                      <Icon name="camera-alt" size={24} color="#6b7280" />
+                      <Text style={styles.usageStatLabel}>Pantry Scans</Text>
+                      <Text style={styles.usageStatValue}>
+                        {usageData.scanUsage}
+                      </Text>
+                    </View>
+
+                    <View style={styles.usageStat}>
+                      <Icon name="lightbulb-outline" size={24} color="#6b7280" />
+                      <Text style={styles.usageStatLabel}>AI Recipes</Text>
+                      <Text style={styles.usageStatValue}>
+                        {usageData.aiRecipeUsage}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.modalSubMessage}>
+                    Upgrade to Premium for unlimited access to all features!
+                  </Text>
+
+                  <View style={styles.modalButtons}>
+                    <TouchableOpacity
+                      style={styles.modalCancelButton}
+                      onPress={() => setShowTierModal(false)}>
+                      <Text style={styles.modalCancelText}>Close</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.modalUpgradeButton}
+                      onPress={() => {
+                        setShowTierModal(false);
+                        handleUpgradePress();
+                      }}>
+                      <Icon name="arrow-upward" size={20} color="#fff" />
+                      <Text style={styles.modalUpgradeText}>Upgrade Now</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.modalMessage}>
+                    You have unlimited access to all Premium features!
+                  </Text>
+
                   <TouchableOpacity
-                    style={styles.modalCancelButton}
+                    style={styles.modalCloseButton}
                     onPress={() => setShowTierModal(false)}>
-                    <Text style={styles.modalCancelText}>Close</Text>
+                    <Text style={styles.modalCloseText}>Close</Text>
                   </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.modalUpgradeButton}
-                    onPress={() => {
-                      setShowTierModal(false);
-                      handleUpgradePress();
-                    }}>
-                    <Icon name="arrow-upward" size={20} color="#fff" />
-                    <Text style={styles.modalUpgradeText}>Upgrade Now</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={styles.modalMessage}>
-                  {usageData.tierDisplay.includes('CREATOR')
-                    ? 'You have unlimited access to all features as a Creator!'
-                    : 'You have unlimited access to all Premium features!'}
-                </Text>
-
-                <TouchableOpacity
-                  style={styles.modalCloseButton}
-                  onPress={() => setShowTierModal(false)}>
-                  <Text style={styles.modalCloseText}>Close</Text>
-                </TouchableOpacity>
-              </>
-            )}
+                </>
+              )}
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
 
       {/* NEW: Notification Drawer */}
       <NotificationDrawer

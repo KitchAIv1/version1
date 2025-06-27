@@ -291,22 +291,18 @@ export default function FeedScreen() {
     }
   }, [isFeedScreenFocused, feedData, currentIndex, user?.id, cacheManager]);
 
-  // EFFICIENT COMMENT COUNT SYNC: Smart sync when returning from recipe details
+  // 🎯 OPTIMIZED FOCUS EFFECT: Only handle essential comment sync
   useFocusEffect(
     useCallback(() => {
       if (feedData && feedData.length > 0 && user?.id) {
-        console.log(
-          '[FeedScreen] 🧠 Screen focused - running smart comment count sync',
-        );
-
-        // Get visible recipes for smart sync
+        console.log('[FeedScreen] 🧠 Screen focused - running smart comment count sync');
+        
         const startIndex = Math.max(0, currentIndex);
         const endIndex = Math.min(feedData.length, startIndex + 3);
         const visibleRecipeIds = feedData
           .slice(startIndex, endIndex)
           .map(item => item.id);
 
-        // Use smart sync to only update what needs updating
         smartSync(visibleRecipeIds, user.id);
       }
     }, [feedData, currentIndex, user?.id, smartSync]),
@@ -418,22 +414,7 @@ export default function FeedScreen() {
           translucent
         />
         
-        {/* Header for development */}
-        {__DEV__ && (
-          <Text
-            style={{
-              color: 'white',
-              textAlign: 'center',
-              padding: 10,
-              position: 'absolute',
-              top: 50,
-              left: 0,
-              right: 0,
-              zIndex: 1000,
-            }}>
-            Feed: {itemsToRender.length} items | Current: {currentIndex}
-          </Text>
-        )}
+
 
         <View style={styles.containerForLayout} onLayout={handleContainerLayout}>
           {!isLoading && itemsToRender.length === 0 && (

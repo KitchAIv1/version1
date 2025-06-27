@@ -15,6 +15,8 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
 import { FollowButton } from '../../components/FollowButton';
+import { FollowButtonOptimized } from '../../components/FollowButtonOptimized';
+import { useBulkFollowStatusPreloader } from '../../hooks/useFollowDataPreloader';
 import { useAuth } from '../../providers/AuthProvider';
 import { MainStackParamList } from '../../navigation/types';
 
@@ -34,113 +36,133 @@ interface UserListItem {
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
-// RPC function calls - UPDATED: Simple approach without joins
-const fetchFollowers = async (userId: string): Promise<UserListItem[]> => {
-  console.log('[FollowersDetailScreen] Fetching followers for user:', userId);
+// 🚀 PERFORMANCE OPTIMIZATION: Use RPC functions instead of N+1 queries
+const fetchFollowersOptimized = async (userId: string): Promise<UserListItem[]> => {
+  console.log('[FollowersDetailScreen] Fetching followers for user (optimized):', userId);
   
-  // First, get the follower IDs from user_follows
-  const { data: followData, error: followError } = await supabase
-    .from('user_follows')
-    .select('follower_id, created_at')
-    .eq('followed_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(100);
+  try {
+    // Use the existing RPC function from useFollowMutation.ts
+    const { data, error } = await supabase.rpc('get_user_followers', {
+      user_id_param: userId,
+      limit_param: 100,
+    });
 
-  if (followError) {
-    console.error('[FollowersDetailScreen] Error fetching follow relationships:', followError);
-    throw followError;
+    if (error) {
+      console.error('[FollowersDetailScreen] RPC error:', error);
+      throw error;
+    }
+
+    if (!data) {
+      console.log('[FollowersDetailScreen] No followers found');
+      return [];
+    }
+
+    // Transform RPC response to match our interface
+    const followers: UserListItem[] = data.map((item: any) => ({
+      user_id: item.user_id,
+      username: item.username || 'Anonymous',
+      avatar_url: item.avatar_url || null,
+      bio: item.bio || null,
+    }));
+
+    console.log('[FollowersDetailScreen] Processed followers (optimized):', followers.length);
+    return followers;
+  } catch (error) {
+    console.error('[FollowersDetailScreen] Fallback to old method due to error:', error);
+    
+    // Fallback to original method if RPC fails
+    const { data: followData, error: followError } = await supabase
+      .from('user_follows')
+      .select('follower_id, created_at')
+      .eq('followed_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (followError) throw followError;
+    if (!followData || followData.length === 0) return [];
+
+    const followerIds = followData.map(item => item.follower_id);
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('user_id, username, bio, avatar_url')
+      .in('user_id', followerIds);
+
+    if (profileError) throw profileError;
+
+    return followData.map(followItem => {
+      const profile = profileData?.find(p => p.user_id === followItem.follower_id);
+      return {
+        user_id: followItem.follower_id,
+        username: profile?.username || 'Anonymous',
+        avatar_url: profile?.avatar_url || null,
+        bio: profile?.bio || null,
+      };
+    });
   }
-
-  console.log('[FollowersDetailScreen] Raw follow data:', followData);
-
-  if (!followData || followData.length === 0) {
-    console.log('[FollowersDetailScreen] No followers found');
-    return [];
-  }
-
-  // Get the follower user IDs
-  const followerIds = followData.map(item => item.follower_id);
-
-  // Now fetch the profile information for these users
-  const { data: profileData, error: profileError } = await supabase
-    .from('profiles')
-    .select('user_id, username, bio, avatar_url')
-    .in('user_id', followerIds);
-
-  if (profileError) {
-    console.error('[FollowersDetailScreen] Error fetching profile data:', profileError);
-    throw profileError;
-  }
-
-  console.log('[FollowersDetailScreen] Profile data:', profileData);
-
-  // Combine the data
-  const followers: UserListItem[] = followData.map(followItem => {
-    const profile = profileData?.find(p => p.user_id === followItem.follower_id);
-    return {
-      user_id: followItem.follower_id,
-      username: profile?.username || 'Anonymous',
-      avatar_url: profile?.avatar_url || null,
-      bio: profile?.bio || null,
-    };
-  });
-
-  console.log('[FollowersDetailScreen] Processed followers:', followers);
-  return followers;
 };
 
-const fetchFollowing = async (userId: string): Promise<UserListItem[]> => {
-  console.log('[FollowersDetailScreen] Fetching following for user:', userId);
+const fetchFollowingOptimized = async (userId: string): Promise<UserListItem[]> => {
+  console.log('[FollowersDetailScreen] Fetching following for user (optimized):', userId);
   
-  // First, get the followed IDs from user_follows
-  const { data: followData, error: followError } = await supabase
-    .from('user_follows')
-    .select('followed_id, created_at')
-    .eq('follower_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(100);
+  try {
+    // Use the existing RPC function from useFollowMutation.ts
+    const { data, error } = await supabase.rpc('get_user_following', {
+      user_id_param: userId,
+      limit_param: 100,
+    });
 
-  if (followError) {
-    console.error('[FollowersDetailScreen] Error fetching follow relationships:', followError);
-    throw followError;
+    if (error) {
+      console.error('[FollowersDetailScreen] RPC error:', error);
+      throw error;
+    }
+
+    if (!data) {
+      console.log('[FollowersDetailScreen] No following found');
+      return [];
+    }
+
+    // Transform RPC response to match our interface
+    const following: UserListItem[] = data.map((item: any) => ({
+      user_id: item.user_id,
+      username: item.username || 'Anonymous',
+      avatar_url: item.avatar_url || null,
+      bio: item.bio || null,
+    }));
+
+    console.log('[FollowersDetailScreen] Processed following (optimized):', following.length);
+    return following;
+  } catch (error) {
+    console.error('[FollowersDetailScreen] Fallback to old method due to error:', error);
+    
+    // Fallback to original method if RPC fails
+    const { data: followData, error: followError } = await supabase
+      .from('user_follows')
+      .select('followed_id, created_at')
+      .eq('follower_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (followError) throw followError;
+    if (!followData || followData.length === 0) return [];
+
+    const followedIds = followData.map(item => item.followed_id);
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('user_id, username, bio, avatar_url')
+      .in('user_id', followedIds);
+
+    if (profileError) throw profileError;
+
+    return followData.map(followItem => {
+      const profile = profileData?.find(p => p.user_id === followItem.followed_id);
+      return {
+        user_id: followItem.followed_id,
+        username: profile?.username || 'Anonymous',
+        avatar_url: profile?.avatar_url || null,
+        bio: profile?.bio || null,
+      };
+    });
   }
-
-  console.log('[FollowersDetailScreen] Raw follow data:', followData);
-
-  if (!followData || followData.length === 0) {
-    console.log('[FollowersDetailScreen] No following found');
-    return [];
-  }
-
-  // Get the followed user IDs
-  const followedIds = followData.map(item => item.followed_id);
-
-  // Now fetch the profile information for these users
-  const { data: profileData, error: profileError } = await supabase
-    .from('profiles')
-    .select('user_id, username, bio, avatar_url')
-    .in('user_id', followedIds);
-
-  if (profileError) {
-    console.error('[FollowersDetailScreen] Error fetching profile data:', profileError);
-    throw profileError;
-  }
-
-  console.log('[FollowersDetailScreen] Profile data:', profileData);
-
-  // Combine the data
-  const following: UserListItem[] = followData.map(followItem => {
-    const profile = profileData?.find(p => p.user_id === followItem.followed_id);
-    return {
-      user_id: followItem.followed_id,
-      username: profile?.username || 'Anonymous',
-      avatar_url: profile?.avatar_url || null,
-      bio: profile?.bio || null,
-    };
-  });
-
-  console.log('[FollowersDetailScreen] Processed following:', following);
-  return following;
 };
 
 // User List Item Component
@@ -221,15 +243,20 @@ export const FollowersDetailScreen: React.FC = () => {
   // State
   const [activeTab, setActiveTab] = useState<'followers' | 'following'>(initialTab);
 
-  // Queries
+  // 🚀 PERFORMANCE OPTIMIZATION: Enhanced queries with better caching
   const {
     data: followers = [],
     isLoading: followersLoading,
     error: followersError,
   } = useQuery<UserListItem[]>({
     queryKey: ['followers', userId],
-    queryFn: () => fetchFollowers(userId),
+    queryFn: () => fetchFollowersOptimized(userId),
     enabled: !!userId,
+    // 🚀 Extended cache times to reduce unnecessary refetches
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 15 * 60 * 1000, // 15 minutes
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnMount: false, // Use cached data if available
   });
 
   const {
@@ -238,8 +265,13 @@ export const FollowersDetailScreen: React.FC = () => {
     error: followingError,
   } = useQuery<UserListItem[]>({
     queryKey: ['following', userId],
-    queryFn: () => fetchFollowing(userId),
+    queryFn: () => fetchFollowingOptimized(userId),
     enabled: !!userId,
+    // 🚀 Extended cache times to reduce unnecessary refetches
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 15 * 60 * 1000, // 15 minutes
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnMount: false, // Use cached data if available
   });
 
   // Debug logging
@@ -267,6 +299,13 @@ export const FollowersDetailScreen: React.FC = () => {
   const currentData = useMemo(() => {
     return activeTab === 'followers' ? followers : following;
   }, [activeTab, followers, following]);
+
+  // 🎯 PRELOAD FOLLOW STATUSES FOR ALL VISIBLE USERS (Performance optimization) - TEMPORARILY DISABLED
+  // const visibleUserIds = useMemo(() => {
+  //   return currentData.map(user => user.user_id);
+  // }, [currentData]);
+  // 
+  // useBulkFollowStatusPreloader(visibleUserIds);
 
   const isLoading = useMemo(() => {
     return activeTab === 'followers' ? followersLoading : followingLoading;
