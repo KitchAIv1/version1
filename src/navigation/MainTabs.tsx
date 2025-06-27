@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Text } from 'react-native';
+import { Text, View, TouchableOpacity, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
@@ -10,6 +10,8 @@ import PantryScreen from '../screens/main/PantryScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import GroceryListScreen from '../screens/grocery/GroceryListScreen';
 import { MainTabsParamList } from './types';
+import { useAccessControl } from '../hooks/useAccessControl';
+import { useAuth } from '../providers/AuthProvider';
 
 const Tab = createBottomTabNavigator<MainTabsParamList>();
 
@@ -26,18 +28,78 @@ export const triggerFeedRefresh = () => {
   }
 };
 
+// Custom Kitch Power Button Component
+const KitchPowerButton = ({ onPress }: { onPress: () => void }) => {
+  const { getUsageDisplay } = useAccessControl();
+  const { profile } = useAuth();
+  const usageData = getUsageDisplay();
+  
+  const isCreator = profile?.role?.toLowerCase() === 'creator';
+  
+  return (
+    <TouchableOpacity
+      style={styles.kitchPowerButton}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      <View style={styles.kitchPowerButtonInner}>
+        <Feather 
+          name={isCreator ? "video" : "zap"} 
+          size={24} 
+          color="#fff" 
+        />
+      </View>
+      <Text style={styles.kitchPowerButtonText}>
+        {isCreator ? "Create" : "Kitch"}
+      </Text>
+    </TouchableOpacity>
+  );
+};
+
+// Placeholder component for Kitch Power functionality
+const KitchPowerScreen = () => {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <Text>Kitch Power Screen - This will handle navigation</Text>
+    </View>
+  );
+};
+
 function MainTabs() {
   const queryClient = useQueryClient();
+  const { profile } = useAuth();
+
+  const handleKitchPowerPress = (navigation: any) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch (e) {
+      console.log('Haptics not available:', e);
+    }
+
+    const isCreator = profile?.role?.toLowerCase() === 'creator';
+    
+    if (isCreator) {
+      // Navigate to Video Uploader for CREATOR users
+      navigation.navigate('VideoRecipeUploader');
+    } else {
+      // Navigate to AI Recipe Generation for FREEMIUM/PREMIUM users
+      navigation.navigate('IngredientSelection');
+    }
+  };
 
   return (
     <Tab.Navigator
       initialRouteName="Feed"
-      screenOptions={({ route }) => ({
+      screenOptions={({ route, navigation }) => ({
         headerShown: false,
         tabBarActiveTintColor: '#22c55e',
         tabBarInactiveTintColor: '#6b7280',
         tabBarLabelStyle: { fontWeight: '500', fontSize: 10, marginBottom: 3 },
-        tabBarStyle: { paddingTop: 5 },
+        tabBarStyle: { 
+          paddingTop: 8,
+          paddingBottom: 8,
+          height: 85,
+        },
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
           const iconSize = focused ? 24 : 22;
@@ -50,6 +112,11 @@ function MainTabs() {
             iconName = 'user';
           } else if (route.name === 'GroceryList') {
             iconName = 'list';
+          } else if (route.name === 'KitchPower') {
+            // Custom button for Kitch Power - handled separately
+            return (
+              <KitchPowerButton onPress={() => handleKitchPowerPress(navigation)} />
+            );
           }
 
           if (!iconName) return null;
@@ -138,7 +205,19 @@ function MainTabs() {
           },
         })}
       />
-      {/* Discover, Create screens are fully removed for this test */}
+      <Tab.Screen
+        name="KitchPower"
+        component={KitchPowerScreen}
+        options={{
+          tabBarLabel: '', // No label for center button
+        }}
+        listeners={({ navigation }) => ({
+          tabPress: e => {
+            // Prevent default navigation since this is handled by the custom button
+            e.preventDefault();
+          },
+        })}
+      />
       <Tab.Screen
         name="GroceryList"
         component={GroceryListScreen}
@@ -162,5 +241,33 @@ function MainTabs() {
     </Tab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  kitchPowerButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -20, // Elevate the button above the tab bar
+  },
+  kitchPowerButtonInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#22c55e',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#22c55e',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    marginBottom: 4,
+  },
+  kitchPowerButtonText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#22c55e',
+    marginTop: 2,
+  },
+});
 
 export default MainTabs;

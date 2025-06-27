@@ -14,12 +14,10 @@ export type AuthStackParamList = {
 // For the main application tabs (nested within MainStack)
 export type MainTabsParamList = {
   Feed: undefined;
-  Discover: undefined;
   Pantry: undefined;
-  Create: undefined;
-  Profile: { userId?: string }; // Added userId parameter for viewing other users' profiles
+  KitchPower: undefined; // Center power button for role-based actions
   GroceryList: undefined;
-  // SearchResults removed from here, moved to MainStack
+  Profile: { userId?: string }; // Added userId parameter for viewing other users' profiles
 };
 
 // Type for the Recipe Detail screen parameters
@@ -127,10 +125,7 @@ export type SignupScreenProps = NativeStackScreenProps<
 
 // Example: Prop types for screens within MainTabs (if needed for options/listeners)
 export type FeedScreenProps = BottomTabScreenProps<MainTabsParamList, 'Feed'>;
-export type DiscoverScreenProps = BottomTabScreenProps<
-  MainTabsParamList,
-  'Discover'
->;
+export type KitchPowerScreenProps = BottomTabScreenProps<MainTabsParamList, 'KitchPower'>;
 // ... define other tab screen props similarly
 
 // Prop types for screens within MainStack
