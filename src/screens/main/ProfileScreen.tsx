@@ -443,11 +443,7 @@ export const ProfileScreen: React.FC = () => {
     />
   );
 
-  // --- Navigation Handler for Add Recipe --- (New Handler)
-  const handleAddRecipePress = () => {
-    navigation.navigate('VideoRecipeUploader');
-  };
-  // --- End Navigation Handler for Add Recipe ---
+
 
   // --- Navigation Handler for Upgrade --- (Updated Handler)
   const handleUpgradePress = () => {
@@ -590,11 +586,6 @@ export const ProfileScreen: React.FC = () => {
         <View style={styles.headerSpacer} />
         <Text style={styles.scrollableHeaderTitle}>Kitch Hub</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={handleAddRecipePress}>
-            <Icon name="add-box" size={26} color="#10b981" />
-          </TouchableOpacity>
           <NotificationBell
             unreadCount={unreadCount}
             onPress={handleNotificationBellPress}
@@ -892,7 +883,7 @@ export const ProfileScreen: React.FC = () => {
         <CreatorAccountModal
           visible={showTierModal}
           onClose={() => setShowTierModal(false)}
-          onCreateRecipe={handleAddRecipePress}
+          onCreateRecipe={() => navigation.navigate('VideoRecipeUploader')}
           username={profile?.username || 'Creator'}
         />
       ) : usageData.tierDisplay === 'PREMIUM' ? (
