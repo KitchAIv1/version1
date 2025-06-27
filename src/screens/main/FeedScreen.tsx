@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
   },
 });
 
-export default function FeedScreen() {
+export default React.memo(function FeedScreen() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const cacheManager = useCacheManager();
@@ -500,4 +500,4 @@ export default function FeedScreen() {
       </SafeAreaView>
     </SafeWrapper>
   );
-}
+});

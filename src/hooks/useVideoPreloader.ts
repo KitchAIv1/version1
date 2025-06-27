@@ -29,7 +29,7 @@ export const useVideoPreloader = (
     Map<string, PreloadedVideo>
   >(new Map());
   const [loadingQueue, setLoadingQueue] = useState<string[]>([]);
-  const [currentlyLoading, setCurrentlyLoading] = useState<Set<string>>(new Set());
+  const [currentlyLoading, setCurrentlyLoading] = useState<Set<string>>(() => new Set());
   const cleanupTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   const getOptimizedVideoUrl = useCallback(

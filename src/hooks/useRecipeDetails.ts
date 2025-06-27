@@ -67,48 +67,56 @@ const cleanPantryMatchData = (pantryData: any, recipeId: string) => {
   }
 
   try {
-    // Handle matched_ingredients array
+    // Handle matched_ingredients array - OPTIMIZED: Single pass with reduce
     let matchedIngredients: string[] = [];
     if (Array.isArray(pantryData.matched_ingredients)) {
-      matchedIngredients = pantryData.matched_ingredients
-        .filter((item: any) => item != null && item !== undefined) // Remove null/undefined
-        .map((item: any) => {
-          // Handle both string and object formats
-          if (typeof item === 'string') {
-            return item.trim();
-          }
-          if (typeof item === 'object' && item.name) {
-            return item.name.trim();
-          }
+      matchedIngredients = pantryData.matched_ingredients.reduce((acc: string[], item: any) => {
+        if (item == null || item === undefined) return acc;
+        
+        let name: string | null = null;
+        if (typeof item === 'string') {
+          name = item.trim();
+        } else if (typeof item === 'object' && item.name) {
+          name = item.name.trim();
+        } else {
           console.warn(
             `[cleanPantryMatchData] Invalid matched ingredient format for recipe ${recipeId}:`,
             item,
           );
-          return null;
-        })
-        .filter((name: any) => name && name.length > 0); // Remove empty strings
+        }
+        
+        if (name && name.length > 0) {
+          acc.push(name);
+        }
+        
+        return acc;
+      }, []);
     }
 
-    // Handle missing_ingredients array
+    // Handle missing_ingredients array - OPTIMIZED: Single pass with reduce
     let missingIngredients: string[] = [];
     if (Array.isArray(pantryData.missing_ingredients)) {
-      missingIngredients = pantryData.missing_ingredients
-        .filter((item: any) => item != null && item !== undefined) // Remove null/undefined
-        .map((item: any) => {
-          // Handle both string and object formats
-          if (typeof item === 'string') {
-            return item.trim();
-          }
-          if (typeof item === 'object' && item.name) {
-            return item.name.trim();
-          }
+      missingIngredients = pantryData.missing_ingredients.reduce((acc: string[], item: any) => {
+        if (item == null || item === undefined) return acc;
+        
+        let name: string | null = null;
+        if (typeof item === 'string') {
+          name = item.trim();
+        } else if (typeof item === 'object' && item.name) {
+          name = item.name.trim();
+        } else {
           console.warn(
             `[cleanPantryMatchData] Invalid missing ingredient format for recipe ${recipeId}:`,
             item,
           );
-          return null;
-        })
-        .filter((name: any) => name && name.length > 0); // Remove empty strings
+        }
+        
+        if (name && name.length > 0) {
+          acc.push(name);
+        }
+        
+        return acc;
+      }, []);
     }
 
     const totalIngredients =

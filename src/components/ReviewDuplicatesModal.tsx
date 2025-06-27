@@ -36,8 +36,8 @@ const ReviewDuplicatesModal: React.FC<ReviewDuplicatesModalProps> = ({
   onDeleteItem,
   onRefresh,
 }) => {
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(() => new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
 
   const toggleItemSelection = (itemId: string) => {
     const newSelection = new Set(selectedItems);

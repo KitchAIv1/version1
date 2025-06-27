@@ -431,7 +431,7 @@ export const FeedScreenOptimized = React.memo(() => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [layoutReady, setLayoutReady] = useState(false);
   const [itemHeight, setItemHeight] = useState(ITEM_HEIGHT);
-  const [loggedViews, setLoggedViews] = useState<Set<string>>(new Set());
+  const [loggedViews, setLoggedViews] = useState<Set<string>>(() => new Set());
 
   // Refs
   const flashListRef = useRef<FlashList<FeedItem>>(null);
@@ -603,7 +603,7 @@ export const FeedScreenOptimized = React.memo(() => {
           <Text style={styles.errorText}>
             Error loading feed: {feedError.message}
           </Text>
-          <Text style={styles.retryText} onPress={() => refetchFeed({ cancelRefetch: true })}>
+          <Text style={styles.retryText} onPress={() => refetchFeed({} as any)}>
             Tap to retry
           </Text>
         </View>

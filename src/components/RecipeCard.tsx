@@ -262,7 +262,7 @@ type RecipeCardNavigationProp = NativeStackNavigationProp<
   'RecipeDetail'
 >;
 
-export default function RecipeCard({
+export default React.memo(function RecipeCard({
   item,
   isActive,
   containerHeight,
@@ -613,4 +613,4 @@ export default function RecipeCard({
       </View>
     </TouchableWithoutFeedback>
   );
-}
+});
