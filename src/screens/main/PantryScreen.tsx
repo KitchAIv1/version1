@@ -175,13 +175,17 @@ export default function PantryScreen() {
   // OPTIMIZED: Smart data selection with memoization
   const { displayItems, isLoading, fetchError, refetch, hasAgingFeatures } =
     useMemo(() => {
-      const hasAging = agingItems.length > 0;
+      // Enable aging features if aging data is available OR if there are items to age
+      const hasAgingDataAvailable = !agingError && agingItems.length >= 0;
+      const hasItemsToAge = pantryItems.length > 0;
+      const shouldUseAging = hasAgingDataAvailable && (agingItems.length > 0 || hasItemsToAge);
+      
       return {
-        displayItems: hasAging ? agingItems : pantryItems,
-        isLoading: hasAging ? agingLoading : pantryLoading,
-        fetchError: hasAging ? agingError : pantryError,
-        refetch: hasAging ? refetchAging : refetchPantry,
-        hasAgingFeatures: hasAging,
+        displayItems: shouldUseAging ? agingItems : pantryItems,
+        isLoading: shouldUseAging ? agingLoading : pantryLoading,
+        fetchError: shouldUseAging ? agingError : pantryError,
+        refetch: shouldUseAging ? refetchAging : refetchPantry,
+        hasAgingFeatures: hasAgingDataAvailable, // Enable if backend works, regardless of item count
       };
     }, [
       agingItems,

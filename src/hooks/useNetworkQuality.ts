@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export interface NetworkQuality {
   speed: number; // Mbps
@@ -7,13 +7,27 @@ export interface NetworkQuality {
   quality: 'low' | 'medium' | 'high';
 }
 
+// 🚀 TIKTOK-LEVEL OPTIMIZATIONS: Global network state cache to avoid redundant checks
+let globalNetworkState: NetworkQuality | null = null;
+let lastNetworkCheck = 0;
+const NETWORK_CHECK_COOLDOWN = 60000; // 1 minute instead of 30 seconds
+
 export const useNetworkQuality = () => {
-  const [networkQuality, setNetworkQuality] = useState<NetworkQuality>({
-    speed: 100, // Default to high speed
-    connectionType: 'wifi',
-    isConnected: true,
-    quality: 'high',
+  const [networkQuality, setNetworkQuality] = useState<NetworkQuality>(() => {
+    // Return cached state if available and recent
+    if (globalNetworkState && Date.now() - lastNetworkCheck < NETWORK_CHECK_COOLDOWN) {
+      return globalNetworkState;
+    }
+    
+    return {
+      speed: 100, // Default to high speed for better UX
+      connectionType: 'wifi',
+      isConnected: true,
+      quality: 'high',
+    };
   });
+
+  const isCheckingRef = useRef(false);
 
   const getQualityFromSpeed = (speed: number): 'low' | 'medium' | 'high' => {
     if (speed < 30) return 'low'; // 480p for slow connections
@@ -21,25 +35,26 @@ export const useNetworkQuality = () => {
     return 'high'; // 1080p for fast connections
   };
 
+  // 🚀 TIKTOK-LEVEL OPTIMIZATIONS: Simplified and faster network speed test
   const measureNetworkSpeed = async (): Promise<number> => {
     try {
       const startTime = Date.now();
-      // Use a small test image from a reliable source
-      const response = await fetch('https://httpbin.org/bytes/1024', {
+      // Use a smaller test file for faster checks
+      const response = await fetch('https://httpbin.org/bytes/512', {
         cache: 'no-cache',
       });
       await response.blob();
       const endTime = Date.now();
 
       const duration = (endTime - startTime) / 1000; // seconds
-      const sizeInBits = 1024 * 8; // 1KB in bits
+      const sizeInBits = 512 * 8; // 512 bytes in bits
       const speedBps = sizeInBits / duration;
       const speedMbps = speedBps / (1024 * 1024);
 
-      return Math.max(speedMbps * 100, 10); // Scale up and ensure minimum
+      return Math.max(speedMbps * 150, 20); // Scale up and ensure reasonable minimum
     } catch (error) {
       console.warn('Network speed test failed:', error);
-      return 30; // Conservative fallback
+      return 50; // More optimistic fallback for better video experience
     }
   };
 
@@ -48,6 +63,7 @@ export const useNetworkQuality = () => {
       const response = await fetch('https://httpbin.org/status/200', {
         method: 'HEAD',
         cache: 'no-cache',
+        signal: AbortSignal.timeout(3000), // 3 second timeout
       });
       return response.ok;
     } catch {
@@ -57,44 +73,72 @@ export const useNetworkQuality = () => {
 
   useEffect(() => {
     const updateNetworkInfo = async () => {
+      // 🚀 TIKTOK-LEVEL OPTIMIZATIONS: Prevent concurrent checks
+      if (isCheckingRef.current) return;
+      
+      const now = Date.now();
+      
+      // Skip if we've checked recently and have cached data
+      if (globalNetworkState && now - lastNetworkCheck < NETWORK_CHECK_COOLDOWN) {
+        return;
+      }
+
+      isCheckingRef.current = true;
+      
       try {
         const isConnected = await checkConnection();
         if (!isConnected) {
-          setNetworkQuality(prev => ({
-            ...prev,
-            isConnected: false,
+          const newState = {
             speed: 0,
-            quality: 'low',
-          }));
+            connectionType: 'none',
+            isConnected: false,
+            quality: 'low' as const,
+          };
+          
+          setNetworkQuality(newState);
+          globalNetworkState = newState;
+          lastNetworkCheck = now;
           return;
         }
 
         const speed = await measureNetworkSpeed();
-
-        setNetworkQuality({
+        const newState = {
           speed,
           connectionType: 'unknown', // Simplified since we don't have NetInfo
           isConnected: true,
           quality: getQualityFromSpeed(speed),
-        });
+        };
+
+        setNetworkQuality(newState);
+        globalNetworkState = newState;
+        lastNetworkCheck = now;
       } catch (error) {
         console.warn('Failed to update network info:', error);
-        // Keep previous state or set conservative defaults
-        setNetworkQuality(prev => ({
-          ...prev,
-          speed: 30,
-          quality: 'low',
-        }));
+        // Keep optimistic defaults for better video experience
+        const fallbackState = {
+          speed: 50,
+          connectionType: 'unknown',
+          isConnected: true,
+          quality: 'medium' as const,
+        };
+        
+        setNetworkQuality(fallbackState);
+        globalNetworkState = fallbackState;
+        lastNetworkCheck = now;
+      } finally {
+        isCheckingRef.current = false;
       }
     };
 
-    // Initial measurement
-    updateNetworkInfo();
+    // Initial measurement only if we don't have recent cached data
+    if (!globalNetworkState || Date.now() - lastNetworkCheck >= NETWORK_CHECK_COOLDOWN) {
+      updateNetworkInfo();
+    }
 
-    // Periodic speed checks (every 30 seconds)
+    // 🚀 TIKTOK-LEVEL OPTIMIZATIONS: Less frequent speed checks (every 2 minutes)
     const speedCheckInterval = setInterval(() => {
       updateNetworkInfo();
-    }, 30000);
+    }, 120000); // Increased from 30s to 2 minutes
 
     return () => {
       clearInterval(speedCheckInterval);

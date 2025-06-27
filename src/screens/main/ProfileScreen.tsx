@@ -729,6 +729,15 @@ export const ProfileScreen: React.FC = () => {
                 refreshControl={refreshControl}
               />
             </Tabs.Tab>
+            <Tabs.Tab name="planner" label="Planner">
+              <Tabs.ScrollView 
+                contentContainerStyle={styles.listContentContainer}
+                showsVerticalScrollIndicator={false}
+                refreshControl={refreshControl}
+              >
+                <MealPlannerV2Screen />
+              </Tabs.ScrollView>
+            </Tabs.Tab>
             <Tabs.Tab name="activity" label="Activity">
               <Tabs.ScrollView 
                 contentContainerStyle={styles.listContentContainer}

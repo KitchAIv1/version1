@@ -1,9 +1,8 @@
--- STANDALONE FIX for new user profile issue
--- This only fixes the get_profile_details function to handle new users properly
--- Does NOT touch any other database structures
--- COMPREHENSIVE VERSION: Includes ALL 172-line functionality with correct table names
+-- Fix get_profile_details function for new user sign-up issues
+-- COMPREHENSIVE FIX: Combines ALL functionality from previous migrations with proper new user handling
+-- The issue is that migration 20250125000003 changed return type and structure causing white screen
 
--- Drop and recreate ONLY the get_profile_details function
+-- Drop the problematic version that changed return type from jsonb to JSON
 DROP FUNCTION IF EXISTS public.get_profile_details(uuid);
 
 -- COMPLETE VERSION: Includes ALL fields and features from previous working versions
@@ -18,9 +17,9 @@ DECLARE
   user_exists BOOLEAN;
   followers_count INTEGER;
   following_count INTEGER;
-  profile_data jsonb;
-  recipes_data jsonb;
-  saved_recipes_data jsonb;
+  profile_data JSONB;
+  recipes_data JSONB;
+  saved_recipes_data JSONB;
 BEGIN
   -- Check if user exists in auth.users
   SELECT EXISTS(SELECT 1 FROM auth.users WHERE id = p_user_id) INTO user_exists;
@@ -59,11 +58,11 @@ BEGIN
 
   IF NOT profile_exists THEN
     RAISE NOTICE 'No profile found for user_id: %, creating default response with auth data', p_user_id;
-    -- Return default structure for new users without profiles but WITH auth.users data
+    -- Return default structure for new users without profiles 
     SELECT jsonb_build_object(
       'user_id', u.id,
       'username', null,
-      'avatar_url', COALESCE(u.raw_user_meta_data ->> 'avatar_url', ''),
+      'avatar_url', '',  -- FIX: Empty for new users since no profile exists yet
       'bio', '',
       'role', null,
       'onboarded', false,
@@ -85,7 +84,7 @@ BEGIN
   SELECT jsonb_build_object(
     'user_id', u.id,
     'username', COALESCE(p.username, 'Anonymous'),
-    'avatar_url', COALESCE(u.raw_user_meta_data ->> 'avatar_url', ''),
+    'avatar_url', COALESCE(p.avatar_url, ''),
     'bio', COALESCE(p.bio, ''),
     'role', CASE 
       WHEN p.role IS NULL OR p.role = '' THEN NULL 
@@ -165,9 +164,9 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
--- Grant permissions (secure setup)
-GRANT EXECUTE ON FUNCTION public.get_profile_details(uuid) TO authenticated;
-REVOKE EXECUTE ON FUNCTION public.get_profile_details(uuid) FROM anon, PUBLIC;
+-- Grant permissions
+GRANT EXECUTE ON FUNCTION public.get_profile_details(UUID) TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.get_profile_details(UUID) FROM anon, PUBLIC;
 
 -- Add comment for documentation
-COMMENT ON FUNCTION public.get_profile_details(uuid) IS 'COMPLETE VERSION: Retrieve profile details with proper new user handling, includes ALL fields from previous migrations - prevents white screen issue'; 
+COMMENT ON FUNCTION public.get_profile_details(UUID) IS 'COMPLETE VERSION: Retrieve profile details with proper new user handling, includes ALL fields from previous migrations - prevents white screen issue'; 

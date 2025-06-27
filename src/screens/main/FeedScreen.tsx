@@ -418,49 +418,76 @@ export default function FeedScreen() {
           translucent
         />
         
+        {/* Header for development */}
+        {__DEV__ && (
+          <Text
+            style={{
+              color: 'white',
+              textAlign: 'center',
+              padding: 10,
+              position: 'absolute',
+              top: 50,
+              left: 0,
+              right: 0,
+              zIndex: 1000,
+            }}>
+            Feed: {itemsToRender.length} items | Current: {currentIndex}
+          </Text>
+        )}
 
+        <View style={styles.containerForLayout} onLayout={handleContainerLayout}>
+          {!isLoading && itemsToRender.length === 0 && (
+            <View style={styles.centeredMessageContainer}>
+              <Text style={styles.emptyText}>No recipes found</Text>
+            </View>
+          )}
 
-        <View
-          style={styles.containerForLayout}
-          onLayout={handleContainerLayout}>
-          {isLoading || !layoutReady ? (
-            <LoadingEnhancement
-              isLoading={true}
-              {...getStandardizedLoadingConfig('feed')}>
-              <View style={styles.centeredMessageContainer}>
-                <ActivityIndicator size="large" color="#666" />
-              </View>
-            </LoadingEnhancement>
-          ) : feedError ? (
+          {feedError && (
             <View style={styles.centeredMessageContainer}>
-              <Text style={styles.errorText}>
-                Error loading feed: {feedError.message}
-              </Text>
+              <Text style={styles.errorText}>Error loading feed</Text>
             </View>
-          ) : itemsToRender.length === 0 ? (
+          )}
+
+          {/* Enhanced loading with skeletons */}
+          {isLoading && (
             <View style={styles.centeredMessageContainer}>
-              <Text style={styles.emptyText}>No recipes found.</Text>
+              <ActivityIndicator size="large" color="#666" />
             </View>
-          ) : (
+          )}
+
+          {layoutReady && itemsToRender.length > 0 && (
             <View style={styles.flashListContainer}>
               <FlashList<FeedItem>
                 ref={flashListRef}
                 data={itemsToRender}
                 keyExtractor={item => item.id}
-                renderItem={({ item, index }) => (
-                  <RecipeCard
-                    item={{
-                      ...item,
-                      onLike: () => likeMutation.mutate(item.id),
-                      onSave: () => saveMutation.mutate(item.id),
-                    }}
-                    isActive={index === currentIndex}
-                    containerHeight={itemHeight}
-                    isScreenFocused={isFeedScreenFocused}
-                    pantryItemCount={pantryItemCount}
-                    onWhatCanICookPress={handleWhatCanICookPress}
-                  />
-                )}
+                renderItem={({ item, index }) => {
+                  // 🚀 TIKTOK-LEVEL OPTIMIZATIONS: Pass adjacent video URLs for preloading
+                  const nextVideoUrl = index < itemsToRender.length - 1 
+                    ? itemsToRender[index + 1]?.video_url || itemsToRender[index + 1]?.video 
+                    : undefined;
+                  const prevVideoUrl = index > 0 
+                    ? itemsToRender[index - 1]?.video_url || itemsToRender[index - 1]?.video 
+                    : undefined;
+
+                  return (
+                    <RecipeCard
+                      item={{
+                        ...item,
+                        onLike: () => likeMutation.mutate(item.id),
+                        onSave: () => saveMutation.mutate(item.id),
+                      }}
+                      isActive={index === currentIndex}
+                      containerHeight={itemHeight}
+                      isScreenFocused={isFeedScreenFocused}
+                      pantryItemCount={pantryItemCount}
+                      onWhatCanICookPress={handleWhatCanICookPress}
+                      // 🚀 TIKTOK-LEVEL OPTIMIZATIONS: Enable video preloading
+                      nextVideoUrl={nextVideoUrl}
+                      prevVideoUrl={prevVideoUrl}
+                    />
+                  );
+                }}
                 estimatedItemSize={itemHeight}
                 pagingEnabled
                 disableIntervalMomentum
@@ -471,8 +498,9 @@ export default function FeedScreen() {
                 overrideItemLayout={layout => {
                   layout.size = itemHeight;
                 }}
-                decelerationRate="fast"
-                // VIDEO-FRIENDLY OPTIMIZATIONS: Removed aggressive optimizations that interfere with video playback:
+                              decelerationRate="fast"
+              // 🚀 TIKTOK-LEVEL OPTIMIZATIONS: Optimized FlashList settings for video
+              // VIDEO-FRIENDLY OPTIMIZATIONS: Removed aggressive optimizations that interfere with video playback:
                 // - removeClippedSubviews: Causes videos to unmount/remount when scrolling
                 // - drawDistance: Limits render distance causing video state loss  
                 // - getItemType: Aggressive recycling interferes with video component state
@@ -488,8 +516,6 @@ export default function FeedScreen() {
           onNavigateToPantry={handleNavigateToPantry}
           currentItemCount={pantryItemCount}
         />
-
-
       </SafeAreaView>
     </SafeWrapper>
   );
