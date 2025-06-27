@@ -20,18 +20,18 @@ import { useAuth } from '../providers/AuthProvider'; // Added to get user ID
 
 const PLACEHOLDER_IMAGE =
   'https://via.placeholder.com/150/D3D3D3/808080?text=No+Image';
-const CARD_MARGIN = 6; // Slightly reduced for tighter grid
+const CARD_MARGIN = 8; // Spacing between cards
 const NUM_COLUMNS = 2;
 const screenWidth = Dimensions.get('window').width;
+const CONTAINER_PADDING = 32; // 16px on each side
 const cardWidth =
-  (screenWidth - (NUM_COLUMNS + 1) * CARD_MARGIN * 2) / NUM_COLUMNS;
+  (screenWidth - CONTAINER_PADDING - (NUM_COLUMNS - 1) * CARD_MARGIN) / NUM_COLUMNS;
 
 // Move styles to top to fix "styles used before defined" errors
 const styles = StyleSheet.create({
   cardWrapper: {
     width: cardWidth,
-    margin: CARD_MARGIN,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   cardContainer: {
     width: '100%',

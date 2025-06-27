@@ -9,13 +9,11 @@ import {
   StyleSheet,
   Alert,
   RefreshControl,
-  RefreshControlProps,
   Modal,
   Dimensions,
   ScrollView,
 } from 'react-native';
 import { useQuery, QueryKey, useQueryClient } from '@tanstack/react-query';
-import { Tabs, MaterialTabBar } from 'react-native-collapsible-tab-view';
 import {
   useSafeAreaInsets,
   SafeAreaView,
@@ -88,7 +86,8 @@ interface ProfileScreenParams {
 
 const screenWidth = Dimensions.get('window').width;
 const screenHeight = Dimensions.get('window').height;
-const HEADER_HEIGHT = screenHeight * 0.35; // 35% of screen height
+const FIXED_HEADER_HEIGHT = 72; // Height for fixed "Kitch Hub" header - match grocery list
+const HEADER_HEIGHT = screenHeight * 0.25; // Reduced from 35% to 25% since fixed header takes space
 const ACTIVE_COLOR = '#10b981'; // Green color for active elements
 
 // -----------------------------------------------------------------------------
@@ -312,58 +311,6 @@ const Bio: React.FC<{
   </View>
 ));
 
-// LazyTabContent component for tab content
-const LazyTabContent: React.FC<{
-  data: VideoPostData[];
-  context: 'myRecipes' | 'savedRecipes' | 'otherUserRecipes';
-  emptyLabel: string;
-  refreshControl?: React.ReactElement<RefreshControlProps>;
-}> = React.memo(({ data, context, emptyLabel, refreshControl }) => {
-  const navigation = useNavigation<ProfileNavigationProp>();
-  
-  const handleRecipePress = useCallback((recipeId: string) => {
-    navigation.navigate('RecipeDetail', { id: recipeId });
-  }, [navigation]);
-
-  const renderItem = useCallback(({ item }: { item: VideoPostData }) => (
-    <ProfileRecipeCard
-      key={item.recipe_id}
-      item={item}
-      onPress={() => handleRecipePress(item.recipe_id)}
-      context={context}
-    />
-  ), [context, handleRecipePress]);
-
-  return (
-    <Tabs.FlatList
-      data={data}
-      renderItem={renderItem}
-      keyExtractor={(item) => item.recipe_id}
-      numColumns={2}
-      removeClippedSubviews
-      maxToRenderPerBatch={4}
-      windowSize={10}
-      initialNumToRender={6}
-      contentContainerStyle={styles.gridContentContainer}
-      showsVerticalScrollIndicator={false}
-      refreshControl={refreshControl}
-      ListEmptyComponent={() => <Empty label={emptyLabel} />}
-    />
-  );
-});
-
-// Custom tab bar
-const renderTabBar = (props: any) => (
-  <MaterialTabBar
-    {...props}
-    indicatorStyle={{ backgroundColor: ACTIVE_COLOR }}
-    style={{ backgroundColor: '#fff' }}
-    labelStyle={{ color: '#333', fontWeight: '600' }}
-    activeColor={ACTIVE_COLOR}
-    inactiveColor="#888"
-  />
-);
-
 // -----------------------------------------------------------------------------
 // Screen
 // -----------------------------------------------------------------------------
@@ -444,33 +391,55 @@ export const ProfileScreen: React.FC = () => {
   // The robust profile state manager handles all updates properly
   // React Query's intelligent caching ensures data freshness when needed
 
-  // Refresh handler - refreshes all data sources
+  // 🚀 OPTIMIZED REFRESH: TikTok/Instagram-style instant feedback
   const handleRefresh = useCallback(async () => {
+    // INSTANT FEEDBACK: Set refreshing immediately (no await)
     setIsRefreshing(true);
+    
+    // OPTIMISTIC UPDATE: Hide refresh indicator quickly like TikTok
+    const hideRefreshIndicator = () => {
+      setTimeout(() => setIsRefreshing(false), 500); // 500ms max like social apps
+    };
+    
     try {
-      // SIMPLIFIED REFRESH: Just refetch profile and activity, let React Query handle caching
-      await refetchProfile();
+      // PARALLEL LOADING: Start all requests simultaneously (no await between them)
+      const refreshPromises = [];
       
+      // Always refresh profile data
+      refreshPromises.push(refetchProfile());
+      
+      // Only add activity refresh for own profile
       if (isOwnProfile && refetchActivity) {
-        await refetchActivity();
+        refreshPromises.push(refetchActivity());
       }
+      
+      // BACKGROUND EXECUTION: Don't wait for completion, let React Query handle caching
+      Promise.allSettled(refreshPromises).then(() => {
+        console.log('[ProfileScreen] 🚀 Background refresh completed');
+      }).catch((error) => {
+        console.error('[ProfileScreen] Background refresh error:', error);
+      });
+      
+      // INSTANT FEEDBACK: Hide indicator immediately like TikTok/Instagram
+      hideRefreshIndicator();
       
     } catch (error) {
       console.error('[ProfileScreen] Refresh error:', error);
-    } finally {
-      setIsRefreshing(false);
+      // Even on error, hide quickly to maintain smooth UX
+      hideRefreshIndicator();
     }
   }, [refetchProfile, refetchActivity, isOwnProfile]);
 
-  // Create RefreshControl component
+  // Create RefreshControl component with TikTok/Instagram-style performance
   const refreshControl = (
     <RefreshControl
       refreshing={isRefreshing}
       onRefresh={handleRefresh}
       tintColor={ACTIVE_COLOR}
       colors={[ACTIVE_COLOR]}
-      title="Pull to refresh"
-      titleColor="#666"
+      progressBackgroundColor="#fff"
+      progressViewOffset={0}
+      // Optimized for fast performance like TikTok/Instagram
     />
   );
 
@@ -611,6 +580,271 @@ export const ProfileScreen: React.FC = () => {
     });
   }, [profile, targetUserId, user?.id, navigation]);
 
+  // Fixed Header Component (stays in place during refresh)
+  const renderFixedHeader = () => {
+    if (!profile) return null;
+    
+    return isOwnProfile ? (
+      // Own Profile: Show "Kitch Hub" header with actions
+      <View style={styles.fixedProfileHeader}>
+        <View style={styles.headerSpacer} />
+        <Text style={styles.scrollableHeaderTitle}>Kitch Hub</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={handleAddRecipePress}>
+            <Icon name="add-box" size={26} color="#10b981" />
+          </TouchableOpacity>
+          <NotificationBell
+            unreadCount={unreadCount}
+            onPress={handleNotificationBellPress}
+            size={26}
+            color="#1f2937"
+            style={styles.iconBtn}
+          />
+          <TouchableOpacity style={styles.iconBtn} onPress={handleSignOut}>
+            <Icon name="menu" size={26} color="#1f2937" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    ) : (
+      // Other User's Profile: Show back button and username  
+      <View style={styles.fixedProfileHeader}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}>
+          <Icon name="arrow-back" size={24} color="#1f2937" />
+        </TouchableOpacity>
+        <Text style={styles.scrollableHeaderTitle}>@{profile.username}</Text>
+        <TouchableOpacity
+          style={styles.iconBtn}
+          onPress={() =>
+            Alert.alert(
+              'Share Profile',
+              'Share functionality to be implemented.',
+            )
+          }>
+          <Icon name="share" size={24} color="#1f2937" />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  // Scrollable Profile Content (participates in refresh)
+  const renderScrollableProfileContent = () => {
+    if (!profile) return <View />;
+    
+    return (
+      <View style={styles.profileInfoContainer}>
+        <AvatarRow 
+          profile={profile} 
+          postsCount={profile.videos?.length || 0}
+          onFollowersPress={handleFollowersPress}
+          onFollowingPress={handleFollowingPress}
+        />
+        <Bio
+          profile={profile}
+          onTierBadgePress={handleTierBadgePress}
+          tierDisplay={usageData.tierDisplay}
+          showTierBadge={isOwnProfile} // Only show tier badge for own profile
+        />
+
+        <View style={styles.buttonRow}>
+          {isOwnProfile ? (
+            <>
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={handleEditProfilePress}>
+                <Text style={styles.editButtonText}>Edit Profile</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.shareButton}
+                onPress={() =>
+                  Alert.alert(
+                    'Share Profile',
+                    'Share functionality to be implemented.',
+                  )
+                }>
+                <Text style={styles.shareButtonText}>Share Profile</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <FollowButton
+                targetUserId={profile.user_id || targetUserId || ''}
+                style={styles.editButton}
+              />
+              <TouchableOpacity
+                style={styles.shareButton}
+                onPress={() =>
+                  Alert.alert(
+                    'Share Profile',
+                    'Share functionality to be implemented.',
+                  )
+                }>
+                <Text style={styles.shareButtonText}>Share Profile</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  // Render current tab content based on selected tab
+  const renderCurrentTabContent = () => {
+    if (!profile) return <View />;
+    
+    // For other users' profiles, only show their recipes
+    if (!isOwnProfile) {
+      return (
+        <View style={styles.tabContentContainer}>
+          {profile.videos && profile.videos.length > 0 ? (
+            <View style={styles.recipeGrid}>
+              {profile.videos.map((item) => (
+                <ProfileRecipeCard
+                  key={item.recipe_id}
+                  item={item}
+                  onPress={() => navigation.navigate('RecipeDetail', { id: item.recipe_id })}
+                  context="otherUserRecipes"
+                />
+              ))}
+            </View>
+          ) : (
+            <Empty label={`${profile?.username || 'User'} hasn't shared any recipes yet.`} />
+          )}
+        </View>
+      );
+    }
+    
+    // For own profile, show content based on selected tab
+    switch (tabIndex) {
+      case 0: // My Recipes
+        return (
+          <View style={styles.tabContentContainer}>
+            {profile.videos && profile.videos.length > 0 ? (
+              <View style={styles.recipeGrid}>
+                {profile.videos.map((item) => (
+                  <ProfileRecipeCard
+                    key={item.recipe_id}
+                    item={item}
+                    onPress={() => navigation.navigate('RecipeDetail', { id: item.recipe_id })}
+                    context="myRecipes"
+                  />
+                ))}
+              </View>
+            ) : (
+              <Empty label="No recipes uploaded yet." />
+            )}
+          </View>
+        );
+      case 1: // Saved
+        return (
+          <View style={styles.tabContentContainer}>
+            {profile.saved_recipes && profile.saved_recipes.length > 0 ? (
+              <View style={styles.recipeGrid}>
+                {profile.saved_recipes.map((item) => (
+                  <ProfileRecipeCard
+                    key={item.recipe_id}
+                    item={item}
+                    onPress={() => navigation.navigate('RecipeDetail', { id: item.recipe_id })}
+                    context="savedRecipes"
+                  />
+                ))}
+              </View>
+            ) : (
+              <Empty label="No saved recipes yet." />
+            )}
+          </View>
+        );
+      case 2: // Planner
+        return (
+          <View style={styles.tabContentContainer}>
+            <MealPlannerV2Screen />
+          </View>
+        );
+      case 3: // Activity
+        return (
+          <View style={styles.tabContentContainer}>
+            <ActivityFeed
+              data={activityData}
+              isLoading={activityLoading}
+              error={activityError}
+            />
+          </View>
+        );
+      default:
+        return <View />;
+    }
+  };
+
+  // Custom tab selector component
+  const renderTabSelector = () => (
+    <View style={styles.tabSelectorContainer}>
+      {isOwnProfile ? (
+        <>
+          <TouchableOpacity
+            style={[styles.tabButton, tabIndex === 0 && styles.activeTabButton]}
+            onPress={() => setTabIndex(0)}>
+            <View style={styles.tabLabelContainer}>
+              <Text style={[
+                styles.tabButtonText, 
+                tabIndex === 0 && styles.activeTabButtonText,
+                { fontSize: tabIndex === 0 ? 13 : 12, lineHeight: 16 }
+              ]}>
+                My
+              </Text>
+              <Text style={[
+                styles.tabButtonText, 
+                tabIndex === 0 && styles.activeTabButtonText,
+                { fontSize: tabIndex === 0 ? 13 : 12, lineHeight: 16, marginTop: -2 }
+              ]}>
+                Recipes
+              </Text>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabButton, tabIndex === 1 && styles.activeTabButton]}
+            onPress={() => setTabIndex(1)}>
+            <Text style={[styles.tabButtonText, tabIndex === 1 && styles.activeTabButtonText]}>
+              Saved
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabButton, tabIndex === 2 && styles.activeTabButton]}
+            onPress={() => setTabIndex(2)}>
+            <Text style={[styles.tabButtonText, tabIndex === 2 && styles.activeTabButtonText]}>
+              Planner
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabButton, tabIndex === 3 && styles.activeTabButton]}
+            onPress={() => setTabIndex(3)}>
+            <Text style={[styles.tabButtonText, tabIndex === 3 && styles.activeTabButtonText]}>
+              Activity
+            </Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        <TouchableOpacity
+          style={[styles.tabButton, styles.activeTabButton]}
+          onPress={() => setTabIndex(0)}>
+          <Text style={[styles.tabButtonText, styles.activeTabButtonText]}>
+            Recipes
+          </Text>
+        </TouchableOpacity>
+      )}
+      <View style={[
+        styles.tabIndicator, 
+        { 
+          left: isOwnProfile 
+            ? `${(100 / 4) * tabIndex + (100 / 8) - 5}%`  // Own profile: 4 tabs
+            : '37.5%'  // Other profile: center single tab
+        }
+      ]} />
+    </View>
+  );
+
   if (profileLoading) return <ProfileScreenSkeleton />;
 
   if (isError || !profile || typeof profile !== 'object') {
@@ -624,108 +858,6 @@ export const ProfileScreen: React.FC = () => {
     return <ErrorMsg message={message} />;
   }
 
-  const renderProfileInfo = () => (
-    <View style={styles.profileInfoContainer}>
-      {/* Header content */}
-      {isOwnProfile ? (
-        // Own Profile: Show "Kitch Hub" header with actions
-        <View style={styles.scrollableHeader}>
-          <View style={styles.headerSpacer} />
-          <Text style={styles.scrollableHeaderTitle}>Kitch Hub</Text>
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={styles.iconBtn}
-              onPress={handleAddRecipePress}>
-              <Icon name="add-box" size={26} color="#10b981" />
-            </TouchableOpacity>
-            <NotificationBell
-              unreadCount={unreadCount}
-              onPress={handleNotificationBellPress}
-              size={26}
-              color="#1f2937"
-              style={styles.iconBtn}
-            />
-            <TouchableOpacity style={styles.iconBtn} onPress={handleSignOut}>
-              <Icon name="menu" size={26} color="#1f2937" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : (
-        // Other User's Profile: Show back button and username
-        <View style={styles.scrollableHeader}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}>
-            <Icon name="arrow-back" size={24} color="#1f2937" />
-          </TouchableOpacity>
-          <Text style={styles.scrollableHeaderTitle}>@{profile.username}</Text>
-          <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={() =>
-              Alert.alert(
-                'Share Profile',
-                'Share functionality to be implemented.',
-              )
-            }>
-            <Icon name="share" size={24} color="#1f2937" />
-          </TouchableOpacity>
-        </View>
-      )}
-
-      <AvatarRow 
-        profile={profile} 
-        postsCount={profile.videos?.length || 0}
-        onFollowersPress={handleFollowersPress}
-        onFollowingPress={handleFollowingPress}
-      />
-      <Bio
-        profile={profile}
-        onTierBadgePress={handleTierBadgePress}
-        tierDisplay={usageData.tierDisplay}
-        showTierBadge={isOwnProfile} // Only show tier badge for own profile
-      />
-
-      <View style={styles.buttonRow}>
-        {isOwnProfile ? (
-          <>
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={handleEditProfilePress}>
-              <Text style={styles.editButtonText}>Edit Profile</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.shareButton}
-              onPress={() =>
-                Alert.alert(
-                  'Share Profile',
-                  'Share functionality to be implemented.',
-                )
-              }>
-              <Text style={styles.shareButtonText}>Share Profile</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <FollowButton
-              targetUserId={profile.user_id || targetUserId || ''}
-              style={styles.editButton} // Use existing editButton style for now
-            />
-            <TouchableOpacity
-              style={styles.shareButton}
-              onPress={() =>
-                Alert.alert(
-                  'Share Profile',
-                  'Share functionality to be implemented.',
-                )
-              }>
-              <Text style={styles.shareButtonText}>Share Profile</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-    </View>
-  );
-
   return (
     <View style={styles.container}>
       {/* Fixed Green Header - covers status bar area and stays fixed */}
@@ -733,70 +865,27 @@ export const ProfileScreen: React.FC = () => {
         <SafeAreaView edges={['top']} />
       </View>
 
-      {/* Scrollable Content - includes Kitch Hub content above avatar */}
-      <View style={styles.tabsContainer}>
-        {isOwnProfile ? (
-          // Own Profile: Show all tabs with collapsible tab view
-          <Tabs.Container
-            renderHeader={renderProfileInfo}
-            headerHeight={HEADER_HEIGHT}
-            renderTabBar={renderTabBar}
-            onIndexChange={setTabIndex}>
-            <Tabs.Tab name="myRecipes" label="My Recipes">
-              <LazyTabContent
-                data={profile.videos}
-                context="myRecipes"
-                emptyLabel="No recipes uploaded yet."
-                refreshControl={refreshControl}
-              />
-            </Tabs.Tab>
-            <Tabs.Tab name="savedRecipes" label="Saved">
-              <LazyTabContent
-                data={profile.saved_recipes}
-                context="savedRecipes"
-                emptyLabel="No saved recipes yet."
-                refreshControl={refreshControl}
-              />
-            </Tabs.Tab>
-            <Tabs.Tab name="planner" label="Planner">
-              <Tabs.ScrollView 
-                contentContainerStyle={styles.listContentContainer}
-                showsVerticalScrollIndicator={false}
-                refreshControl={refreshControl}
-              >
-                <MealPlannerV2Screen />
-              </Tabs.ScrollView>
-            </Tabs.Tab>
-            <Tabs.Tab name="activity" label="Activity">
-              <Tabs.ScrollView 
-                contentContainerStyle={styles.listContentContainer}
-                showsVerticalScrollIndicator={false}
-              >
-                <ActivityFeed
-                  data={activityData}
-                  isLoading={activityLoading}
-                  error={activityError}
-                />
-              </Tabs.ScrollView>
-            </Tabs.Tab>
-          </Tabs.Container>
-        ) : (
-          // Other User's Profile: Show only their recipes with collapsible tab view
-          <Tabs.Container
-            renderHeader={renderProfileInfo}
-            headerHeight={HEADER_HEIGHT}
-            renderTabBar={renderTabBar}>
-            <Tabs.Tab name="userRecipes" label="Recipes">
-              <LazyTabContent
-                data={profile.videos}
-                context="otherUserRecipes"
-                emptyLabel={`${profile.username} hasn't shared any recipes yet.`}
-                refreshControl={refreshControl}
-              />
-            </Tabs.Tab>
-          </Tabs.Container>
-        )}
-      </View>
+      {/* Fixed Profile Header - like "My Grocery List" */}
+      {renderFixedHeader()}
+
+      {/* Single Unified ScrollView - Everything Below Fixed Header */}
+      <ScrollView
+        style={styles.unifiedScrollContainer}
+        refreshControl={refreshControl}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+        scrollEventThrottle={16}>
+        
+        {/* Profile Content */}
+        {renderScrollableProfileContent()}
+        
+        {/* Tab Selector */}
+        {renderTabSelector()}
+        
+        {/* Current Tab Content */}
+        {renderCurrentTabContent()}
+        
+      </ScrollView>
 
       {/* Enhanced Creator/Tier Modal */}
       {usageData.tierDisplay.includes('CREATOR') ? (
@@ -1094,6 +1183,7 @@ const styles = StyleSheet.create({
   },
   profileInfoContainer: {
     backgroundColor: '#fff',
+    marginTop: 60, // Further increased spacing for better separation
   },
   container: {
     flex: 1,
@@ -1105,7 +1195,7 @@ const styles = StyleSheet.create({
   tabsContainer: {
     flex: 1,
     zIndex: 1,
-    paddingTop: 50,
+    marginTop: 0,
   },
   scrollableHeader: {
     flexDirection: 'row',
@@ -1118,9 +1208,9 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f0f0f0',
   },
   scrollableHeaderTitle: {
-    color: '#1f2937',
+    color: '#111827',
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     textAlign: 'center',
     flex: 1,
     letterSpacing: 0.5,
@@ -1298,12 +1388,81 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 10,
   },
+  activityContent: {
+    padding: 16,
+  },
+  headerScrollContainer: {
+    flex: 1,
+  },
+  fixedProfileHeader: {
+    position: 'absolute',
+    top: 50, // Position below green status bar (adjust based on status bar height)
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    height: FIXED_HEADER_HEIGHT,
+    zIndex: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  unifiedScrollContainer: {
+    flex: 1,
+    marginTop: FIXED_HEADER_HEIGHT, // Push content below fixed header
+  },
+  tabSelectorContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e5',
+    position: 'relative',
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+  },
+  activeTabButton: {
+    // Active state handled by text color
+  },
+  tabButtonText: {
+    fontWeight: '600',
+    fontSize: 14,
+    color: '#888',
+    letterSpacing: 0.4,
+    textAlign: 'center',
+  },
+  activeTabButtonText: {
+    color: ACTIVE_COLOR,
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  tabLabelContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabContentContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    minHeight: 400,
+  },
   recipeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-  },
-  activityContent: {
-    padding: 16,
+    justifyContent: 'space-around',
+    paddingHorizontal: 0,
+    width: '100%',
   },
 });
 
