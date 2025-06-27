@@ -45,13 +45,10 @@ const KitchPowerButton = ({ onPress }: { onPress: () => void }) => {
       <View style={styles.kitchPowerButtonInner}>
         <Feather 
           name={isCreator ? "video" : "zap"} 
-          size={24} 
+          size={28} 
           color="#fff" 
         />
       </View>
-      <Text style={styles.kitchPowerButtonText}>
-        {isCreator ? "Create" : "Kitch"}
-      </Text>
     </TouchableOpacity>
   );
 };
@@ -228,6 +225,9 @@ function MainTabs() {
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
+        options={{
+          tabBarLabel: 'Hub',
+        }}
         listeners={({ navigation }) => ({
           tabPress: e => {
             // Prevent default navigation
@@ -249,25 +249,19 @@ const styles = StyleSheet.create({
     marginTop: -20, // Elevate the button above the tab bar
   },
   kitchPowerButtonInner: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     backgroundColor: '#22c55e',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#22c55e',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-    marginBottom: 4,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 12,
   },
-  kitchPowerButtonText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#22c55e',
-    marginTop: 2,
-  },
+
 });
 
 export default MainTabs;
