@@ -122,6 +122,47 @@ export default function LoginScreen() {
     return true;
   };
 
+  // Forgot password handler
+  const onForgotPassword = async () => {
+    if (!email) {
+      Alert.alert(
+        'Email Required',
+        'Please enter your email address to reset your password.',
+        [{ text: 'OK', onPress: () => emailInputRef.current?.focus() }]
+      );
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        // Use custom scheme for immediate functionality
+        redirectTo: 'kitchai://auth/reset-password'
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      Alert.alert(
+        'Reset Link Sent! 📧',
+        'Check your email for a password reset link. It may take a few minutes to arrive.',
+        [{ text: 'OK' }]
+      );
+    } catch (error: any) {
+      Alert.alert(
+        'Reset Failed',
+        error.message || 'Unable to send reset email. Please try again.',
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Enhanced login with validation
   const onLogin = async () => {
     const isEmailValid = validateEmail(email);
@@ -306,6 +347,10 @@ export default function LoginScreen() {
                     emailError ? COLORS.error : COLORS.primary
                   }
                   error={!!emailError}
+                  // Prevent autofill yellow background and lockout issues
+                  autoComplete="email"
+                  textContentType="emailAddress"
+                  importantForAutofill="yes"
                   theme={{
                     colors: {
                       primary: emailError ? COLORS.error : COLORS.primary,
@@ -346,6 +391,10 @@ export default function LoginScreen() {
                     passwordError ? COLORS.error : COLORS.primary
                   }
                   error={!!passwordError}
+                  // Prevent autofill yellow background and lockout issues
+                  autoComplete="current-password"
+                  textContentType="password"
+                  importantForAutofill="yes"
                   right={
                     <TextInput.Icon
                       icon={secureTextEntry ? 'eye' : 'eye-off'}
@@ -384,12 +433,8 @@ export default function LoginScreen() {
 
                 <TouchableOpacity
                   style={styles.forgotPasswordContainer}
-                  onPress={() =>
-                    Alert.alert(
-                      'Forgot Password',
-                      'Password reset functionality coming soon.',
-                    )
-                  }>
+                  onPress={onForgotPassword}
+                  disabled={isLoading}>
                   <Text style={styles.forgotPasswordText}>
                     Forgot password?
                   </Text>

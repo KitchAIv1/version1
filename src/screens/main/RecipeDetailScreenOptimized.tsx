@@ -469,12 +469,9 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
   const { groceryList, fetchGroceryList } = useGroceryManager();
   const isScreenFocused = useIsFocused();
 
-  // Performance tracking
+    // Performance tracking - Using optimized monitoring (removed duplicate tracking)
   useScreenLoadTracking('RecipeDetailScreen');
   const { startApiCall, endApiCall } = useApiPerformanceTracking();
-  
-  // PHASE 3: Enhanced performance monitoring wrapper
-  const { trackSearch } = usePerformanceTracking('RecipeDetailScreen');
 
   // Route params
   const id = route.params?.id;

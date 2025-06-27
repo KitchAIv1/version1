@@ -43,7 +43,10 @@ import { TierDisplay } from '../../components/TierDisplay'; // Added TierDisplay
 import { FollowButton } from '../../components/FollowButton';
 import { FollowButtonOptimized } from '../../components/FollowButtonOptimized';
 import { useFollowDataPreloader } from '../../hooks/useFollowDataPreloader';
-import { CreatorAccountModal } from '../../components/CreatorAccountModal'; // Import FollowButton
+import { CreatorAccountModal } from '../../components/CreatorAccountModal';
+import { PremiumUpgradeModal } from '../../components/PremiumUpgradeModal';
+import { PremiumFeaturesModal } from '../../components/PremiumFeaturesModal';
+import { PrismaticCelebration } from '../../components/PrismaticCelebration';
 // import { useCacheDebug } from '../../hooks/useCacheDebug'; // REMOVED - no longer needed
 
 // Import notification components
@@ -402,6 +405,9 @@ export const ProfileScreen: React.FC = () => {
   // NEW: Toast notification state
   const [toastNotification, setToastNotification] = useState<any>(null);
 
+  // NEW: Global confetti state for upgrade celebration
+  const [showPrismaticCelebration, setShowPrismaticCelebration] = useState(false);
+
   // 🚀 PERFORMANCE OPTIMIZATION: Conditional data loading
   // Only load activity feed for own profile and when on activity tab
   const isActivityTab = tabIndex === 3; // Assuming activity is tab index 3
@@ -474,11 +480,20 @@ export const ProfileScreen: React.FC = () => {
   };
   // --- End Navigation Handler for Add Recipe ---
 
-  // --- Navigation Handler for Upgrade --- (New Handler)
+  // --- Navigation Handler for Upgrade --- (Updated Handler)
   const handleUpgradePress = () => {
-    navigation.navigate('UpgradeScreen');
+    // NEW: Direct modal-based upgrade instead of navigating to old screen
+    setShowTierModal(true);
   };
   // --- End Navigation Handler for Upgrade ---
+
+  // --- Navigation Handler for Become Creator --- (Fixed Handler)
+  const handleBecomeCreatorPress = () => {
+    console.log('[ProfileScreen] ⭐ Navigate to video uploader to start creating content');
+    // Navigate directly to video uploader screen for content creation
+    navigation.navigate('VideoRecipeUploader');
+  };
+  // --- End Navigation Handler for Become Creator ---
 
   // --- Recipe Navigation Handler --- (Fixed to prevent re-renders)
   const handleRecipePress = useCallback((recipeId: string) => {
@@ -488,6 +503,13 @@ export const ProfileScreen: React.FC = () => {
 
   // --- Tier Badge Press Handler ---
   const handleTierBadgePress = () => {
+    console.log('[ProfileScreen] 🎯 Tier badge pressed, showing tier modal');
+    console.log('[ProfileScreen] Current tierDisplay:', usageData.tierDisplay);
+    console.log('[ProfileScreen] Modal logic will show:', 
+      usageData.tierDisplay.includes('CREATOR') ? 'CreatorAccountModal' :
+      usageData.tierDisplay === 'PREMIUM' ? 'PREMIUM Confirmation Modal' :
+      'PremiumUpgradeModal'
+    );
     setShowTierModal(true);
   };
   // --- End Tier Badge Press Handler ---
@@ -545,6 +567,17 @@ export const ProfileScreen: React.FC = () => {
 
   const handleDismissToast = useCallback(() => {
     setToastNotification(null);
+  }, []);
+
+  // NEW: Handle upgrade success with global confetti
+  const handleUpgradeSuccess = useCallback(() => {
+    console.log('[ProfileScreen] 🎆 Triggering upgrade success prismatic celebration');
+    setShowPrismaticCelebration(true);
+    
+    // Auto-hide celebration after prismatic sequence
+    setTimeout(() => {
+      setShowPrismaticCelebration(false);
+    }, 3000); // 3 seconds for premium celebration
   }, []);
 
   // Navigation handler for "Edit Profile"
@@ -773,93 +806,21 @@ export const ProfileScreen: React.FC = () => {
           onCreateRecipe={handleAddRecipePress}
           username={profile?.username || 'Creator'}
         />
-      ) : (
-        <Modal
+      ) : usageData.tierDisplay === 'PREMIUM' ? (
+        <PremiumFeaturesModal
           visible={showTierModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowTierModal(false)}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
-              <View style={styles.modalHeader}>
-                <Icon
-                  name={
-                    usageData.tierDisplay === 'PREMIUM'
-                      ? 'star'
-                      : 'person'
-                  }
-                  size={48}
-                  color={
-                    usageData.tierDisplay === 'PREMIUM'
-                      ? '#FFD700'
-                      : '#10b981'
-                  }
-                />
-                <Text style={styles.modalTitle}>
-                  {`${usageData.tierDisplay} Account`}
-                </Text>
-              </View>
-
-              {usageData.showUsage ? (
-                <>
-                  <Text style={styles.modalMessage}>Monthly Usage</Text>
-
-                  <View style={styles.usageStatsContainer}>
-                    <View style={styles.usageStat}>
-                      <Icon name="camera-alt" size={24} color="#6b7280" />
-                      <Text style={styles.usageStatLabel}>Pantry Scans</Text>
-                      <Text style={styles.usageStatValue}>
-                        {usageData.scanUsage}
-                      </Text>
-                    </View>
-
-                    <View style={styles.usageStat}>
-                      <Icon name="lightbulb-outline" size={24} color="#6b7280" />
-                      <Text style={styles.usageStatLabel}>AI Recipes</Text>
-                      <Text style={styles.usageStatValue}>
-                        {usageData.aiRecipeUsage}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <Text style={styles.modalSubMessage}>
-                    Upgrade to Premium for unlimited access to all features!
-                  </Text>
-
-                  <View style={styles.modalButtons}>
-                    <TouchableOpacity
-                      style={styles.modalCancelButton}
-                      onPress={() => setShowTierModal(false)}>
-                      <Text style={styles.modalCancelText}>Close</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.modalUpgradeButton}
-                      onPress={() => {
-                        setShowTierModal(false);
-                        handleUpgradePress();
-                      }}>
-                      <Icon name="arrow-upward" size={20} color="#fff" />
-                      <Text style={styles.modalUpgradeText}>Upgrade Now</Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.modalMessage}>
-                    You have unlimited access to all Premium features!
-                  </Text>
-
-                  <TouchableOpacity
-                    style={styles.modalCloseButton}
-                    onPress={() => setShowTierModal(false)}>
-                    <Text style={styles.modalCloseText}>Close</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
-          </View>
-        </Modal>
+          onClose={() => setShowTierModal(false)}
+          onBecomeCreator={handleBecomeCreatorPress}
+          username={profile?.username || 'Chef'}
+        />
+      ) : (
+        <PremiumUpgradeModal
+          visible={showTierModal}
+          onClose={() => setShowTierModal(false)}
+          onBecomeCreator={handleBecomeCreatorPress}
+          onUpgradeSuccess={handleUpgradeSuccess}
+          username={profile?.username || 'Chef'}
+        />
       )}
 
       {/* NEW: Notification Drawer */}
@@ -885,6 +846,14 @@ export const ProfileScreen: React.FC = () => {
           duration={6000} // 6 seconds for urgent notifications
         />
       )}
+
+      {/* NEW: Global Prismatic Celebration for Upgrades */}
+      <PrismaticCelebration
+        visible={showPrismaticCelebration}
+        intensity="ultra"
+        theme="prismatic"
+        onComplete={() => setShowPrismaticCelebration(false)}
+      />
     </View>
   );
 };

@@ -1,4 +1,5 @@
 import 'react-native-url-polyfill/auto';
+import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { PaperProvider } from 'react-native-paper';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -10,6 +11,7 @@ import { GroceryProvider } from './src/providers/GroceryProvider';
 import { NetworkProvider } from './src/providers/NetworkProvider';
 import AppNavigator from './src/navigation/AppNavigator';
 import GlobalOfflineIndicator from './src/components/GlobalOfflineIndicator';
+import DeepLinkingService from './src/services/DeepLinkingService';
 
 // Create a client with optimized caching and global retry configuration
 const queryClient = new QueryClient({
@@ -31,6 +33,17 @@ const queryClient = new QueryClient({
 });
 
 export default function App() {
+  // Initialize deep linking service
+  useEffect(() => {
+    const deepLinkingService = DeepLinkingService.getInstance();
+    deepLinkingService.initialize();
+
+    // Cleanup on unmount
+    return () => {
+      deepLinkingService.cleanup();
+    };
+  }, []);
+
   return (
     // Wrap with GestureHandlerRootView
     <GestureHandlerRootView style={{ flex: 1 }}>

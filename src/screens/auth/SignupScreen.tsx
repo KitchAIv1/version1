@@ -189,7 +189,13 @@ export default function SignupScreen() {
       }),
     ]).start();
 
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ 
+      email, 
+      password,
+      options: {
+        emailRedirectTo: 'kitchai://auth/confirm'
+      }
+    });
     setIsLoading(false);
 
     if (error) {
@@ -386,6 +392,10 @@ export default function SignupScreen() {
                     emailError ? COLORS.error : COLORS.primary
                   }
                   error={!!emailError}
+                  // Prevent autofill yellow background and lockout issues
+                  autoComplete="email"
+                  textContentType="emailAddress"
+                  importantForAutofill="yes"
                   theme={{
                     colors: {
                       primary: emailError ? COLORS.error : COLORS.primary,
@@ -426,6 +436,10 @@ export default function SignupScreen() {
                     passwordError ? COLORS.error : COLORS.primary
                   }
                   error={!!passwordError}
+                  // Prevent autofill yellow background and lockout issues
+                  autoComplete="new-password"
+                  textContentType="newPassword"
+                  importantForAutofill="yes"
                   right={
                     <TextInput.Icon
                       icon={secureTextEntry ? 'eye' : 'eye-off'}
@@ -488,6 +502,10 @@ export default function SignupScreen() {
                     confirmError ? COLORS.error : COLORS.primary
                   }
                   error={!!confirmError}
+                  // Prevent autofill yellow background and lockout issues
+                  autoComplete="new-password"
+                  textContentType="newPassword"
+                  importantForAutofill="yes"
                   right={
                     <TextInput.Icon
                       icon={secureConfirmEntry ? 'eye' : 'eye-off'}

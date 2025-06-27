@@ -4,10 +4,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
+// Revert to original screens temporarily to fix crash
 import FeedScreen from '../screens/main/FeedScreen';
-// import DiscoverScreen from '../screens/main/DiscoverScreen';
 import PantryScreen from '../screens/main/PantryScreen';
-// import CreateScreen from '../screens/main/CreateScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import GroceryListScreen from '../screens/grocery/GroceryListScreen';
 import { MainTabsParamList } from './types';

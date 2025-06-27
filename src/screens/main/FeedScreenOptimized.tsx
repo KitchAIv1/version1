@@ -85,11 +85,13 @@ const useOptimizedFeed = () => {
         if (!user?.id) throw new Error('User authentication required');
 
         const { data: rawData, error: rpcError } = await supabase.rpc(
-          'get_community_feed_pantry_match_v4',
+          'get_enhanced_feed_v4',
           {
-            user_id: user.id,
-            limit_count: 20,
-            offset_count: 0,
+            user_id_param: user.id,
+            session_context: {},
+            feed_position: 0,
+            time_context: 'general',
+            limit_param: 20,
           },
         );
 
@@ -101,47 +103,53 @@ const useOptimizedFeed = () => {
           throw new Error('Feed data not found.');
         }
 
-        // Optimized data processing
-        const processedItems: FeedItem[] = Array.isArray(rawData)
-          ? rawData
+        // Handle Enhanced Feed V4 response structure
+        const feedResponse = rawData as any;
+        const recipes = feedResponse.recipes || rawData;
+        
+        if (!Array.isArray(recipes)) {
+          throw new Error('Invalid feed data structure.');
+        }
+
+        // Optimized data processing (using Enhanced Feed V4 field mappings)
+        const processedItems: FeedItem[] = recipes
               .map((item: Record<string, unknown>, index: number) => ({
-                id: (item.id ||
-                  item.recipe_id ||
+                id: (item.output_id || 
+                  item.id ||
                   `feed_item_${index}`) as string,
-                recipe_id: (item.id ||
-                  item.recipe_id ||
+                recipe_id: (item.output_id || 
+                  item.id ||
                   `feed_item_${index}`) as string,
-                title: (item.title ||
-                  item.recipe_name ||
-                  'Untitled Recipe') as string,
-                recipe_name: (item.recipe_name ||
+                title: (item.output_name ||
                   item.title ||
                   'Untitled Recipe') as string,
-                description: (item.description || '') as string,
-                video_url: (item.video_url || item.video || '') as string,
-                video: (item.video || item.video_url || '') as string,
+                recipe_name: (item.output_name ||
+                  item.title ||
+                  'Untitled Recipe') as string,
+                description: (item.output_description || item.description || '') as string,
+                video_url: (item.output_video_url || item.video_url || item.video || '') as string,
+                video: (item.output_video_url || item.video || item.video_url || '') as string,
                 thumbnail_url: (item.thumbnail_url || undefined) as
                   | string
                   | undefined,
-                creator_user_id: (item.creator_user_id ||
+                creator_user_id: (item.output_user_id ||
+                  item.creator_user_id ||
                   item.user_id ||
                   '') as string,
-                username: (item.username || 'Unknown User') as string,
-                avatar_url: (item.avatar_url || undefined) as
+                username: (item.user_name || item.username || 'Unknown User') as string,
+                avatar_url: (item.out_creator_avatar_url || item.avatar_url || undefined) as
                   | string
                   | undefined,
-                likes: (item.likes || 0) as number,
-                comments_count: (item.comments_count || 0) as number,
-                created_at: (item.created_at ||
+                likes: (item.output_likes_count || item.likes || 0) as number,
+                comments_count: (item.output_comments_count || item.comments_count || 0) as number,
+                created_at: (item.output_created_at ||
+                  item.created_at ||
                   new Date().toISOString()) as string,
-                pantryMatchPct: (item.pantryMatchPct ||
-                  item.pantry_match_pct ||
-                  0) as number,
-                is_liked: (item.is_liked || false) as boolean,
-                is_saved: (item.is_saved || false) as boolean,
+                pantryMatchPct: ((item as any).pantry_match?.match_percentage || 0) as number,
+                is_liked: (item.output_is_liked || item.is_liked || false) as boolean,
+                is_saved: (item.output_is_saved || item.is_saved || false) as boolean,
               }))
-              .filter((item: FeedItem) => item.id && item.title)
-          : [];
+              .filter((item: FeedItem) => item.id && item.title);
 
         const result = {
           items: processedItems,
@@ -603,7 +611,7 @@ export const FeedScreenOptimized = React.memo(() => {
           <Text style={styles.errorText}>
             Error loading feed: {feedError.message}
           </Text>
-          <Text style={styles.retryText} onPress={() => refetchFeed({} as any)}>
+          <Text style={styles.retryText} onPress={() => refetchFeed({ throwOnError: false })}>
             Tap to retry
           </Text>
         </View>

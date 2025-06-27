@@ -19,6 +19,7 @@
       "nutrition"
     ],
     "primaryColor": "#FF6B35",
+    "scheme": "kitchai",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -31,11 +32,21 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.chieftitan.kitchai-v2",
       "buildNumber": "1",
+      "associatedDomains": [
+        "applinks:kitchai.app",
+        "applinks:*.kitchai.app"
+      ],
       "infoPlist": {
         "NSCameraUsageDescription": "KitchAI uses your camera to scan pantry items and identify ingredients for personalized recipe recommendations.",
         "NSPhotoLibraryUsageDescription": "KitchAI accesses your photo library to let you select images of ingredients for recipe suggestions.",
         "CFBundleDisplayName": "KitchAI",
-        "CFBundleName": "KitchAI"
+        "CFBundleName": "KitchAI",
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLName": "com.chieftitan.kitchai-v2",
+            "CFBundleURLSchemes": ["kitchai"]
+          }
+        ]
       },
       "config": {
         "usesNonExemptEncryption": false
@@ -55,7 +66,27 @@
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE"
       ],
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "kitchai.app"
+            },
+            {
+              "scheme": "https", 
+              "host": "*.kitchai.app"
+            },
+            {
+              "scheme": "kitchai"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
