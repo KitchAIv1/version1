@@ -49,8 +49,18 @@ export const TikTokVideoControls: React.FC<TikTokVideoControlsProps> = ({
     };
   }, []);
 
-  // Auto-hide controls after 3 seconds
-  const hideControls = useCallback(() => {
+  // Show controls and auto-hide after 3 seconds
+  const showControlsHandler = () => {
+    if (!showControls) {
+      setShowControls(true);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+    
+    // Clear existing timeout and set new one
     if (hideTimeout.current) {
       clearTimeout(hideTimeout.current);
     }
@@ -61,20 +71,7 @@ export const TikTokVideoControls: React.FC<TikTokVideoControlsProps> = ({
         useNativeDriver: true,
       }).start(() => setShowControls(false));
     }, 3000);
-  }, [fadeAnim]);
-
-  // Show controls
-  const showControlsHandler = useCallback(() => {
-    if (!showControls) {
-      setShowControls(true);
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    }
-    hideControls();
-  }, [showControls, fadeAnim, hideControls]);
+  };
 
   // Handle tap to show/hide controls
   const handleTap = () => {
@@ -122,7 +119,7 @@ export const TikTokVideoControls: React.FC<TikTokVideoControlsProps> = ({
   };
 
   // Progress bar gesture handler
-  const handleProgressGesture = useCallback(({ nativeEvent }: any) => {
+  const handleProgressGesture = ({ nativeEvent }: any) => {
     if (nativeEvent.state === State.BEGAN) {
       setIsDragging(true);
     } else if (nativeEvent.state === State.ACTIVE) {
@@ -136,7 +133,7 @@ export const TikTokVideoControls: React.FC<TikTokVideoControlsProps> = ({
       setIsDragging(false);
       showControlsHandler();
     }
-  }, [duration, showControlsHandler]);
+  };
 
   // Format time display
   const formatTime = (seconds: number) => {
