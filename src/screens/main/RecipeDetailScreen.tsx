@@ -1349,13 +1349,14 @@ const styles = StyleSheet.create({
   videoViewCountContainer: {
     position: 'absolute',
     bottom: 12,
-    right: 12,
+    left: 12,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.6)',
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 8,
+    zIndex: 5,
   },
   videoViewCountIcon: {
     fontSize: 15,
