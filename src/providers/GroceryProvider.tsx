@@ -9,6 +9,7 @@ import React, {
 import { PostgrestError } from '@supabase/supabase-js';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase'; // Adjusted path
+import { useAuth } from './AuthProvider'; // Import AuthProvider
 
 // --- Interfaces (copied from original useGroceryManager) ---
 export interface GroceryItem {
@@ -86,31 +87,21 @@ export const GroceryProvider: React.FC<GroceryProviderProps> = ({
   const [groceryList, setGroceryList] = useState<GroceryItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const queryClient = useQueryClient();
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session?.user) {
-        setCurrentUserId(session.user.id);
-      } else {
-        setCurrentUserId(null);
-        setGroceryList([]);
-        setError('User not authenticated.');
-      }
-    };
-    fetchUser();
-  }, []);
+  
+  // 🚨 FIX: Use AuthProvider instead of independent session checking
+  const { user } = useAuth();
+  const currentUserId = user?.id || null;
 
   const fetchGroceryList = useCallback(
     async (userIdToFetch?: string) => {
       const uid = userIdToFetch || currentUserId;
       if (!uid) {
-        setError('User ID not available to fetch grocery list.');
+        // 🚨 FIX: Don't set persistent error for unauthenticated users
+        // This is normal during app startup before AuthProvider completes
+        console.log('[GroceryProvider] No user ID available, clearing grocery list');
         setGroceryList([]);
+        setError(null); // Clear any previous errors
         return;
       }
       setIsLoading(true);
@@ -148,6 +139,10 @@ export const GroceryProvider: React.FC<GroceryProviderProps> = ({
   useEffect(() => {
     if (currentUserId) {
       fetchGroceryList(currentUserId);
+    } else {
+      // 🚨 FIX: Clear grocery list when user is not authenticated, but don't set persistent error
+      setGroceryList([]);
+      setError(null); // Clear any previous errors
     }
   }, [currentUserId, fetchGroceryList]);
 
