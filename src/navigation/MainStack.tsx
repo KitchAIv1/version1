@@ -115,24 +115,21 @@ const MainStack: React.FC<MainStackProps> = ({ userOnboarded }) => {
         name="IngredientSelection"
         component={IngredientSelectionScreen}
         options={{
-          headerShown: true,
-          title: 'Select Ingredients',
+          headerShown: false,
         }}
       />
       <Stack.Screen
         name="RecipeResults"
         component={RecipeResultsScreen}
         options={{
-          headerShown: true,
-          title: 'Recipe Suggestions',
+          headerShown: false,
         }}
       />
       <Stack.Screen
         name="AIRecipeGeneration"
         component={AIRecipeGenerationScreen}
         options={{
-          headerShown: true,
-          title: 'AI Recipe Generator',
+          headerShown: false,
         }}
       />
 

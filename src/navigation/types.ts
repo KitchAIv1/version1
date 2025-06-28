@@ -14,7 +14,7 @@ export type AuthStackParamList = {
 // For the main application tabs (nested within MainStack)
 export type MainTabsParamList = {
   Feed: undefined;
-  Pantry: undefined;
+  Pantry: { showManualAdd?: boolean }; // Added parameter to trigger manual add modal
   KitchPower: undefined; // Center power button for role-based actions
   GroceryList: undefined;
   Profile: { userId?: string }; // Added userId parameter for viewing other users' profiles

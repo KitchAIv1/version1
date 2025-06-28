@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { RecipeResultsScreenProps } from '../../navigation/types';
 import { useRecipeSuggestions } from '../../hooks/useRecipeSuggestions';
+import { useAccessControl } from '../../hooks/useAccessControl';
+import { LimitReachedModal } from '../../components/modals/LimitReachedModal';
 
 export default function RecipeResultsScreen({
   navigation,
@@ -27,6 +29,40 @@ export default function RecipeResultsScreen({
     refetch,
   } = useRecipeSuggestions(selectedIngredients);
 
+  // Access control for AI recipe generation
+  const { checkAIRecipeAvailability } = useAccessControl();
+  
+  // State for AI recipe availability and limit modal
+  const [aiAvailability, setAiAvailability] = useState<{
+    canGenerate: boolean;
+    isLimitReached: boolean;
+    usage: any;
+    reason: string | null;
+  } | null>(null);
+  const [showLimitModal, setShowLimitModal] = useState(false);
+
+  // Check AI recipe availability when component mounts
+  useEffect(() => {
+    const checkAvailability = async () => {
+      try {
+        const availability = await checkAIRecipeAvailability();
+        setAiAvailability(availability);
+        console.log('[RecipeResultsScreen] AI availability check result:', availability);
+      } catch (error) {
+        console.error('[RecipeResultsScreen] Error checking AI availability:', error);
+        // On error, assume available (backend will handle)
+        setAiAvailability({
+          canGenerate: true,
+          isLimitReached: false,
+          usage: null,
+          reason: null,
+        });
+      }
+    };
+
+    checkAvailability();
+  }, [checkAIRecipeAvailability]);
+
   const handleGoBack = () => {
     navigation.goBack();
   };
@@ -40,10 +76,31 @@ export default function RecipeResultsScreen({
   };
 
   const handleAIGeneration = () => {
-    // Navigate to AI Generation screen (Phase 3)
+    // Check if user has reached their limit
+    if (aiAvailability?.isLimitReached) {
+      console.log('[RecipeResultsScreen] AI recipe limit reached - showing limit modal');
+      setShowLimitModal(true);
+      return;
+    }
+
+    // Navigate to AI Generation screen
     navigation.navigate('AIRecipeGeneration', {
       selectedIngredients,
     });
+  };
+
+  const handleUpgradeSuccess = () => {
+    console.log('[RecipeResultsScreen] Upgrade successful - refreshing availability');
+    // Refresh AI availability after upgrade
+    const checkAvailability = async () => {
+      try {
+        const availability = await checkAIRecipeAvailability();
+        setAiAvailability(availability);
+      } catch (error) {
+        console.error('[RecipeResultsScreen] Error refreshing availability:', error);
+      }
+    };
+    checkAvailability();
   };
 
   // Loading state
@@ -54,7 +111,9 @@ export default function RecipeResultsScreen({
           <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
             <Feather name="arrow-left" size={24} color="#333" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Finding Recipes...</Text>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>Finding Recipes...</Text>
+          </View>
         </View>
 
         <View style={styles.loadingContainer}>
@@ -76,7 +135,9 @@ export default function RecipeResultsScreen({
           <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
             <Feather name="arrow-left" size={24} color="#333" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Recipe Results</Text>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>Recipe Results</Text>
+          </View>
         </View>
 
         <View style={styles.errorContainer}>
@@ -97,6 +158,14 @@ export default function RecipeResultsScreen({
   const { recipe_matches, total_matches, ai_generation_available } =
     suggestionsData || {};
 
+  // DEBUGGING: Log the total_matches value being used
+  console.log('[RecipeResultsScreen] 🔍 TOTAL MATCHES DEBUG:', {
+    total_matches,
+    recipe_matches_length: recipe_matches?.length || 0,
+    suggestionsData_keys: Object.keys(suggestionsData || {}),
+    full_suggestionsData: suggestionsData,
+  });
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -105,10 +174,6 @@ export default function RecipeResultsScreen({
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>Recipe Results</Text>
-          <Text style={styles.headerSubtitle}>
-            {selectedIngredients.length} ingredients • {total_matches || 0}{' '}
-            matches
-          </Text>
         </View>
       </View>
 
@@ -117,6 +182,9 @@ export default function RecipeResultsScreen({
         {recipe_matches && recipe_matches.length > 0 ? (
           <View style={styles.matchesSection}>
             <Text style={styles.sectionTitle}>Perfect Matches for You</Text>
+            <Text style={styles.sectionSubtitle}>
+              {selectedIngredients.length} ingredients • {total_matches || recipe_matches?.length || 0} matches found
+            </Text>
 
             {recipe_matches.map(recipe => (
               <TouchableOpacity
@@ -204,41 +272,90 @@ export default function RecipeResultsScreen({
           </View>
         ) : (
           // No matches found
-          <View style={styles.noMatchesContainer}>
-            <View style={styles.noMatchesIcon}>
-              <Feather name="search" size={48} color="#9ca3af" />
-            </View>
-            <Text style={styles.noMatchesTitle}>No Perfect Matches</Text>
-            <Text style={styles.noMatchesMessage}>
-              We couldn't find recipes that match your ingredients perfectly.
-              Try our AI chef to create something custom!
+          <View style={styles.matchesSection}>
+            <Text style={styles.sectionTitle}>Perfect Matches for You</Text>
+            <Text style={styles.sectionSubtitle}>
+              {selectedIngredients.length} ingredients • {total_matches || recipe_matches?.length || 0} matches found
             </Text>
+            <View style={styles.noMatchesContainer}>
+              <View style={styles.noMatchesIcon}>
+                <Feather name="search" size={48} color="#9ca3af" />
+              </View>
+              <Text style={styles.noMatchesTitle}>No Perfect Matches</Text>
+              <Text style={styles.noMatchesMessage}>
+                We couldn't find recipes that match your ingredients perfectly.
+                Try our AI chef to create something custom!
+              </Text>
+            </View>
           </View>
         )}
 
-        {/* AI Generation Section */}
-        {ai_generation_available && (
-          <View style={styles.aiSection}>
-            <View style={styles.aiHeader}>
-              <View style={styles.aiIconContainer}>
-                <Feather name="zap" size={24} color="#10b981" />
-              </View>
-              <View style={styles.aiTextContainer}>
-                <Text style={styles.aiTitle}>Create Something New</Text>
-                <Text style={styles.aiSubtitle}>
-                  Let our AI chef create a custom recipe with your ingredients
-                </Text>
-              </View>
+        {/* AI Generation Section - Always show for all users, let limit logic handle the UI */}
+        <View style={styles.aiSection}>
+          <View style={styles.aiHeader}>
+            <View style={styles.aiIconContainer}>
+              <Feather name="zap" size={24} color="#10b981" />
             </View>
+            <View style={styles.aiTextContainer}>
+              <Text style={styles.aiTitle}>Create Something New</Text>
+              <Text style={styles.aiSubtitle}>
+                Let our AI chef create a custom recipe with your ingredients
+              </Text>
+              
+              {/* Show usage info for FREEMIUM users */}
+              {aiAvailability?.usage && (
+                <Text style={styles.usageInfo}>
+                  {aiAvailability.usage.remaining} of {aiAvailability.usage.limit} AI recipes remaining this month
+                </Text>
+              )}
+            </View>
+          </View>
+          
+          {/* Dynamic button based on availability */}
+          {aiAvailability?.isLimitReached ? (
+            // Limit reached - show upgrade CTA
+            <View style={styles.limitReachedContainer}>
+              <TouchableOpacity
+                onPress={handleAIGeneration}
+                style={styles.upgradeButton}>
+                <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
+                <Feather name="star" size={16} color="#fff" />
+              </TouchableOpacity>
+              <Text style={styles.limitReachedText}>
+                You've reached your monthly AI recipe limit. Upgrade for unlimited access!
+              </Text>
+            </View>
+          ) : (
+            // Can generate - show normal button
             <TouchableOpacity
               onPress={handleAIGeneration}
-              style={styles.aiButton}>
-              <Text style={styles.aiButtonText}>Generate AI Recipe</Text>
-              <Feather name="arrow-right" size={16} color="#fff" />
+              style={[
+                styles.aiButton,
+                aiAvailability?.canGenerate === false && styles.disabledButton
+              ]}
+              disabled={aiAvailability?.canGenerate === false}>
+              <Text style={[
+                styles.aiButtonText,
+                aiAvailability?.canGenerate === false && styles.disabledButtonText
+              ]}>
+                {aiAvailability?.canGenerate === false ? 'Checking Availability...' : 'Generate AI Recipe'}
+              </Text>
+              {aiAvailability?.canGenerate !== false && (
+                <Feather name="arrow-right" size={16} color="#fff" />
+              )}
             </TouchableOpacity>
-          </View>
-        )}
+          )}
+        </View>
       </ScrollView>
+
+      {/* Limit Reached Modal */}
+      <LimitReachedModal
+        visible={showLimitModal}
+        onClose={() => setShowLimitModal(false)}
+        limitType="ai_recipe"
+        onUpgradeSuccess={handleUpgradeSuccess}
+        usageData={aiAvailability?.usage}
+      />
     </SafeAreaView>
   );
 }
@@ -344,6 +461,12 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     color: '#111827',
+    marginBottom: 8,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
     marginBottom: 20,
   },
   recipeCard: {
@@ -537,5 +660,43 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  usageInfo: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  limitReachedContainer: {
+    alignItems: 'center',
+  },
+  upgradeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f59e0b',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    gap: 8,
+    marginBottom: 12,
+  },
+  upgradeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  limitReachedText: {
+    fontSize: 13,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  disabledButton: {
+    backgroundColor: '#9ca3af',
+    opacity: 0.6,
+  },
+  disabledButtonText: {
+    color: '#d1d5db',
   },
 });

@@ -17,6 +17,7 @@ import { useAuth } from '../../providers/AuthProvider';
 import { supabase } from '../../services/supabase';
 import { useQueryClient } from '@tanstack/react-query';
 import { parseIngredientString } from '../../utils/ingredientParser';
+import { LimitReachedModal } from '../../components/modals/LimitReachedModal';
 
 interface AIRecipeData {
   name: string;
@@ -82,6 +83,7 @@ export default function AIRecipeGenerationScreen({
   const [currentRecipeIndex, setCurrentRecipeIndex] = useState(0);
   const [generationStep, setGenerationStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [showLimitModal, setShowLimitModal] = useState(false);
 
   // Animation values
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -196,46 +198,30 @@ export default function AIRecipeGenerationScreen({
       recipe.ingredients.forEach(ingredient => {
         const cleanIngredient = ingredient.toLowerCase().trim();
         // Check if any selected ingredient is contained in this recipe ingredient
-        const isValid = Array.from(selectedSet).some(selected => {
-          // More flexible matching - check both directions
-          return (
-            cleanIngredient.includes(selected) ||
-            selected.includes(cleanIngredient) ||
-            // Handle common variations (e.g., "chicken breast" vs "chicken")
-            (cleanIngredient.includes('chicken') &&
-              selected.includes('chicken')) ||
-            (cleanIngredient.includes('tomato') &&
-              selected.includes('tomato')) ||
-            // Basic seasonings are always allowed
-            ['salt', 'pepper', 'oil', 'water'].some(basic =>
-              cleanIngredient.includes(basic),
-            )
-          );
-        });
+        const isValid = Array.from(selectedSet).some(selectedIng =>
+          cleanIngredient.includes(selectedIng) || selectedIng.includes(cleanIngredient)
+        );
 
         if (isValid) {
           validIngredients.push(ingredient);
         } else {
           invalidIngredients.push(ingredient);
-          console.log(
-            '[AIRecipeGeneration] Invalid ingredient found:',
-            ingredient,
-          );
         }
       });
 
       console.log('[AIRecipeGeneration] Validation results:', {
-        validIngredients,
-        invalidIngredients,
+        recipeName: recipe.name,
         originalCount: recipe.ingredients.length,
         validCount: validIngredients.length,
+        validIngredients,
+        invalidIngredients,
       });
 
+      // Return recipe with validated ingredients and preserved original
       return {
         ...recipe,
-        original_ingredients: recipe.ingredients, // PRESERVE original ingredients for parsing
-        ingredients: validIngredients, // Validated ingredients for display
-        // Move invalid ingredients to optional additions
+        ingredients: validIngredients,
+        original_ingredients: recipe.ingredients, // Preserve original ingredients
         optional_additions: [
           ...(recipe.optional_additions || []),
           ...invalidIngredients.map(ing => `${ing} (not in pantry)`),
@@ -246,12 +232,7 @@ export default function AIRecipeGenerationScreen({
   );
 
   const handleGenerateRecipe = async () => {
-    // Check access control with proper user tier detection
-    if (!canGenerateAIRecipe()) {
-      // Access control will show appropriate alert based on user tier
-      return;
-    }
-
+    // Let the backend handle all limit checking
     setIsGenerating(true);
     setGenerationStep(0);
     setError(null);
@@ -277,6 +258,14 @@ export default function AIRecipeGenerationScreen({
       // Use the access control's generateAIRecipe function
       // This handles user tier detection and usage tracking automatically
       const result = await generateAIRecipe(recipeRequestData);
+
+      // Check if limit was reached
+      if (result && typeof result === 'object' && result.limitReached) {
+        console.log('[AIRecipeGeneration] AI recipe limit reached, showing limit modal');
+        setIsGenerating(false);
+        setShowLimitModal(true);
+        return;
+      }
 
       if (result) {
         // Simulate minimum generation time for better UX
@@ -496,6 +485,7 @@ export default function AIRecipeGenerationScreen({
   };
 
   const handleGenerateMore = () => {
+    // Let Edge Function handle validation - no pre-checks needed
     setGeneratedRecipes([]);
     setCurrentRecipeIndex(0);
     setError(null);
@@ -770,7 +760,22 @@ export default function AIRecipeGenerationScreen({
   }
 
   // This should not be reached since we auto-generate on load
-  return null;
+  return (
+    <>
+      {/* Limit Reached Modal */}
+      <LimitReachedModal
+        visible={showLimitModal}
+        onClose={() => setShowLimitModal(false)}
+        limitType="ai_recipe"
+        onUpgradeSuccess={() => {
+          setShowLimitModal(false);
+          // Refresh and continue with recipe generation
+          handleGenerateRecipe();
+        }}
+        username={user?.user_metadata?.username || 'Chef'}
+      />
+    </>
+  );
 }
 
 const styles = StyleSheet.create({

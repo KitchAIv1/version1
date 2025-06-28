@@ -11,106 +11,106 @@ export const useAccessControl = () => {
   const {
     user,
     profile,
-    usageLimits,
     getEffectiveTier,
     isCreator,
-    refreshUsageLimits,
   } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Check if user can perform pantry scan
+  // Legacy synchronous function - kept for backward compatibility
   const canPerformScan = useCallback((): boolean => {
     const isCreatorResult = isCreator();
     const effectiveTier = getEffectiveTier();
-    const shouldHaveUnlimitedAccess = isCreatorResult || effectiveTier === 'PREMIUM';
     
-    console.log('[useAccessControl] canPerformScan DEBUG:', {
-      isCreator: isCreatorResult,
-      effectiveTier: effectiveTier,
-      shouldHaveUnlimitedAccess: shouldHaveUnlimitedAccess,
-      usageLimits: usageLimits,
-      scanCount: usageLimits?.scan_count || 0,
-      limit: FREEMIUM_SCAN_LIMIT
-    });
-
-    if (shouldHaveUnlimitedAccess) {
+    // PREMIUM/CREATOR users always have access
+    if (isCreatorResult || effectiveTier === 'PREMIUM') {
       return true;
     }
+    
+    // For FREEMIUM users, this is just a fallback - use checkScanAvailability for real checks
+    return true; 
+  }, [isCreator, getEffectiveTier]);
 
-    return (usageLimits?.scan_count || 0) < FREEMIUM_SCAN_LIMIT;
-  }, [isCreator, getEffectiveTier, usageLimits]);
-
-  // Check if user can generate AI recipe
   const canGenerateAIRecipe = useCallback((): boolean => {
     const isCreatorResult = isCreator();
     const effectiveTier = getEffectiveTier();
-    const shouldHaveUnlimitedAccess = isCreatorResult || effectiveTier === 'PREMIUM';
     
-    console.log('[useAccessControl] canGenerateAIRecipe DEBUG:', {
-      isCreator: isCreatorResult,
-      effectiveTier: effectiveTier,
-      shouldHaveUnlimitedAccess: shouldHaveUnlimitedAccess,
-      usageLimits: usageLimits,
-      aiRecipeCount: usageLimits?.ai_recipe_count || 0,
-      limit: FREEMIUM_AI_RECIPE_LIMIT
-    });
+    // Always allow attempt for PREMIUM/CREATOR - backend will handle FREEMIUM limits
+    return true;
+  }, [isCreator, getEffectiveTier]);
 
-    if (shouldHaveUnlimitedAccess) {
-      return true;
+  // Simple usage display - now returns static values, use getScanUsageDisplay for real data
+  const getUsageDisplay = useCallback(() => {
+    const isCreatorResult = isCreator();
+    const effectiveTier = getEffectiveTier();
+
+    if (isCreatorResult) {
+      return {
+        tierDisplay: 'CREATOR (PREMIUM)',
+        showUsage: false,
+        scanUsage: 'Unlimited',
+        aiRecipeUsage: 'Unlimited',
+      };
     }
 
-    return (usageLimits?.ai_recipe_count || 0) < FREEMIUM_AI_RECIPE_LIMIT;
-  }, [isCreator, getEffectiveTier, usageLimits]);
+    if (effectiveTier === 'PREMIUM') {
+      return {
+        tierDisplay: 'PREMIUM',
+        showUsage: false,
+        scanUsage: 'Unlimited',
+        aiRecipeUsage: 'Unlimited',
+      };
+    }
 
-  // Perform pantry scan with access control
+    // FREEMIUM user - use dedicated functions for real data
+    return {
+      tierDisplay: 'FREEMIUM',
+      showUsage: true,
+      scanUsage: 'Check limits',
+      aiRecipeUsage: 'Check limits',
+    };
+  }, [isCreator, getEffectiveTier]);
+
+  // Perform pantry scan with access control using backend RPC
   const performPantryScan = useCallback(
-    async (items: any[], scanStatus: string = 'success') => {
+    async (items: any[], scanStatus: string = 'completed'): Promise<boolean> => {
       if (!user?.id) {
         Alert.alert('Error', 'User not authenticated');
         return false;
       }
 
-      if (!canPerformScan()) {
-        Alert.alert(
-          'Scan Limit Reached',
-          'FREEMIUM limit reached: 3 scans per month. Upgrade to PREMIUM for unlimited access.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Upgrade Now',
-              onPress: () => {
-                /* Navigate to upgrade screen */
-              },
-            },
-          ],
-        );
-        return false;
-      }
-
       setIsProcessing(true);
       try {
+        // Call backend RPC to log scan and check limits
         const { error } = await supabase.rpc('log_pantry_scan', {
           p_user_id: user.id,
-          p_items_scanned: items,
+          p_items_scanned: items.length,
           p_scan_status: scanStatus,
         });
 
         if (error) {
-          Alert.alert('Error', error.message);
+          console.error('[useAccessControl] Error logging pantry scan:', error);
+          
+          // Check if it's a limit exceeded error
+          if (error.message.includes('limit exceeded') || error.message.includes('limit reached')) {
+            // Return special object to trigger limit modal
+            return { limitReached: true, limitType: 'scan' } as any;
+          }
+          
+          Alert.alert('Error', error.message || 'Failed to perform scan');
           return false;
         }
 
-        // Refresh usage limits after successful scan
-        await refreshUsageLimits(user.id);
+        console.log('[useAccessControl] Pantry scan logged successfully');
         return true;
       } catch (error: any) {
+        console.error('[useAccessControl] Error logging pantry scan:', error);
         Alert.alert('Error', error.message || 'Failed to perform scan');
         return false;
       } finally {
         setIsProcessing(false);
       }
     },
-    [user, canPerformScan, refreshUsageLimits],
+    [user],
   );
 
   // Generate AI recipe with access control
@@ -162,97 +162,31 @@ export const useAccessControl = () => {
         try {
           data = JSON.parse(rawResponse);
         } catch (parseError) {
-          // If direct JSON parsing fails, try to extract JSON from markdown
-          if (rawResponse.includes('```json')) {
-            const jsonMatch = rawResponse.match(/```json\s*([\s\S]*?)\s*```/);
-            if (jsonMatch && jsonMatch[1]) {
-              try {
-                data = JSON.parse(jsonMatch[1]);
-                console.log(
-                  '[useAccessControl] Parsed JSON from markdown in response:',
-                  data,
-                );
-              } catch (innerParseError) {
-                console.error(
-                  '[useAccessControl] Failed to parse JSON from markdown:',
-                  innerParseError,
-                );
-                Alert.alert('Error', 'Invalid response format from AI service');
-                return null;
-              }
-            } else {
-              console.error(
-                '[useAccessControl] No valid JSON found in markdown response',
-              );
-              Alert.alert('Error', 'Invalid response format from AI service');
-              return null;
-            }
-          } else {
-            console.error(
-              '[useAccessControl] Failed to parse response as JSON:',
-              parseError,
-            );
-            Alert.alert('Error', 'Invalid response from AI service');
-            return null;
-          }
+          console.error('[useAccessControl] Failed to parse response as JSON:', parseError);
+          Alert.alert('Error', 'Invalid response from AI service');
+          return null;
         }
 
         if (!response.ok) {
           console.error('[useAccessControl] Edge Function error:', data);
 
-          // Special handling: If the error contains JSON parsing issues with markdown,
-          // try to extract the JSON from the error message itself
-          if (
-            data.error &&
-            typeof data.error === 'string' &&
-            data.error.includes('```json')
-          ) {
-            console.log(
-              '[useAccessControl] Attempting to extract JSON from error message...',
-            );
-            try {
-              // The error message contains the actual JSON we need
-              const jsonMatch = data.error.match(
-                /```json\s*([\s\S]*?)(?:\s*```|$)/,
-              );
-              if (jsonMatch && jsonMatch[1]) {
-                const extractedJson = JSON.parse(jsonMatch[1]);
-                console.log(
-                  '[useAccessControl] Successfully extracted JSON from error message:',
-                  extractedJson,
-                );
-
-                // Refresh usage limits after successful generation
-                await refreshUsageLimits(user.id);
-
-                return extractedJson; // Return the extracted recipes
-              }
-            } catch (extractError) {
-              console.error(
-                '[useAccessControl] Failed to extract JSON from error message:',
-                extractError,
-              );
-            }
-          }
-
-          // Handle specific error cases
+          // Handle specific error cases for limits
           if (
             data.error?.includes('limit reached') ||
-            data.error?.includes('LIMIT_EXCEEDED')
+            data.error?.includes('limit exceeded') ||
+            data.error?.includes('LIMIT_EXCEEDED') ||
+            data.error_code === 'LIMIT_EXCEEDED'
           ) {
-            Alert.alert(
-              'AI Recipe Limit Reached',
-              'FREEMIUM limit reached: 10 AI recipes per month. Upgrade to PREMIUM for unlimited access.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Upgrade Now',
-                  onPress: () => {
-                    /* Navigate to upgrade screen */
-                  },
-                },
-              ],
-            );
+            console.log('[useAccessControl] AI recipe limit reached - returning limitReached object');
+            
+            // Return a special error object that the calling component can handle
+            return {
+              limitReached: true,
+              limitType: 'ai_recipe',
+              error: 'LIMIT_EXCEEDED',
+              message: data.error || 'AI recipe generation limit reached',
+              usageInfo: data.usage_info,
+            };
           } else {
             Alert.alert('Error', data.error || 'Failed to generate AI recipe');
           }
@@ -261,46 +195,21 @@ export const useAccessControl = () => {
 
         console.log('[useAccessControl] Edge Function returned recipes:', data);
 
-        // Handle case where AI returns JSON wrapped in markdown code blocks in the data field
-        let parsedData = data;
-        if (typeof data === 'string' && data.includes('```json')) {
-          try {
-            // Extract JSON from markdown code blocks
-            const jsonMatch = data.match(/```json\s*([\s\S]*?)\s*```/);
-            if (jsonMatch && jsonMatch[1]) {
-              parsedData = JSON.parse(jsonMatch[1]);
-              console.log(
-                '[useAccessControl] Parsed JSON from markdown:',
-                parsedData,
-              );
-            }
-          } catch (parseError) {
-            console.error(
-              '[useAccessControl] Failed to parse JSON from markdown:',
-              parseError,
-            );
-            Alert.alert('Error', 'Invalid response format from AI service');
-            return null;
-          }
-        }
-
         // Extract the recipe data from the response
         let recipesData;
-        if (parsedData.success && parsedData.data) {
-          recipesData = parsedData.data; // Extract the actual recipes array
-        } else if (Array.isArray(parsedData)) {
-          recipesData = parsedData; // Direct array response
+        if (data.success && data.data) {
+          recipesData = data.data; // Extract the actual recipes array
+        } else if (Array.isArray(data)) {
+          recipesData = data; // Direct array response
         } else {
-          console.error('[useAccessControl] Unexpected response format:', parsedData);
+          console.error('[useAccessControl] Unexpected response format:', data);
           Alert.alert('Error', 'Unexpected response format from AI service');
           return null;
         }
 
         console.log('[useAccessControl] Extracted recipes data:', recipesData);
 
-        // Refresh usage limits after successful generation
-        await refreshUsageLimits(user.id);
-
+        // The Edge Function already handles usage tracking, so we don't need to call RPC here
         return recipesData; // Should be array of 3 recipes with recipe_id
       } catch (error: any) {
         console.error('[useAccessControl] AI recipe generation error:', error);
@@ -310,59 +219,273 @@ export const useAccessControl = () => {
         setIsProcessing(false);
       }
     },
-    [user, refreshUsageLimits],
+    [user],
   );
 
-  // Get usage display data
-  const getUsageDisplay = useCallback(() => {
+  // Get usage status from backend RPC
+  const getUserUsageStatus = useCallback(async () => {
+    if (!user?.id) return null;
+
+    try {
+      const { data, error } = await supabase.rpc('get_user_usage_status', {
+        p_user_id: user.id,
+      });
+
+      if (error) {
+        console.error('[useAccessControl] Error fetching usage status:', error);
+        return null;
+      }
+
+      console.log('[useAccessControl] Usage status from backend:', data);
+      return data;
+    } catch (error) {
+      console.error('[useAccessControl] Error in getUserUsageStatus:', error);
+      return null;
+    }
+  }, [user]);
+
+  // Check if user can generate AI recipes (for UI gating)
+  const checkAIRecipeAvailability = useCallback(async () => {
+    const isCreatorResult = isCreator();
+    const effectiveTier = getEffectiveTier();
+
+    // PREMIUM/CREATOR users always have access
+    if (isCreatorResult || effectiveTier === 'PREMIUM') {
+      return {
+        canGenerate: true,
+        isLimitReached: false,
+        usage: null,
+        reason: null,
+      };
+    }
+
+    // FREEMIUM users - check backend limits
+    if (!user?.id) {
+      return {
+        canGenerate: false,
+        isLimitReached: false,
+        usage: null,
+        reason: 'User not authenticated',
+      };
+    }
+
+    try {
+      const usageStatus = await getUserUsageStatus();
+      
+      if (!usageStatus) {
+        // If we can't get usage status, allow attempt (backend will handle)
+        return {
+          canGenerate: true,
+          isLimitReached: false,
+          usage: null,
+          reason: null,
+        };
+      }
+
+      // Backend returns usage status as an object, not array
+      console.log('[useAccessControl] Raw usage status:', usageStatus);
+      
+      if (!usageStatus.ai_recipe_count && usageStatus.ai_recipe_count !== 0) {
+        // No AI recipe usage data found, allow attempt
+        return {
+          canGenerate: true,
+          isLimitReached: false,
+          usage: null,
+          reason: null,
+        };
+      }
+
+      const currentUsage = usageStatus.ai_recipe_count || 0;
+      const limit = usageStatus.ai_recipe_limit || FREEMIUM_AI_RECIPE_LIMIT;
+      const remaining = usageStatus.ai_recipes_remaining || 0;
+      const isLimitReached = remaining <= 0;
+
+      console.log('[useAccessControl] AI Recipe Usage Check:', {
+        currentUsage,
+        limit,
+        remaining,
+        isLimitReached,
+      });
+
+      return {
+        canGenerate: !isLimitReached,
+        isLimitReached,
+        usage: {
+          current: currentUsage,
+          limit: limit,
+          remaining: remaining,
+        },
+        reason: isLimitReached ? 'AI recipe generation limit reached' : null,
+      };
+
+    } catch (error) {
+      console.error('[useAccessControl] Error checking AI recipe availability:', error);
+      // On error, allow attempt (backend will handle)
+      return {
+        canGenerate: true,
+        isLimitReached: false,
+        usage: null,
+        reason: null,
+      };
+    }
+  }, [user, isCreator, getEffectiveTier, getUserUsageStatus]);
+
+  // Check scan availability and get usage data (for UI display)
+  const getScanUsageDisplay = useCallback(async () => {
+    console.log('[useAccessControl] getScanUsageDisplay called');
+    
+    const isCreatorResult = isCreator();
+    const effectiveTier = getEffectiveTier();
+
+    console.log('[useAccessControl] User tier check:', { isCreatorResult, effectiveTier });
+
+    // PREMIUM/CREATOR users always have unlimited access
+    if (isCreatorResult || effectiveTier === 'PREMIUM') {
+      console.log('[useAccessControl] Premium/Creator user - returning Unlimited');
+      return 'Unlimited';
+    }
+
+    // FREEMIUM users - check backend limits
+    if (!user?.id) {
+      console.log('[useAccessControl] No user ID - returning Loading');
+      return 'Loading...';
+    }
+
+    try {
+      console.log('[useAccessControl] Fetching usage status for scan display...');
+      const usageStatus = await getUserUsageStatus();
+      
+      console.log('[useAccessControl] Raw usage status for scan display:', usageStatus);
+      
+      if (!usageStatus) {
+        console.log('[useAccessControl] No usage status received - returning Loading');
+        return 'Loading...';
+      }
+
+      // Backend returns usage status as an object
+      const currentUsage = usageStatus.scan_count || 0;
+      const limit = usageStatus.scan_limit || FREEMIUM_SCAN_LIMIT;
+      const remaining = usageStatus.scans_remaining || 0;
+
+      console.log('[useAccessControl] Scan Usage Check:', {
+        currentUsage,
+        limit,
+        remaining,
+        fullUsageStatus: usageStatus,
+      });
+
+      const displayText = `${remaining}/${limit} left`;
+      console.log('[useAccessControl] Returning scan display text:', displayText);
+      return displayText;
+
+    } catch (error) {
+      console.error('[useAccessControl] Error getting scan usage:', error);
+      return 'Loading...';
+    }
+  }, [user, isCreator, getEffectiveTier, getUserUsageStatus]);
+
+  // Check if user can perform scan (async check for accurate limits)
+  const checkScanAvailability = useCallback(async () => {
     const isCreatorResult = isCreator();
     const effectiveTier = getEffectiveTier();
     
-    // Reduced logging to prevent spam during multiple re-renders
-    // console.log('[useAccessControl] getUsageDisplay DEBUG:', {
-    //   isCreator: isCreatorResult,
-    //   effectiveTier: effectiveTier,
-    //   usageLimits: usageLimits
-    // });
-
-    if (isCreatorResult) {
-      return {
-        tierDisplay: 'CREATOR (PREMIUM)',
-        showUsage: false,
-        scanUsage: '',
-        aiRecipeUsage: '',
-      };
+    // PREMIUM/CREATOR users always have access
+    if (isCreatorResult || effectiveTier === 'PREMIUM') {
+      return { canScan: true, limitReached: false };
+    }
+    
+    // FREEMIUM users - check backend limits
+    if (!user?.id) {
+      return { canScan: false, limitReached: false };
     }
 
-    if (effectiveTier === 'PREMIUM') {
-      return {
-        tierDisplay: 'PREMIUM',
-        showUsage: false,
-        scanUsage: '',
-        aiRecipeUsage: '',
+    try {
+      const usageStatus = await getUserUsageStatus();
+      
+      if (!usageStatus) {
+        // If we can't get usage status, allow attempt (backend will handle)
+        return { canScan: true, limitReached: false };
+      }
+
+      const remaining = usageStatus.scans_remaining || 0;
+      const limitReached = remaining <= 0;
+
+      return { 
+        canScan: !limitReached, 
+        limitReached,
+        usage: {
+          current: usageStatus.scan_count || 0,
+          limit: usageStatus.scan_limit || FREEMIUM_SCAN_LIMIT,
+          remaining: remaining,
+        }
       };
+
+    } catch (error) {
+      console.error('[useAccessControl] Error checking scan availability:', error);
+      // On error, allow attempt (backend will handle)
+      return { canScan: true, limitReached: false };
+    }
+  }, [isCreator, getEffectiveTier, user, getUserUsageStatus]);
+
+  // Get AI recipe usage display (for UI display)
+  const getAIRecipeUsageDisplay = useCallback(async () => {
+    const isCreatorResult = isCreator();
+    const effectiveTier = getEffectiveTier();
+
+    // PREMIUM/CREATOR users always have unlimited access
+    if (isCreatorResult || effectiveTier === 'PREMIUM') {
+      return 'Unlimited';
     }
 
-    // FREEMIUM user
-    return {
-      tierDisplay: 'FREEMIUM',
-      showUsage: true,
-      scanUsage: `${usageLimits?.scan_count || 0}/${FREEMIUM_SCAN_LIMIT}`,
-      aiRecipeUsage: `${usageLimits?.ai_recipe_count || 0}/${FREEMIUM_AI_RECIPE_LIMIT}`,
-    };
-  }, [isCreator, getEffectiveTier, usageLimits]);
+    // FREEMIUM users - check backend limits
+    if (!user?.id) {
+      return 'Loading...';
+    }
+
+    try {
+      const usageStatus = await getUserUsageStatus();
+      
+      if (!usageStatus) {
+        return 'Loading...';
+      }
+
+      // Backend returns usage status as an object
+      const currentUsage = usageStatus.ai_recipe_count || 0;
+      const limit = usageStatus.ai_recipe_limit || FREEMIUM_AI_RECIPE_LIMIT;
+      const remaining = usageStatus.ai_recipes_remaining || 0;
+
+      console.log('[useAccessControl] AI Recipe Usage Check:', {
+        currentUsage,
+        limit,
+        remaining,
+      });
+
+      return `${remaining}/${limit} left`;
+
+    } catch (error) {
+      console.error('[useAccessControl] Error getting AI recipe usage:', error);
+      return 'Loading...';
+    }
+  }, [user, isCreator, getEffectiveTier, getUserUsageStatus]);
 
   return {
     // Access checks
     canPerformScan,
     canGenerateAIRecipe,
+    checkAIRecipeAvailability,
+    checkScanAvailability,
 
     // Actions with access control
     performPantryScan,
     generateAIRecipe,
 
+    // Usage tracking
+    getUserUsageStatus,
+
     // Display helpers
     getUsageDisplay,
+    getScanUsageDisplay,
+    getAIRecipeUsageDisplay,
 
     // State
     isProcessing,

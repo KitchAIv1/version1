@@ -51,12 +51,15 @@ import * as Haptics from 'expo-haptics';
 import { useNavigation } from '@react-navigation/native';
 import { Button } from 'react-native-paper';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAccessControl } from '../../hooks/useAccessControl';
+import { useAuth } from '../../providers/AuthProvider';
 
 import {
   ScanningLoadingOverlay,
   CameraInterface,
   ItemConfirmationModal,
 } from '../../components/pantry';
+import { LimitReachedModal } from '../../components/modals/LimitReachedModal';
 import {
   processImageWithAI,
   enforceMinimumDisplayTime,
@@ -73,6 +76,8 @@ export default function PantryScanningScreen() {
   const [isCameraVisible, setIsCameraVisible] = useState(false);
   const nav = useNavigation();
   const queryClient = useQueryClient();
+  const { performPantryScan } = useAccessControl();
+  const { user } = useAuth();
 
   // Enhanced state management for V1 features
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -81,6 +86,7 @@ export default function PantryScanningScreen() {
   const [analysisMessage, setAnalysisMessage] = useState(
     'Analyzing your pantry...',
   );
+  const [showLimitModal, setShowLimitModal] = useState(false);
 
   // Analysis message cycling
   const analysisPhrases = [
@@ -209,6 +215,24 @@ export default function PantryScanningScreen() {
 
     try {
       if (itemsToUpsert.length > 0) {
+        // CRITICAL: Check scan limits before saving
+        const scanResult = await performPantryScan(itemsToUpsert);
+        
+        // Handle limit reached case
+        if (scanResult && typeof scanResult === 'object' && 'limitReached' in scanResult) {
+          console.log('[PantryScanningScreen] Scan limit reached');
+          setIsSaving(false);
+          setShowLimitModal(true);
+          return;
+        }
+
+        // If scan tracking failed, don't save items
+        if (!scanResult) {
+          console.error('[PantryScanningScreen] Scan tracking failed');
+          setIsSaving(false);
+          return;
+        }
+
         // Use Supabase directly for upsert operation
         const { error } = await supabase.from('stock').upsert(itemsToUpsert, {
           onConflict: 'user_id, item_name',
@@ -317,6 +341,23 @@ export default function PantryScanningScreen() {
           isAnalyzing={isAnalyzing}
           isSaving={isSaving}
           analysisMessage={analysisMessage}
+        />
+
+        {/* Scan Limit Reached Modal */}
+        <LimitReachedModal
+          visible={showLimitModal}
+          onClose={() => {
+            setShowLimitModal(false);
+            // Reopen camera after closing modal
+            if (!isCameraVisible) openCamera();
+          }}
+          limitType="scan"
+          onUpgradeSuccess={() => {
+            setShowLimitModal(false);
+            // Continue with scanning after upgrade
+            if (!isCameraVisible) openCamera();
+          }}
+          username={user?.user_metadata?.username || 'Chef'}
         />
       </View>
     </>

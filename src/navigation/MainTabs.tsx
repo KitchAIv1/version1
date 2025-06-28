@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Text, View, TouchableOpacity, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
@@ -10,8 +10,11 @@ import PantryScreen from '../screens/main/PantryScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import GroceryListScreen from '../screens/grocery/GroceryListScreen';
 import { MainTabsParamList } from './types';
-import { useAccessControl } from '../hooks/useAccessControl';
+
 import { useAuth } from '../providers/AuthProvider';
+import { usePantryData } from '../hooks/usePantryData';
+import InsufficientItemsModal from '../components/modals/InsufficientItemsModal';
+import { LimitReachedModal } from '../components/modals/LimitReachedModal';
 
 const Tab = createBottomTabNavigator<MainTabsParamList>();
 
@@ -30,9 +33,7 @@ export const triggerFeedRefresh = () => {
 
 // Custom Kitch Power Button Component
 const KitchPowerButton = ({ onPress }: { onPress: () => void }) => {
-  const { getUsageDisplay } = useAccessControl();
   const { profile } = useAuth();
-  const usageData = getUsageDisplay();
   
   const isCreator = profile?.role?.toLowerCase() === 'creator';
   
@@ -64,7 +65,15 @@ const KitchPowerScreen = () => {
 
 function MainTabs() {
   const queryClient = useQueryClient();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  
+  // Pantry data for checking item count
+  const { data: pantryItems = [] } = usePantryData(user?.id);
+  
+  // Modal state for insufficient items
+  const [showInsufficientModal, setShowInsufficientModal] = useState(false);
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [limitType, setLimitType] = useState<'scan' | 'ai_recipe'>('ai_recipe');
 
   const handleKitchPowerPress = (navigation: any) => {
     try {
@@ -79,166 +88,199 @@ function MainTabs() {
       // Navigate to Video Uploader for CREATOR users
       navigation.navigate('VideoRecipeUploader');
     } else {
-      // Navigate to AI Recipe Generation for FREEMIUM/PREMIUM users
-      navigation.navigate('IngredientSelection');
+      // Check pantry item count for FREEMIUM/PREMIUM users
+      const pantryItemCount = pantryItems.length;
+      console.log('[MainTabs] Pantry item count:', pantryItemCount);
+      
+      if (pantryItemCount >= 3) {
+        // Proceed to AI Recipe Generation - backend will handle limits
+        navigation.navigate('IngredientSelection', {
+          pantryItems: pantryItems,
+        });
+      } else {
+        // Show insufficient items modal
+        console.log('[MainTabs] Insufficient pantry items, showing modal');
+        setShowInsufficientModal(true);
+      }
     }
   };
 
   return (
-    <Tab.Navigator
-      initialRouteName="Feed"
-      screenOptions={({ route, navigation }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: '#22c55e',
-        tabBarInactiveTintColor: '#6b7280',
-        tabBarLabelStyle: { fontWeight: '500', fontSize: 10, marginBottom: 3 },
-        tabBarStyle: { 
-          paddingTop: 8,
-          paddingBottom: 8,
-          height: 85,
-        },
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
-          const iconSize = focused ? 24 : 22;
+    <>
+      <Tab.Navigator
+        initialRouteName="Feed"
+        screenOptions={({ route, navigation }) => ({
+          headerShown: false,
+          tabBarActiveTintColor: '#22c55e',
+          tabBarInactiveTintColor: '#6b7280',
+          tabBarLabelStyle: { fontWeight: '500', fontSize: 10, marginBottom: 3 },
+          tabBarStyle: { 
+            paddingTop: 8,
+            paddingBottom: 8,
+            height: 85,
+          },
+          tabBarIcon: ({ focused, color, size }) => {
+            let iconName;
+            const iconSize = focused ? 24 : 22;
 
-          if (route.name === 'Feed') {
-            iconName = 'home';
-          } else if (route.name === 'Pantry') {
-            iconName = 'inbox';
-          } else if (route.name === 'Profile') {
-            iconName = 'user';
-          } else if (route.name === 'GroceryList') {
-            iconName = 'list';
-          } else if (route.name === 'KitchPower') {
-            // Custom button for Kitch Power - handled separately
+            if (route.name === 'Feed') {
+              iconName = 'home';
+            } else if (route.name === 'Pantry') {
+              iconName = 'inbox';
+            } else if (route.name === 'Profile') {
+              iconName = 'user';
+            } else if (route.name === 'GroceryList') {
+              iconName = 'list';
+            } else if (route.name === 'KitchPower') {
+              // Custom button for Kitch Power - handled separately
+              return (
+                <KitchPowerButton onPress={() => handleKitchPowerPress(navigation)} />
+              );
+            }
+
+            if (!iconName) return null;
             return (
-              <KitchPowerButton onPress={() => handleKitchPowerPress(navigation)} />
+              <Feather name={iconName as any} size={iconSize} color={color} />
             );
-          }
+          },
+        })}>
+        <Tab.Screen
+          name="Feed"
+          component={FeedScreen}
+          listeners={({ navigation, route }) => ({
+            tabPress: e => {
+              e.preventDefault();
 
-          if (!iconName) return null;
-          return (
-            <Feather name={iconName as any} size={iconSize} color={color} />
-          );
-        },
-      })}>
-      <Tab.Screen
-        name="Feed"
-        component={FeedScreen}
-        listeners={({ navigation, route }) => ({
-          tabPress: e => {
-            e.preventDefault();
+              const state = navigation.getState();
+              const currentRoute = state.routes[state.index];
 
-            const state = navigation.getState();
-            const currentRoute = state.routes[state.index];
+              // Check if we're actually on the Feed tab already
+              if (currentRoute.name === 'Feed') {
+                // Only do master refresh if this is a deliberate tab press
+                // Check if we're coming from a nested screen (like RecipeDetail)
+                const currentTabRoute =
+                  currentRoute.state?.routes &&
+                  currentRoute.state.index !== undefined
+                    ? currentRoute.state.routes[currentRoute.state.index]
+                    : null;
 
-            // Check if we're actually on the Feed tab already
-            if (currentRoute.name === 'Feed') {
-              // Only do master refresh if this is a deliberate tab press
-              // Check if we're coming from a nested screen (like RecipeDetail)
-              const currentTabRoute =
-                currentRoute.state?.routes &&
-                currentRoute.state.index !== undefined
-                  ? currentRoute.state.routes[currentRoute.state.index]
-                  : null;
+                // If we're on the Feed tab but not on the main Feed screen, don't refresh
+                if (currentTabRoute && currentTabRoute.name !== 'Feed') {
+                  console.log(
+                    'Returning to Feed from nested screen - preserving state',
+                  );
+                } else {
+                  console.log(
+                    '🔄 Feed tab pressed while active - Master refresh triggered (TikTok-style)',
+                  );
 
-              // If we're on the Feed tab but not on the main Feed screen, don't refresh
-              if (currentTabRoute && currentTabRoute.name !== 'Feed') {
-                console.log(
-                  'Returning to Feed from nested screen - preserving state',
-                );
-              } else {
-                console.log(
-                  '🔄 Feed tab pressed while active - Master refresh triggered (TikTok-style)',
-                );
+                  // 📳 Light haptic feedback for premium feel
+                  try {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  } catch (e) {
+                    // Haptics might not be available on all devices
+                    console.log('Haptics not available:', e);
+                  }
 
-                // 📳 Light haptic feedback for premium feel
-                try {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                } catch (e) {
-                  // Haptics might not be available on all devices
-                  console.log('Haptics not available:', e);
+                  // ✅ ENHANCED FEED V4 MASTER REFRESH - TikTok-style active tab refresh
+                  // Invalidate all relevant caches for fresh content
+                  queryClient.invalidateQueries({ queryKey: ['feed'] });
+                  queryClient.invalidateQueries({ queryKey: ['pantryData'] });
+                  queryClient.invalidateQueries({ queryKey: ['recipeDetails'] });
+                  queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
+                  queryClient.invalidateQueries({ queryKey: ['groceryList'] });
+                  
+                  // 🔝 Trigger scroll to top
+                  triggerFeedRefresh();
+                  
+                  console.log('✅ Master refresh completed - Enhanced Feed V4 refreshed with fresh human recipes');
+                  console.log('🔝 Feed will auto-scroll to top on data refresh');
                 }
+              }
 
-                // ✅ ENHANCED FEED V4 MASTER REFRESH - TikTok-style active tab refresh
-                // Invalidate all relevant caches for fresh content
-                queryClient.invalidateQueries({ queryKey: ['feed'] });
+              navigation.jumpTo('Feed');
+            },
+          })}
+        />
+        <Tab.Screen
+          name="Pantry"
+          component={PantryScreen}
+          listeners={({ navigation, route }) => ({
+            tabPress: e => {
+              e.preventDefault();
+
+              const state = navigation.getState();
+              if (state.routes[state.index].name === 'Pantry') {
+                console.log(
+                  'Pantry tab pressed while it is the current tab. Refreshing pantry and related data.',
+                );
                 queryClient.invalidateQueries({ queryKey: ['pantryData'] });
                 queryClient.invalidateQueries({ queryKey: ['recipeDetails'] });
                 queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
-                queryClient.invalidateQueries({ queryKey: ['groceryList'] });
-                
-                // 🔝 Trigger scroll to top
-                triggerFeedRefresh();
-                
-                console.log('✅ Master refresh completed - Enhanced Feed V4 refreshed with fresh human recipes');
-                console.log('🔝 Feed will auto-scroll to top on data refresh');
+                queryClient.invalidateQueries({ queryKey: ['feed'] });
               }
-            }
 
-            navigation.jumpTo('Feed');
-          },
-        })}
+              navigation.jumpTo('Pantry');
+            },
+          })}
+        />
+        <Tab.Screen
+          name="KitchPower"
+          component={KitchPowerScreen}
+          options={{
+            tabBarLabel: '', // No label for center button
+          }}
+          listeners={({ navigation }) => ({
+            tabPress: e => {
+              // Prevent default navigation since this is handled by the custom button
+              e.preventDefault();
+            },
+          })}
+        />
+        <Tab.Screen
+          name="GroceryList"
+          component={GroceryListScreen}
+          options={{
+            tabBarLabel: 'Grocery',
+          }}
+        />
+        <Tab.Screen
+          name="Profile"
+          component={ProfileScreen}
+          options={{
+            tabBarLabel: 'Hub',
+          }}
+          listeners={({ navigation }) => ({
+            tabPress: e => {
+              // Prevent default navigation
+              e.preventDefault();
+
+              // Navigate to Profile without any parameters to ensure own profile is shown
+              navigation.navigate('Profile', {});
+            },
+          })}
+        />
+      </Tab.Navigator>
+      
+      {/* Enhanced Insufficient Items Modal */}
+      <InsufficientItemsModal
+        visible={showInsufficientModal}
+        onClose={() => setShowInsufficientModal(false)}
+        currentItemCount={pantryItems.length}
       />
-      <Tab.Screen
-        name="Pantry"
-        component={PantryScreen}
-        listeners={({ navigation, route }) => ({
-          tabPress: e => {
-            e.preventDefault();
-
-            const state = navigation.getState();
-            if (state.routes[state.index].name === 'Pantry') {
-              console.log(
-                'Pantry tab pressed while it is the current tab. Refreshing pantry and related data.',
-              );
-              queryClient.invalidateQueries({ queryKey: ['pantryData'] });
-              queryClient.invalidateQueries({ queryKey: ['recipeDetails'] });
-              queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
-              queryClient.invalidateQueries({ queryKey: ['feed'] });
-            }
-
-            navigation.jumpTo('Pantry');
-          },
-        })}
-      />
-      <Tab.Screen
-        name="KitchPower"
-        component={KitchPowerScreen}
-        options={{
-          tabBarLabel: '', // No label for center button
+      
+      {/* Limit Reached Modal */}
+      <LimitReachedModal
+        visible={showLimitModal}
+        onClose={() => setShowLimitModal(false)}
+        limitType={limitType}
+        onUpgradeSuccess={() => {
+          setShowLimitModal(false);
+          // Continue with AI recipe generation after upgrade
         }}
-        listeners={({ navigation }) => ({
-          tabPress: e => {
-            // Prevent default navigation since this is handled by the custom button
-            e.preventDefault();
-          },
-        })}
+        username={user?.user_metadata?.username || 'Chef'}
       />
-      <Tab.Screen
-        name="GroceryList"
-        component={GroceryListScreen}
-        options={{
-          tabBarLabel: 'Grocery',
-        }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{
-          tabBarLabel: 'Hub',
-        }}
-        listeners={({ navigation }) => ({
-          tabPress: e => {
-            // Prevent default navigation
-            e.preventDefault();
-
-            // Navigate to Profile without any parameters to ensure own profile is shown
-            navigation.navigate('Profile', {});
-          },
-        })}
-      />
-    </Tab.Navigator>
+    </>
   );
 }
 
@@ -261,7 +303,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 12,
   },
-
 });
 
 export default MainTabs;

@@ -23,12 +23,13 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
-import { MainStackParamList } from '../../navigation/types';
+import { MainStackParamList, MainTabsParamList } from '../../navigation/types';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../providers/AuthProvider';
 import { useAccessControl } from '../../hooks/useAccessControl';
@@ -68,6 +69,7 @@ import { useStorageLocationPreference } from '../../hooks/useStorageLocationPref
 // Import "What Can I Cook?" components
 import WhatCanICookButton from '../../components/WhatCanICookButton';
 import InsufficientItemsModal from '../../components/modals/InsufficientItemsModal';
+import { LimitReachedModal } from '../../components/modals/LimitReachedModal';
 import { useWhatCanICook } from '../../hooks/useWhatCanICook';
 
 // Import real-time subscription hook
@@ -137,6 +139,7 @@ SearchEmptyState.displayName = 'SearchEmptyState';
 
 export default function PantryScreen() {
   const navigation = useNavigation<PantryNavigationProp>();
+  const route = useRoute<BottomTabScreenProps<MainTabsParamList, 'Pantry'>['route']>();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
@@ -146,8 +149,10 @@ export default function PantryScreen() {
   const {
     performPantryScan,
     canPerformScan,
+    checkScanAvailability,
     isProcessing,
     getUsageDisplay,
+    getScanUsageDisplay,
     FREEMIUM_SCAN_LIMIT,
   } = useAccessControl();
 
@@ -268,12 +273,21 @@ export default function PantryScreen() {
   const [activeStorageLocation, setActiveStorageLocation] =
     useState<StorageLocation>(lastUsedLocation);
   const [ageFilter, setAgeFilter] = useState<AgeGroup | 'all'>('all');
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showLimitModal, setShowLimitModal] = useState(false);
   const [isManualAddSheetVisible, setIsManualAddSheetVisible] = useState(false);
   const [editingItem, setEditingItem] = useState<
     StockAgingItem | PantryItem | null
   >(null);
   const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
+
+  // Handle route parameters to trigger manual add modal
+  useEffect(() => {
+    if (route.params?.showManualAdd) {
+      setIsManualAddSheetVisible(true);
+      // Clear the parameter to prevent reopening on re-renders
+      navigation.setParams({ showManualAdd: undefined });
+    }
+  }, [route.params?.showManualAdd, navigation]);
 
   // OPTIMIZED: Debounced search with proper memoization
   const debouncedSearchQuery = useDebouncedValue(searchQuery, DEBOUNCE_DELAY);
@@ -379,6 +393,34 @@ export default function PantryScreen() {
 
   // OPTIMIZED: Memoized usage data
   const usageData = useMemo(() => getUsageDisplay(), [getUsageDisplay]);
+  
+  // State for real scan usage display
+  const [scanUsageText, setScanUsageText] = useState('Loading...');
+
+  // Refresh scan usage function
+  const refreshScanUsage = useCallback(async () => {
+    console.log('[PantryScreen] refreshScanUsage called');
+    try {
+      console.log('[PantryScreen] Calling getScanUsageDisplay...');
+      const usage = await getScanUsageDisplay();
+      console.log('[PantryScreen] Got usage result:', usage);
+      setScanUsageText(usage);
+    } catch (error) {
+      console.error('[PantryScreen] Error refreshing scan usage:', error);
+      setScanUsageText('Error');
+    }
+  }, [getScanUsageDisplay]);
+
+  // Fetch real scan usage on mount and when screen focuses
+  useEffect(() => {
+    refreshScanUsage();
+  }, [refreshScanUsage]);
+
+  // Refresh scan usage when screen gains focus (user returns from scanning)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', refreshScanUsage);
+    return unsubscribe;
+  }, [navigation, refreshScanUsage]);
 
   // OPTIMIZED: Stable event handlers
   const handleSearchChange = useCallback((text: string) => {
@@ -414,12 +456,20 @@ export default function PantryScreen() {
   );
 
   const handleScanPress = useCallback(async () => {
-    if (!canPerformScan()) {
-      setShowUpgradeModal(true);
+    console.log('[PantryScreen] handleScanPress called - checking scan availability...');
+    
+    const scanCheck = await checkScanAvailability();
+    console.log('[PantryScreen] Scan availability check result:', scanCheck);
+    
+    if (!scanCheck.canScan || scanCheck.limitReached) {
+      console.log('[PantryScreen] Scan limit reached - showing limit modal');
+      setShowLimitModal(true);
       return;
     }
+    
+    console.log('[PantryScreen] Scan allowed - navigating to camera');
     navigation.navigate('PantryScan');
-  }, [canPerformScan, navigation]);
+  }, [checkScanAvailability, navigation]);
 
   const handleManualAddPress = useCallback(() => {
     setEditingItem(null);
@@ -613,7 +663,7 @@ export default function PantryScreen() {
                 <View style={styles.secondaryButtonTextContainer}>
                   <Text style={styles.secondaryButtonTitle}>Scan</Text>
                   <Text style={styles.secondaryButtonSubtitle}>
-                    {usageData.scanUsage}
+                    {scanUsageText}
                   </Text>
                 </View>
               </Animated.View>
@@ -891,48 +941,23 @@ export default function PantryScreen() {
         unitOptions={UNIT_OPTIONS}
       />
 
-      {/* Upgrade Modal */}
-      <Modal
-        visible={showUpgradeModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowUpgradeModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Upgrade Required</Text>
-              <TouchableOpacity onPress={() => setShowUpgradeModal(false)}>
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.modalText}>
-              You've reached your scanning limit. Upgrade to Premium for
-              unlimited scans and more features!
-            </Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalSecondaryButton}
-                onPress={() => setShowUpgradeModal(false)}>
-                <Text style={styles.modalSecondaryButtonText}>Maybe Later</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalPrimaryButton}
-                onPress={() => {
-                  setShowUpgradeModal(false);
-                  // Navigate to subscription/upgrade screen
-                }}>
-                <Text style={styles.modalPrimaryButtonText}>Upgrade Now</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Scan Limit Reached Modal */}
+      <LimitReachedModal
+        visible={showLimitModal}
+        onClose={() => setShowLimitModal(false)}
+        limitType="scan"
+        onUpgradeSuccess={() => {
+          setShowLimitModal(false);
+          // Refresh scan usage after upgrade
+          refreshScanUsage();
+        }}
+        username={user?.user_metadata?.username || 'Chef'}
+      />
 
       {/* Insufficient Items Modal */}
       <InsufficientItemsModal
         visible={showInsufficientModal}
         onClose={handleCloseModal}
-        onNavigateToPantry={handleNavigateToPantry}
         currentItemCount={pantryItemCount}
       />
 

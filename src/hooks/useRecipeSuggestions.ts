@@ -81,6 +81,14 @@ export const useRecipeSuggestions = (selectedIngredients: string[]) => {
         '[useRecipeSuggestions] Number of matches found:',
         data.database_matches?.length || 0,
       );
+      
+      // DEBUGGING: Check all possible total_matches fields
+      console.log('[useRecipeSuggestions] 🔍 TOTAL MATCHES DEBUGGING:', {
+        total_matches_found: data.total_matches_found,
+        matches_returned: data.matches_returned,
+        database_matches_length: data.database_matches?.length || 0,
+        all_response_keys: Object.keys(data || {}),
+      });
 
       // Map backend response to frontend interface
       const mappedRecipeMatches = (data.database_matches || []).map(
