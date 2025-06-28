@@ -76,6 +76,12 @@ export const useStockManager = () => {
   // Modal Visibility States
   const [isManualModalVisible, setIsManualModalVisible] = useState(false);
   const [editingItem, setEditingItem] = useState<StockItem | null>(null);
+  
+  // Scanning Fallback State
+  const [scanFallback, setScanFallback] = useState<{
+    visible: boolean;
+    type: 'no_items' | 'error' | 'network';
+  }>({ visible: false, type: 'no_items' });
 
   // Fetch user ID with React Query
   const { data: userId } = useQuery({
@@ -250,6 +256,31 @@ export const useStockManager = () => {
     [deleteItemMutation],
   );
 
+  // Scanning Fallback Handlers
+  const handleScanError = useCallback((errorType: string, itemsFound: number = 0) => {
+    if (itemsFound === 0) {
+      setScanFallback({ visible: true, type: 'no_items' });
+    } else if (errorType === 'network') {
+      setScanFallback({ visible: true, type: 'network' });
+    } else {
+      setScanFallback({ visible: true, type: 'error' });
+    }
+  }, []);
+
+  const handleRetryScanning = useCallback(() => {
+    setScanFallback({ visible: false, type: 'no_items' });
+    // Caller should handle camera re-opening logic
+  }, []);
+
+  const handleScanFallbackManualAdd = useCallback(() => {
+    setScanFallback({ visible: false, type: 'no_items' });
+    setIsManualModalVisible(true);
+  }, []);
+
+  const closeScanFallback = useCallback(() => {
+    setScanFallback({ visible: false, type: 'no_items' });
+  }, []);
+
   return {
     stockData,
     userId,
@@ -269,6 +300,13 @@ export const useStockManager = () => {
     // Item Operations
     deleteStockItem,
     fetchStock,
+
+    // Scanning Fallback
+    scanFallback,
+    handleScanError,
+    handleRetryScanning,
+    handleScanFallbackManualAdd,
+    closeScanFallback,
 
     unitOptions: DEFAULT_UNIT_OPTIONS,
   };

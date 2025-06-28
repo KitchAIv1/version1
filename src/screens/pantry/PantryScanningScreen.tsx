@@ -53,6 +53,7 @@ import { Button } from 'react-native-paper';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAccessControl } from '../../hooks/useAccessControl';
 import { useAuth } from '../../providers/AuthProvider';
+import { useStockManager } from '../../hooks/useStockManager';
 
 import {
   ScanningLoadingOverlay,
@@ -60,6 +61,7 @@ import {
   ItemConfirmationModal,
 } from '../../components/pantry';
 import { LimitReachedModal } from '../../components/modals/LimitReachedModal';
+import ScanFallbackModal from '../../components/modals/ScanFallbackModal';
 import {
   processImageWithAI,
   enforceMinimumDisplayTime,
@@ -78,6 +80,15 @@ export default function PantryScanningScreen() {
   const queryClient = useQueryClient();
   const { performPantryScan } = useAccessControl();
   const { user } = useAuth();
+  
+  // Scanning fallback integration
+  const {
+    scanFallback,
+    handleScanError,
+    handleRetryScanning,
+    handleScanFallbackManualAdd,
+    closeScanFallback,
+  } = useStockManager();
 
   // Enhanced state management for V1 features
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -187,10 +198,7 @@ export default function PantryScanningScreen() {
 
       if (recognitionResult.items.length === 0) {
         setIsAnalyzing(false);
-        Alert.alert(
-          'No Items Recognized',
-          'Could not detect items. Try a different angle or better lighting?',
-        );
+        handleScanError('no_items', 0);
       } else {
         setScannedItems(recognitionResult.items);
         setIsAnalyzing(false);
@@ -201,10 +209,14 @@ export default function PantryScanningScreen() {
         error,
       );
       setIsAnalyzing(false);
-      Alert.alert(
-        'Error',
-        `Failed to process image: ${(error as Error).message}`,
-      );
+      
+      // Smart fallback based on error type
+      const errorMessage = (error as Error).message?.toLowerCase() || '';
+      if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('connection')) {
+        handleScanError('network', 0);
+      } else {
+        handleScanError('error', 0);
+      }
     }
   };
 
@@ -273,6 +285,15 @@ export default function PantryScanningScreen() {
     setScannedItems(null);
     // Reopen camera
     if (!isCameraVisible) openCamera();
+  };
+
+  // Enhanced retry scanning handler
+  const handleRetryWithCamera = () => {
+    handleRetryScanning();
+    // Ensure camera is visible for retry
+    if (!isCameraVisible) {
+      openCamera();
+    }
   };
 
   // ---------- render states ----------
@@ -358,6 +379,15 @@ export default function PantryScanningScreen() {
             if (!isCameraVisible) openCamera();
           }}
           username={user?.user_metadata?.username || 'Chef'}
+        />
+
+        {/* Scanning Fallback Modal */}
+        <ScanFallbackModal
+          visible={scanFallback.visible}
+          fallbackType={scanFallback.type}
+          onRetry={handleRetryWithCamera}
+          onManualAdd={handleScanFallbackManualAdd}
+          onClose={closeScanFallback}
         />
       </View>
     </>
