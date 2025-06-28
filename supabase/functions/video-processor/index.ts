@@ -203,22 +203,24 @@ async function insertRecipeData(metadata: VideoMetadata, userId: string, videoUr
     is_public: metadata.is_public,
     video_url: videoUrl,
     thumbnail_url: metadata.thumbnail_url || null,
+    is_ai_generated: false,
     created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
   }
+
+  console.log(`[VIDEO-PROCESSOR] Inserting recipe with data:`, recipeData)
 
   const { data, error } = await supabase
     .from('recipe_uploads')
-    .insert(recipeData)
+    .insert([recipeData])
     .select()
-    .single()
 
   if (error) {
-    throw new Error(`Failed to insert recipe data: ${error.message}`)
+    console.error(`[VIDEO-PROCESSOR] Database insertion error:`, error)
+    throw new Error(`Failed to save recipe: ${error.message}`)
   }
 
-  console.log(`[VIDEO-PROCESSOR] Recipe inserted with ID: ${data.id}`)
-  return data.id
+  console.log(`[VIDEO-PROCESSOR] Successfully inserted recipe:`, data)
+  return data[0].id
 }
 
 async function cleanupRawVideo(filename: string): Promise<void> {
@@ -238,87 +240,132 @@ async function cleanupRawVideo(filename: string): Promise<void> {
 }
 
 // Main handler
-serve(async (request: Request) => {
-  const startTime = Date.now()
-  console.log(`[VIDEO-PROCESSOR] Request received: ${request.method} ${request.url}`)
-
+serve(async (req) => {
   try {
-    // Validate request method
-    if (request.method !== 'POST') {
-      return new Response(
-        JSON.stringify({ error: 'Method not allowed' }),
-        { status: 405, headers: { 'Content-Type': 'application/json' } }
-      )
+    console.log(`[VIDEO-PROCESSOR] Request received: ${req.method} ${req.url}`)
+    
+    if (req.method !== 'POST') {
+      console.log(`[VIDEO-PROCESSOR] Invalid method: ${req.method}`)
+      return new Response('Method not allowed', { status: 405 })
     }
 
-    // Parse request body
-    const { fileName, metadata } = await request.json()
+    const { fileName, metadata } = await req.json()
+    console.log(`[VIDEO-PROCESSOR] Request body parsed:`, { fileName, metadata: !!metadata })
 
     if (!fileName || !metadata) {
-      return new Response(
-        JSON.stringify({ error: 'Missing fileName or metadata' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      )
+      console.log(`[VIDEO-PROCESSOR] Missing required fields:`, { fileName: !!fileName, metadata: !!metadata })
+      return new Response('Missing fileName or metadata', { status: 400 })
     }
 
-    // Authenticate user
-    const user = await getUserFromRequest(request)
-    console.log(`[VIDEO-PROCESSOR] Processing video for user: ${user.id}`)
+    // Get the user from the Authorization header
+    const authHeader = req.headers.get('Authorization')
+    console.log(`[VIDEO-PROCESSOR] Auth header present:`, !!authHeader)
+    
+    if (!authHeader) {
+      console.log(`[VIDEO-PROCESSOR] No authorization header`)
+      return new Response('Unauthorized', { status: 401 })
+    }
 
-    // Validate metadata
-    validateMetadata(metadata)
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token)
+    
+    console.log(`[VIDEO-PROCESSOR] User auth result:`, { 
+      user: !!user, 
+      userId: user?.id, 
+      error: userError?.message 
+    })
 
-    // Download and validate video file
-    const videoData = await downloadVideoFile(fileName)
-    validateVideoFile(fileName, videoData.length)
+    if (userError || !user) {
+      console.log(`[VIDEO-PROCESSOR] User authentication failed:`, userError?.message)
+      return new Response('Unauthorized', { status: 401 })
+    }
 
-    // Move video to processed folder (no transcoding)
-    const processedFilename = generateProcessedFilename(fileName)
-    const videoUrl = await moveVideoToProcessed(videoData, processedFilename)
+    console.log(`[VIDEO-PROCESSOR] Processing video for user ${user.id}, fileName: ${fileName}`)
 
-    // Insert recipe data
+    // Download the raw video from storage
+    const { data: videoBlob, error: downloadError } = await supabase.storage
+      .from('videos')
+      .download(`raw-videos/${fileName}`)
+
+    console.log(`[VIDEO-PROCESSOR] Video download result:`, { 
+      success: !!videoBlob, 
+      error: downloadError?.message,
+      size: videoBlob?.size 
+    })
+
+    if (downloadError || !videoBlob) {
+      console.log(`[VIDEO-PROCESSOR] Failed to download video:`, downloadError?.message)
+      return new Response(`Failed to download video: ${downloadError?.message}`, { status: 400 })
+    }
+
+    // Upload the processed video (for now, just re-upload the same video)
+    const processedFileName = fileName.replace('raw-videos/', '')
+    const processedPath = `processed-videos/${processedFileName}`
+
+    console.log(`[VIDEO-PROCESSOR] Uploading processed video to: ${processedPath}`)
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('videos')
+      .upload(processedPath, videoBlob, {
+        contentType: 'video/mp4',
+        upsert: true,
+      })
+
+    console.log(`[VIDEO-PROCESSOR] Processed video upload result:`, { 
+      success: !!uploadData, 
+      error: uploadError?.message,
+      path: uploadData?.path 
+    })
+
+    if (uploadError) {
+      console.log(`[VIDEO-PROCESSOR] Failed to upload processed video:`, uploadError.message)
+      return new Response(`Failed to upload processed video: ${uploadError.message}`, { status: 500 })
+    }
+
+    // Get the public URL for the processed video
+    const { data: urlData } = supabase.storage
+      .from('videos')
+      .getPublicUrl(processedPath)
+
+    const videoUrl = urlData.publicUrl
+    console.log(`[VIDEO-PROCESSOR] Generated video URL:`, videoUrl)
+
+    // Insert the recipe data into the database
+    console.log(`[VIDEO-PROCESSOR] Inserting recipe data...`)
     const recipeId = await insertRecipeData(metadata, user.id, videoUrl)
+    console.log(`[VIDEO-PROCESSOR] Recipe inserted successfully with ID:`, recipeId)
 
-    // Cleanup raw video (non-blocking)
-    cleanupRawVideo(fileName).catch(console.warn)
+    // Clean up the raw video
+    console.log(`[VIDEO-PROCESSOR] Cleaning up raw video...`)
+    const { error: deleteError } = await supabase.storage
+      .from('videos')
+      .remove([`raw-videos/${fileName}`])
 
-    const processingTime = Date.now() - startTime
-    console.log(`[VIDEO-PROCESSOR] Processing completed in ${processingTime}ms`)
-
-    const result: ProcessingResult = {
-      success: true,
-      recipeId,
-      videoUrl,
-      thumbnailUrl: metadata.thumbnail_url,
-      processingTime,
-      message: 'Video processed successfully (no transcoding - original format preserved)'
+    if (deleteError) {
+      console.log(`[VIDEO-PROCESSOR] Warning: Failed to delete raw video:`, deleteError.message)
+    } else {
+      console.log(`[VIDEO-PROCESSOR] Raw video cleaned up successfully`)
     }
 
-    return new Response(
-      JSON.stringify(result),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
-    )
+    console.log(`[VIDEO-PROCESSOR] Process completed successfully for recipe:`, recipeId)
+    return new Response(JSON.stringify({ 
+      success: true, 
+      recipeId,
+      videoUrl 
+    }), {
+      headers: { 'Content-Type': 'application/json' },
+      status: 200,
+    })
 
   } catch (error) {
-    const processingTime = Date.now() - startTime
-    console.error(`[VIDEO-PROCESSOR] Error after ${processingTime}ms:`, error)
-
-    // Determine appropriate status code
-    let statusCode = 500
-    if ((error as Error).message.includes('Authentication failed') || (error as Error).message.includes('Authorization')) {
-      statusCode = 401
-    } else if ((error as Error).message.includes('Missing') || (error as Error).message.includes('Invalid') || (error as Error).message.includes('Unsupported')) {
-      statusCode = 400
-    }
-
-    return new Response(
-      JSON.stringify({
-        error: 'Video processing failed',
-        details: (error as Error).message,
-        processingTime
-      }),
-      { status: statusCode, headers: { 'Content-Type': 'application/json' } }
-    )
+    console.error(`[VIDEO-PROCESSOR] Unhandled error:`, error)
+    return new Response(JSON.stringify({ 
+      error: 'Internal server error',
+      details: error.message 
+    }), {
+      headers: { 'Content-Type': 'application/json' },
+      status: 500,
+    })
   }
 })
 

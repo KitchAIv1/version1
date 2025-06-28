@@ -9,8 +9,10 @@ import { paperTheme } from './theme/paperTheme';
 import { AuthProvider } from './src/providers/AuthProvider';
 import { GroceryProvider } from './src/providers/GroceryProvider';
 import { NetworkProvider } from './src/providers/NetworkProvider';
+import { ToastProvider } from './src/providers/ToastProvider';
 import AppNavigator from './src/navigation/AppNavigator';
 import GlobalOfflineIndicator from './src/components/GlobalOfflineIndicator';
+import { GlobalUploadIndicator } from './src/components/GlobalUploadIndicator';
 import DeepLinkingService from './src/services/DeepLinkingService';
 import { initializeSentry } from './src/config/sentry';
 
@@ -57,11 +59,14 @@ export default function App() {
           <PaperProvider theme={paperTheme}>
             <AuthProvider>
               <GroceryProvider>
-                <NavigationContainer>
-                  <AppNavigator />
-                  <GlobalOfflineIndicator />
-                  <StatusBar style="auto" />
-                </NavigationContainer>
+                <ToastProvider>
+                  <NavigationContainer>
+                    <AppNavigator />
+                    <GlobalOfflineIndicator />
+                    <GlobalUploadIndicator visible={true} />
+                    <StatusBar style="auto" />
+                  </NavigationContainer>
+                </ToastProvider>
               </GroceryProvider>
             </AuthProvider>
           </PaperProvider>

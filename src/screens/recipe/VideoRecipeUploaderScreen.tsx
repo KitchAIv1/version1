@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -34,6 +34,9 @@ import {
 } from '../../hooks/useVideoUploader';
 import { MainStackParamList } from '../../navigation/types';
 import { useAuth } from '../../providers/AuthProvider';
+import { useBackgroundUpload } from '../../hooks/useBackgroundUpload';
+import { useToast } from '../../providers/ToastProvider';
+import { UploadQueueModal } from '../../components/UploadQueueModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BRAND_PRIMARY = '#10B981';
@@ -133,6 +136,15 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const { showToast } = useToast();
+
+  // Upload queue management
+  const { uploads: queueUploads } = useBackgroundUpload();
+  const [showQueueModal, setShowQueueModal] = useState(false);
+  
+  // Calculate queue stats
+  const pendingUploads = queueUploads.filter(u => u.status === 'pending' || u.status === 'uploading').length;
+  const failedUploads = queueUploads.filter(u => u.status === 'failed').length;
 
   // Animation values
   const fadeAnim = useState(new Animated.Value(0))[0];
@@ -152,9 +164,9 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+  }, [fadeAnim, scaleAnim]);
 
-  const onUploadSuccessHandler = (response: any) => {
+  const onUploadSuccessHandler = useCallback((response: any) => {
     const recipeId = response?.recipeId;
     Alert.alert('Success', 'Recipe uploaded successfully!');
 
@@ -177,9 +189,9 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
     setServings('');
     // Hook will clear its own videoUri and thumbnailUri if needed
     if (navigation.canGoBack()) navigation.goBack();
-  };
+  }, [user?.id, queryClient, navigation]);
 
-  const onUploadErrorHandler = (errorDetails: any | string) => {
+  const onUploadErrorHandler = useCallback((errorDetails: any | string) => {
     console.error('onUploadErrorHandler received:', errorDetails);
     let errorMessage = 'An unexpected error occurred during upload.';
     if (typeof errorDetails === 'string') {
@@ -188,7 +200,7 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
       errorMessage = errorDetails.message;
     }
     Alert.alert('Upload Error', errorMessage);
-  };
+  }, []);
 
   const {
     uploadRecipe,
@@ -380,6 +392,148 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
     uploadRecipe(metadata);
   };
 
+  // Add background upload support
+  const [useBackgroundUploadMode, setUseBackgroundUploadMode] = useState(true); // Default to background upload
+  
+  // Memoize callback functions to prevent infinite re-renders
+  const onBackgroundUploadSuccess = useCallback((uploadId: string, recipeId: string) => {
+    console.log(`🎉 Background upload completed: ${recipeId}`);
+    showToast({
+      type: 'success',
+      message: `Recipe uploaded successfully! 🎉`,
+      duration: 5000,
+    });
+  }, [showToast]);
+
+  const onBackgroundUploadError = useCallback((uploadId: string, error: string) => {
+    console.error(`❌ Background upload failed: ${error}`);
+    showToast({
+      type: 'error',
+      message: `Upload failed: ${error}`,
+      duration: 6000,
+      action: {
+        label: 'Retry',
+        onPress: () => {
+          // Could implement retry logic here
+        },
+      },
+    });
+  }, [showToast]);
+
+  const { startBackgroundUpload } = useBackgroundUpload({
+    onUploadSuccess: onBackgroundUploadSuccess,
+    onUploadError: onBackgroundUploadError,
+  });
+
+  const handleUpload = async () => {
+    // First validate the form like in handlePublish
+    if (!videoUri) {
+      Alert.alert('Validation Error', 'Please select a video.');
+      return;
+    }
+    if (!thumbnailUri) {
+      Alert.alert('Validation Error', 'Please select a thumbnail.');
+      return;
+    }
+    if (!title.trim()) {
+      Alert.alert('Validation Error', 'Please enter a recipe title.');
+      return;
+    }
+    if (
+      !prepTimeMinutes.trim() ||
+      !cookTimeMinutes.trim() ||
+      !servings.trim()
+    ) {
+      Alert.alert(
+        'Validation Error',
+        'Please fill in Prep Time, Cook Time, and Servings.',
+      );
+      return;
+    }
+    if (
+      isNaN(parseInt(prepTimeMinutes)) ||
+      isNaN(parseInt(cookTimeMinutes)) ||
+      isNaN(parseInt(servings))
+    ) {
+      Alert.alert(
+        'Validation Error',
+        'Prep Time, Cook Time, and Servings must be valid numbers.',
+      );
+      return;
+    }
+    if (
+      ingredients.length === 0 ||
+      ingredients.every(ing => !ing.name.trim())
+    ) {
+      Alert.alert(
+        'Validation Error',
+        'Please add at least one valid ingredient (name is required).',
+      );
+      return;
+    }
+    if (
+      preparationSteps.length === 0 ||
+      preparationSteps.every(step => !step.trim())
+    ) {
+      Alert.alert(
+        'Validation Error',
+        'Please add at least one preparation step.',
+      );
+      return;
+    }
+
+    // Generate recipe ID
+    let recipeId;
+    try {
+      recipeId = uuidv4();
+    } catch (e: any) {
+      Alert.alert(
+        'Error',
+        `Could not generate a unique ID for the recipe: ${e.message || 'Unknown error'}`,
+      );
+      return;
+    }
+
+    // Create metadata
+    const metadata: RecipeMetadataForEdgeFunction = {
+      id: recipeId,
+      title: title.trim(),
+      description: description.trim(),
+      ingredients: ingredients.filter(ing => ing.name.trim() !== ''),
+      diet_tags: dietTags,
+      is_public: isPublic,
+      preparation_steps: preparationSteps.filter(step => step.trim() !== ''),
+      prep_time_minutes: parseInt(prepTimeMinutes) || 0,
+      cook_time_minutes: parseInt(cookTimeMinutes) || 0,
+      servings: parseInt(servings) || 0,
+    };
+
+    if (useBackgroundUploadMode) {
+      // Use background upload - non-blocking
+      try {
+        await startBackgroundUpload(videoUri, thumbnailUri, metadata);
+        
+        // Show immediate feedback and navigate back
+        Alert.alert(
+          '🚀 Upload Started!',
+          'Your recipe is uploading in the background. You can continue using the app.',
+          [
+            {
+              text: 'Continue',
+              onPress: () => navigation.goBack(),
+            },
+          ]
+        );
+      } catch (error) {
+        console.error('Failed to start background upload:', error);
+        Alert.alert('Error', 'Failed to start upload. Please try again.');
+      }
+    } else {
+      // Use existing blocking upload
+      uploadRecipe(metadata);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
@@ -401,14 +555,18 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
             <Text style={styles.headerSubtitle}>Share your culinary creation</Text>
           </View>
           
-          {/* Save Draft Button (Optional) */}
+          {/* Upload Queue Button */}
           <TouchableOpacity 
-            style={styles.draftButton}
-            onPress={() => {
-              // Could implement save draft functionality
-              Alert.alert('Draft', 'Draft saved locally');
-            }}>
-            <Text style={styles.draftButtonText}>Draft</Text>
+            style={styles.queueButton}
+            onPress={() => setShowQueueModal(true)}>
+            <Feather name="upload-cloud" size={18} color={BRAND_PRIMARY} />
+            {(pendingUploads + failedUploads) > 0 && (
+              <View style={styles.queueBadge}>
+                <Text style={styles.queueBadgeText}>
+                  {pendingUploads + failedUploads}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -719,12 +877,32 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
           </CollapsibleCard>
         </View>
 
+        {/* Add background upload toggle in the UI */}
+        <View style={styles.uploadOptionsContainer}>
+          <Text style={styles.uploadOptionsLabel}>Upload Options</Text>
+          <TouchableOpacity
+            style={[styles.uploadModeToggle, useBackgroundUploadMode && styles.uploadModeToggleActive]}
+            onPress={() => setUseBackgroundUploadMode(!useBackgroundUploadMode)}
+          >
+            <Text style={[styles.uploadModeText, useBackgroundUploadMode && styles.uploadModeTextActive]}>
+              {useBackgroundUploadMode ? '🚀 Background Upload (Recommended)' : '📤 Standard Upload'}
+            </Text>
+            <Text style={styles.uploadModeDescription}>
+              {useBackgroundUploadMode 
+                ? 'Upload continues in background. Navigate freely!'
+                : 'Wait for upload to complete before navigating.'
+              }
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Modified upload button */}
         <TouchableOpacity
           style={[
             styles.publishButton,
             isUploading && styles.saveButtonDisabled,
           ]}
-          onPress={handlePublish}
+          onPress={handleUpload}
           disabled={isUploading}
           activeOpacity={0.8}>
           {isUploading ? (
@@ -734,7 +912,9 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
                 size="small"
                 style={{ marginRight: 10 }}
               />
-              <Text style={styles.publishButtonText}>Uploading...</Text>
+              <Text style={styles.publishButtonText}>
+                {useBackgroundUploadMode ? 'Starting Background Upload...' : 'Uploading...'}
+              </Text>
             </View>
           ) : (
             <View style={styles.publishButtonContent}>
@@ -744,7 +924,9 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
                 color="#fff"
                 style={{ marginRight: 10 }}
               />
-              <Text style={styles.publishButtonText}>Publish Recipe</Text>
+              <Text style={styles.publishButtonText}>
+                {useBackgroundUploadMode ? '🚀 Start Background Upload' : 'Publish Recipe'}
+              </Text>
             </View>
           )}
         </TouchableOpacity>
@@ -766,6 +948,12 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
         </Animated.View>
         </ScrollView>
       </PanGestureHandler>
+
+      {/* Upload Queue Modal */}
+      <UploadQueueModal 
+        visible={showQueueModal}
+        onClose={() => setShowQueueModal(false)}
+      />
     </View>
   );
 };
@@ -815,17 +1003,33 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 2,
   },
-  draftButton: {
+  queueButton: {
+    position: 'relative',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#f0fdf4',
     marginLeft: 12,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
   },
-  draftButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#6b7280',
+  queueBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  queueBadgeText: {
+    fontSize: 11,
+    color: 'white',
+    fontWeight: '600',
   },
   scrollContainer: {
     flex: 1,
@@ -1223,6 +1427,37 @@ const styles = StyleSheet.create({
     top: 8,
     fontSize: 12,
     fontWeight: '500',
+  },
+  uploadOptionsContainer: {
+    padding: 16,
+  },
+  uploadOptionsLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  uploadModeToggle: {
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+  },
+  uploadModeToggleActive: {
+    borderColor: BRAND_PRIMARY,
+  },
+  uploadModeText: {
+    color: '#6b7280',
+    fontSize: 14,
+  },
+  uploadModeTextActive: {
+    color: BRAND_PRIMARY,
+  },
+  uploadModeDescription: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 4,
   },
 });
 

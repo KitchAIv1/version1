@@ -704,6 +704,7 @@ export default function PantryScreen() {
       isProcessing,
       canPerformScan,
       usageData,
+      scanUsageText,
       handleScanPress,
       scanButtonScale,
       handleManualAddPress,

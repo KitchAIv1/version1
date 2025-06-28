@@ -45,6 +45,7 @@ import { CreatorAccountModal } from '../../components/CreatorAccountModal';
 import { PremiumUpgradeModal } from '../../components/PremiumUpgradeModal';
 import { PremiumFeaturesModal } from '../../components/PremiumFeaturesModal';
 import { PrismaticCelebration } from '../../components/PrismaticCelebration';
+
 // import { useCacheDebug } from '../../hooks/useCacheDebug'; // REMOVED - no longer needed
 
 // Import notification components
@@ -357,7 +358,7 @@ export const ProfileScreen: React.FC = () => {
 
   // 🚀 PERFORMANCE OPTIMIZATION: Conditional data loading
   // Only load activity feed for own profile and when on activity tab
-  const isActivityTab = tabIndex === 3; // Assuming activity is tab index 3
+  const isActivityTab = tabIndex === 3; // Activity is now tab index 3
   
   const {
     data: activityData,
@@ -754,6 +755,12 @@ export const ProfileScreen: React.FC = () => {
             <MealPlannerV2Screen />
           </View>
         );
+      case 3: // Planner
+        return (
+          <View style={styles.tabContentContainer}>
+            <MealPlannerV2Screen />
+          </View>
+        );
       case 3: // Activity
         return (
           <View style={styles.tabContentContainer}>
@@ -829,8 +836,8 @@ export const ProfileScreen: React.FC = () => {
         styles.tabIndicator, 
         { 
           left: isOwnProfile 
-            ? `${(100 / 4) * tabIndex + (100 / 8) - 5}%`  // Own profile: 4 tabs
-            : '37.5%'  // Other profile: center single tab
+            ? `${(100 / 4) * tabIndex + (100 / 8) - 5}%`  // Own profile: 4 tabs now
+            : '30%'  // Other profile: center single tab
         }
       ]} />
     </View>

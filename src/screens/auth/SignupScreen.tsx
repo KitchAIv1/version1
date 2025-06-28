@@ -210,7 +210,9 @@ export default function SignupScreen() {
       );
       nav.replace('Login');
     } else if (data.user && data.session) {
-      Alert.alert('Signup Successful!', 'You are now signed up.');
+      // 🚨 CRITICAL FIX: Don't show success alert when user has session
+      // They will be automatically taken to onboarding by AuthProvider
+      console.log('Signup successful! User will be taken to onboarding automatically.');
     } else {
       Alert.alert(
         'Sign-up Puzzling',
