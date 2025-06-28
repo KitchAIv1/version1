@@ -1,132 +1,148 @@
 # KitchAI Privacy Policy
 
-**Last Updated: [DATE]**
+**Last Updated:** January 28, 2025
 
 ## Introduction
 
-KitchAI ("we," "our," or "us") respects your privacy and is committed to protecting your personal information. This Privacy Policy explains how we collect, use, and safeguard your information when you use our mobile application.
+KitchAI ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application and related services.
 
 ## Information We Collect
 
 ### Personal Information
-- **Account Information**: Email address, username, profile picture
-- **Profile Data**: Dietary preferences, cooking skill level, favorite cuisines
-- **User-Generated Content**: Recipes you create, comments, likes, and shares
+- **Account Information:** Email address, username, profile picture
+- **Profile Data:** Cooking preferences, dietary restrictions, skill level
+- **User Content:** Recipes, comments, photos, videos you share
 
 ### Usage Information
-- **App Usage**: Features used, time spent, navigation patterns
-- **Recipe Interactions**: Recipes viewed, saved, liked, or shared
-- **Search Queries**: Ingredient searches and recipe searches
+- **App Activity:** Recipes viewed, searches performed, ingredients scanned
+- **Device Information:** Device type, operating system, app version
+- **Performance Data:** App crashes, loading times, feature usage
 
-### Device Information
-- **Camera Access**: For scanning pantry items and ingredients
-- **Photo Library**: For selecting ingredient images (with permission)
-- **Device Identifiers**: For app functionality and analytics
-
-### Automatically Collected Information
-- **Analytics Data**: App performance, crash reports, usage statistics
-- **Log Data**: IP address, device type, operating system version
+### Camera and Photos
+- **Ingredient Scanning:** Photos of ingredients for AI recognition
+- **Recipe Content:** Photos and videos you choose to share
+- **Note:** Camera access is only used when you actively scan ingredients
 
 ## How We Use Your Information
 
-### Core App Functionality
+### Core Features
 - Provide personalized recipe recommendations
-- Enable pantry scanning and ingredient recognition
-- Facilitate social features (sharing, commenting, following)
-- Meal planning and grocery list generation
+- Enable ingredient scanning and recognition
+- Facilitate meal planning and grocery lists
+- Support social features (following, likes, comments)
 
-### Service Improvement
-- Analyze usage patterns to improve app features
-- Develop new features based on user behavior
-- Optimize app performance and fix bugs
+### Improvement and Analytics
+- Analyze app performance and user experience
+- Improve AI recommendation algorithms
+- Develop new features and functionality
+- Provide customer support
 
-### Communication
+### Communications
 - Send important app updates and notifications
-- Respond to customer support inquiries
-- Share new features and improvements (with consent)
+- Respond to your inquiries and support requests
+- Share relevant cooking tips and content (with your consent)
 
 ## Information Sharing
 
-### We DO NOT sell your personal information to third parties.
+### We DO NOT sell your personal information.
 
-### We may share information with:
-- **Service Providers**: Cloud hosting, analytics, customer support
-- **AI Services**: OpenAI for recipe generation (anonymized data only)
-- **Legal Requirements**: When required by law or to protect rights
+### We may share information in these limited circumstances:
+- **Service Providers:** Trusted partners who help us operate the app
+- **Legal Requirements:** When required by law or to protect rights
+- **Business Transfers:** In case of merger or acquisition
+- **With Your Consent:** When you explicitly agree to sharing
 
-### Social Features
-- Profile information and recipes you choose to make public
-- Comments and interactions on public recipes
-- User-generated content shared within the app
+### Public Information
+- Profile information you choose to make public
+- Recipes, comments, and content you share publicly
+- Your followers and following lists (if public)
 
 ## Data Security
 
 We implement industry-standard security measures:
-- Encryption of data in transit and at rest
-- Secure authentication through Supabase
-- Regular security audits and updates
-- Limited access to personal information
+- **Encryption:** Data encrypted in transit and at rest
+- **Access Controls:** Limited access to personal information
+- **Regular Audits:** Security assessments and improvements
+- **Secure Infrastructure:** Hosted on secure cloud platforms
 
 ## Your Rights and Choices
 
 ### Account Control
-- Update your profile and preferences anytime
-- Delete your account and associated data
-- Control privacy settings for shared content
+- **Access:** View your personal information
+- **Update:** Modify your profile and preferences
+- **Delete:** Remove your account and associated data
+- **Export:** Download your data in a portable format
 
-### Data Access
-- Request a copy of your personal data
-- Request correction of inaccurate information
-- Request deletion of your data (subject to legal requirements)
+### Privacy Settings
+- **Profile Visibility:** Control who can see your profile
+- **Recipe Sharing:** Choose what content to make public
+- **Notifications:** Manage communication preferences
+- **Data Collection:** Opt out of non-essential data collection
 
-### Communication Preferences
-- Opt out of promotional communications
-- Control push notification settings
-- Manage email preferences
+### Camera and Photos
+- **Permission Control:** Grant or revoke camera access anytime
+- **Photo Deletion:** Remove photos from your device and our servers
+- **Scanning Data:** Choose whether to save scanned ingredient data
 
 ## Children's Privacy
 
-KitchAI is not intended for children under 13. We do not knowingly collect personal information from children under 13. If we become aware of such collection, we will delete the information immediately.
+KitchAI is not intended for children under 13. We do not knowingly collect personal information from children under 13. If we discover such collection, we will delete the information immediately.
+
+## International Users
+
+Your information may be transferred to and processed in countries other than your own. We ensure appropriate safeguards are in place to protect your privacy rights.
 
 ## Third-Party Services
 
-### Our app integrates with:
-- **Supabase**: Database and authentication services
-- **OpenAI**: AI-powered recipe generation
-- **Google Vision API**: Ingredient recognition
-- **Expo**: App development and deployment platform
+### Analytics and Crash Reporting
+- **Sentry:** Error tracking and performance monitoring
+- **Usage Analytics:** Anonymous usage statistics
 
-Each service has its own privacy policy governing their data practices.
+### AI Services
+- **OpenAI:** Recipe generation and ingredient recognition
+- **Note:** We do not share personal information with AI providers
+
+### Authentication
+- **Google Sign-In:** Optional login method
+- **Supabase:** Secure authentication and data storage
 
 ## Data Retention
 
-- **Account Data**: Retained while your account is active
-- **Usage Analytics**: Retained for 2 years for service improvement
-- **User Content**: Retained until you delete it or close your account
-- **Legal Requirements**: Some data may be retained longer if required by law
+- **Account Data:** Retained while your account is active
+- **Usage Data:** Anonymized and retained for analytics
+- **Deleted Accounts:** Personal data removed within 30 days
+- **Legal Requirements:** Some data may be retained longer if required by law
 
-## International Data Transfers
-
-Your information may be transferred to and processed in countries other than your own. We ensure appropriate safeguards are in place for such transfers.
-
-## Changes to This Policy
+## Updates to This Policy
 
 We may update this Privacy Policy periodically. We will notify you of significant changes through:
 - In-app notifications
-- Email notifications (if you've provided an email)
+- Email notifications (if provided)
 - Updated "Last Modified" date
 
 ## Contact Us
 
-If you have questions about this Privacy Policy or our data practices:
+For privacy-related questions or concerns:
 
-**Email**: [SUPPORT_EMAIL]
-**Address**: [COMPANY_ADDRESS]
-**App Support**: Through the app's support feature
+**Email:** privacy@kitchai.app
+**Support:** https://kitchai.app/support
+**Address:** [Company Address]
 
-## Consent
+## Your California Privacy Rights (CCPA)
 
-By using KitchAI, you consent to the collection and use of your information as described in this Privacy Policy.
+California residents have additional rights:
+- **Right to Know:** What personal information we collect and how it's used
+- **Right to Delete:** Request deletion of personal information
+- **Right to Opt-Out:** Opt out of sale of personal information (we don't sell data)
+- **Right to Non-Discrimination:** Equal service regardless of privacy choices
+
+## European Privacy Rights (GDPR)
+
+EU residents have additional rights:
+- **Data Portability:** Receive your data in a machine-readable format
+- **Right to Rectification:** Correct inaccurate personal information
+- **Right to Restriction:** Limit how we process your information
+- **Right to Object:** Object to certain types of processing
 
 ---
 

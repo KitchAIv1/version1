@@ -27,9 +27,16 @@ KitchAI revolutionizes your cooking experience by combining artificial intellige
 • AI recommendations based on your preferences
 • Discover new cuisines and cooking styles
 
+**🎥 Instagram-Style Video Experience**
+• Smooth video recipe tutorials
+• Tap-to-mute/unmute controls
+• Clean, modern interface
+• Professional video quality
+
 **📱 Social Cooking Community**
 • Share your culinary creations
 • Like and save favorite recipes
+• Follow your favorite creators
 • Connect with fellow food enthusiasts
 
 **📋 Intelligent Meal Planning**
@@ -40,24 +47,28 @@ KitchAI revolutionizes your cooking experience by combining artificial intellige
 **✨ Key Features:**
 • AI-powered ingredient scanning
 • Personalized recipe recommendations
+• Instagram-style video interface
 • Social recipe sharing and discovery
+• Creator profiles and following system
 • Meal planning and grocery lists
 • User profiles and cooking preferences
-• Video recipe tutorials
+• Video recipe tutorials with modern controls
 • Nutritional information
 • Dietary restriction support
+• Deep linking for easy sharing
 
 **Perfect for:**
 • Home cooks of all skill levels
 • Busy professionals seeking meal inspiration
 • Food enthusiasts exploring new recipes
+• Content creators sharing cooking videos
 • Anyone looking to reduce food waste
 • Families planning weekly meals
 
 Transform your kitchen into a smart cooking hub with KitchAI!
 
 ## Keywords
-recipe, cooking, AI, meal planning, food, pantry, kitchen, nutrition, ingredients, smart cooking, meal prep, grocery list, food scanner, recipe discovery
+recipe, cooking, AI, meal planning, food, pantry, kitchen, nutrition, ingredients, smart cooking, meal prep, grocery list, food scanner, recipe discovery, video recipes, social cooking, creator platform
 
 ## App Store Categories
 - **Primary**: Food & Drink
@@ -68,40 +79,54 @@ recipe, cooking, AI, meal planning, food, pantry, kitchen, nutrition, ingredient
 - **Android**: Everyone
 
 ## Privacy Policy URL
-[To be added - create privacy policy]
+https://kitchai.app/privacy
 
 ## Support URL
-[To be added - create support page]
+https://kitchai.app/support
 
 ## Marketing URL
-[To be added - create landing page]
+https://kitchai.app
 
 ## Screenshots Needed
-1. **Pantry Scanning Screen** - Show camera scanning ingredients
-2. **Recipe Discovery** - Display personalized recipe recommendations
-3. **Recipe Detail** - Show recipe with video and instructions
-4. **Social Feed** - Community recipes and interactions
-5. **Meal Planning** - Weekly meal planner interface
-6. **Profile Screen** - User preferences and cooking stats
+1. **Pantry Scanning Screen** - Show camera scanning ingredients with AI recognition
+2. **Recipe Discovery Feed** - Display personalized recipe recommendations with social features
+3. **Instagram-Style Video Player** - Show recipe video with modern controls and mute button
+4. **Social Feed** - Community recipes with likes, saves, and creator profiles
+5. **Meal Planning** - Weekly meal planner interface with smart suggestions
+6. **Profile Screen** - User preferences, following/followers, and cooking stats
 
 ## App Store Optimization (ASO)
 - Focus on "AI recipe" and "smart cooking" keywords
 - Highlight pantry scanning as unique feature
-- Emphasize personalization and community aspects
+- Emphasize social and creator aspects
+- Showcase Instagram-style video experience
 - Use food photography in screenshots
 - Include user testimonials when available
 
 ## Promotional Text (170 characters)
-🍳 Cook smarter with AI! Scan your pantry, get personalized recipes, plan meals & join our cooking community. Transform your kitchen today!
+🍳 Cook smarter with AI! Scan your pantry, get personalized recipes, watch beautiful videos & join our cooking community. Transform your kitchen today!
 
-## Release Notes (Version 1.0.0)
-🎉 Welcome to KitchAI!
+## Release Notes (Version 1.1.0)
+🎉 Major Update - Instagram-Style Video Experience!
 
-• AI-powered pantry scanning and ingredient recognition
-• Personalized recipe recommendations
-• Social recipe sharing and discovery
-• Intelligent meal planning tools
-• Beautiful, intuitive interface
-• Community features for food lovers
+**New Features:**
+• Instagram-style video controls with tap-to-mute
+• Enhanced social features with creator following
+• Improved recipe discovery algorithm
+• Better pantry scanning accuracy
+• Performance optimizations
+
+**Improvements:**
+• Faster app loading and smoother navigation
+• Enhanced video quality and playback
+• Better error handling and crash reporting
+• Updated modern UI design
+• Improved accessibility features
+
+**Bug Fixes:**
+• Fixed video playback issues
+• Resolved authentication edge cases
+• Improved recipe matching accuracy
+• Enhanced stability and performance
 
 Start your smart cooking journey today! 
