@@ -28,7 +28,7 @@ import { supabase } from '../../services/supabase';
 import { useAuth } from '../../providers/AuthProvider';
 import { useCacheManager } from '../../hooks/useCacheManager';
 import { useCommentCountSync } from '../../hooks/useCommentCountSync';
-import { registerFeedRefresh } from '../../navigation/MainTabs';
+import { registerFeedRefresh } from '../../utils/feedRefresh';
 
 // Import "What Can I Cook?" components
 import InsufficientItemsModal from '../../components/modals/InsufficientItemsModal';
@@ -494,7 +494,6 @@ export default React.memo(function FeedScreen() {
         <InsufficientItemsModal
           visible={showInsufficientModal}
           onClose={handleCloseModal}
-          onNavigateToPantry={handleNavigateToPantry}
           currentItemCount={pantryItemCount}
         />
       </SafeAreaView>

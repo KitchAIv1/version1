@@ -302,7 +302,7 @@ export const useApiPerformanceTracking = () => {
  */
 export const useMemoryMonitoring = () => {
   const [memoryUsage, setMemoryUsage] = useState<number>(0);
-  const intervalRef = useRef<NodeJS.Timeout>();
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const startMonitoring = useCallback(() => {
     intervalRef.current = setInterval(() => {

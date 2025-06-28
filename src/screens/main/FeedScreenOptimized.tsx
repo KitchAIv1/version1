@@ -443,7 +443,7 @@ export const FeedScreenOptimized = React.memo(() => {
 
   // Refs
   const flashListRef = useRef<FlashList<FeedItem>>(null);
-  const viewLogTimeoutRef = useRef<NodeJS.Timeout>();
+  const viewLogTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Memoized values
   const itemsToRender = useMemo(() => feedData?.items || [], [feedData?.items]);
@@ -673,7 +673,6 @@ export const FeedScreenOptimized = React.memo(() => {
         <InsufficientItemsModal
           visible={showInsufficientModal}
           onClose={handleCloseModal}
-          onNavigateToPantry={handleNavigateToPantry}
           currentItemCount={pantryItemCount}
         />
       </Suspense>

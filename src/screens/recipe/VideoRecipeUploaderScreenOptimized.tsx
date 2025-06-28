@@ -578,8 +578,8 @@ export const VideoRecipeUploaderScreenOptimized: React.FC<
       <Suspense
         fallback={<ActivityIndicator size="large" style={{ margin: 20 }} />}>
         <MediaSelectionSection
-          videoUri={videoUri}
-          thumbnailUri={thumbnailUri}
+          videoUri={videoUri || undefined}
+          thumbnailUri={thumbnailUri || undefined}
           onSelectVideo={handleSelectVideo}
           onSelectThumbnail={handleSelectThumbnail}
         />

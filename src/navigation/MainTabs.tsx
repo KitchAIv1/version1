@@ -15,21 +15,9 @@ import { useAuth } from '../providers/AuthProvider';
 import { usePantryData } from '../hooks/usePantryData';
 import InsufficientItemsModal from '../components/modals/InsufficientItemsModal';
 import { LimitReachedModal } from '../components/modals/LimitReachedModal';
+import { registerFeedRefresh, triggerFeedRefresh } from '../utils/feedRefresh';
 
 const Tab = createBottomTabNavigator<MainTabsParamList>();
-
-// Create a global reference for the feed refresh function
-let feedRefreshFunction: (() => void) | null = null;
-
-export const registerFeedRefresh = (refreshFn: () => void) => {
-  feedRefreshFunction = refreshFn;
-};
-
-export const triggerFeedRefresh = () => {
-  if (feedRefreshFunction) {
-    feedRefreshFunction();
-  }
-};
 
 // Custom Kitch Power Button Component
 const KitchPowerButton = ({ onPress }: { onPress: () => void }) => {
@@ -220,7 +208,7 @@ function MainTabs() {
                 queryClient.invalidateQueries({ queryKey: ['feed'] });
               }
 
-              navigation.jumpTo('Pantry');
+              navigation.jumpTo('Pantry', {});
             },
           })}
         />
@@ -255,8 +243,8 @@ function MainTabs() {
               // Prevent default navigation
               e.preventDefault();
 
-              // Navigate to Profile without any parameters to ensure own profile is shown
-              navigation.navigate('Profile', {});
+              // Jump to Profile tab
+              navigation.jumpTo('Profile', {});
             },
           })}
         />

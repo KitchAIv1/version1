@@ -30,7 +30,8 @@ import { useAuth } from '../../providers/AuthProvider';
 import ProfileRecipeCard from '../../components/ProfileRecipeCard';
 import ActivityFeed from '../../components/ActivityFeed';
 import MealPlannerV2Screen from './meal_planner_v2/MealPlannerV2Screen';
-import { ProfileScreenSkeleton, RecipeGridSkeleton } from '../../components/ProfileScreenSkeletons';
+import { ProfileScreenSkeleton } from '../../components/ProfileScreenSkeletons';
+import { RecipeGridSkeleton } from '../../components/skeletons';
 import { FollowButton } from '../../components/FollowButton';
 import { TierDisplay } from '../../components/TierDisplay';
 import { NotificationBell } from '../../components/NotificationBell';
@@ -369,16 +370,12 @@ const ProfileScreenV2: React.FC = () => {
     // Pass update callback to EditProfile screen for immediate UI updates
     navigation.navigate('EditProfile', {
       initialProfileData: {
-        bio: profile.bio,
-        avatar_url: profile.avatar_url,
-        username: profile.username,
-      },
-      onProfileUpdate: (updatedData: Partial<ProfileData>) => {
-        // Immediate optimistic update
-        updateProfile(updatedData);
+        bio: profile?.bio || null,
+        avatar_url: profile?.avatar_url || null,
+        username: profile?.username || null,
       },
     });
-  }, [navigation, profile, updateProfile]);
+  }, [navigation, profile]);
 
   const handleRefresh = useCallback(async () => {
     if (!user?.id) return;

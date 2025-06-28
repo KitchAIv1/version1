@@ -759,6 +759,13 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
     }
   }, [activeTab, recipeDetails?.preparation_steps]);
 
+  // Wrapper function for setActiveTab to handle type conversion
+  const handleSetActiveTab = useCallback((tab: string) => {
+    if (Object.values(TAB_ROUTES).includes(tab as any)) {
+      setActiveTab(tab as (typeof TAB_ROUTES)[keyof typeof TAB_ROUTES]);
+    }
+  }, []);
+
   // Loading state
   if (isLoading) {
     return (
@@ -814,7 +821,7 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
           </View>
         ) : (
           <OptimizedVideoPlayer
-            videoUrl={recipeDetails?.video_url}
+            videoUrl={recipeDetails?.video_url || undefined}
             isScreenFocused={isScreenFocused}
             isMuted={isMuted}
             onToggleMute={toggleMute}
@@ -856,15 +863,10 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
         {/* Action Overlay */}
         <Suspense fallback={null}>
           <ActionOverlay
-            recipeDetails={recipeDetails}
+            item={recipeDetails as any}
             onLike={() => likeMutation.mutate(id)}
             onSave={() => saveMutation.mutate(id)}
-            onComment={handleCommentPress}
-            onShare={handleShare}
-            onAddToMealPlan={handleOpenPlannerModal}
-            user={user}
-            likeMutation={likeMutation}
-            saveMutation={saveMutation}
+            onCommentPress={handleCommentPress}
           />
         </Suspense>
       </View>
@@ -906,7 +908,7 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
         {/* Tab Navigator */}
         <OptimizedTabNavigator
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          setActiveTab={handleSetActiveTab}
           tabs={Object.values(TAB_ROUTES)}
           tabContent={renderTabContent()}
           onTabChange={handleTabChange}
@@ -916,10 +918,10 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
       {/* Modals */}
       <Suspense fallback={null}>
         <AddToMealPlannerModal
-          visible={isPlannerModalVisible}
+          isVisible={isPlannerModalVisible}
           onClose={handleClosePlannerModal}
-          onAddToMealPlan={handleAddToMealPlan}
-          recipeTitle={recipeDetails?.title || ''}
+          onAddToPlan={handleAddToMealPlan}
+          recipeName={recipeDetails?.title || ''}
         />
       </Suspense>
 

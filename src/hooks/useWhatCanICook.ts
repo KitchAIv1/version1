@@ -45,7 +45,7 @@ export const useWhatCanICook = () => {
   const handleNavigateToPantry = useCallback(() => {
     setShowInsufficientModal(false);
     // Navigate to Pantry tab
-    navigation.navigate('MainTabs', { screen: 'Pantry' });
+    navigation.navigate('MainTabs', { screen: 'Pantry', params: {} });
   }, [navigation]);
 
   return {

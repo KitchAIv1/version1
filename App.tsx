@@ -37,6 +37,7 @@ export default function App() {
   useEffect(() => {
     const deepLinkingService = DeepLinkingService.getInstance();
     deepLinkingService.initialize();
+    console.log('🔗 Deep linking service initialized');
 
     // Cleanup on unmount
     return () => {

@@ -38,7 +38,7 @@ export const TikTokVideoControls: React.FC<TikTokVideoControlsProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [tempPosition, setTempPosition] = useState(0);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const hideTimeout = useRef<NodeJS.Timeout>();
+  const hideTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Cleanup timeout on unmount
   useEffect(() => {

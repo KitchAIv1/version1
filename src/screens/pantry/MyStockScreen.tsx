@@ -75,7 +75,7 @@ export default function MyStockScreen() {
             <View style={styles.itemTextContainer}>
               <Text style={styles.itemName}>{item.item_name}</Text>
             </View>
-            <Text style={styles.itemQty}>×{item.qty}</Text>
+            <Text style={styles.itemQty}>×{item.quantity}</Text>
             <TouchableOpacity
               onPress={() => handleRemoveItem(item.id, item.item_name)}
               style={styles.trashButton}>

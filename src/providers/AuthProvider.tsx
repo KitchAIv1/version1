@@ -26,6 +26,7 @@ type AuthContextType = {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
+  profileLoading: boolean;
   updateProfile: (newProfileData: Partial<UserProfile>) => void;
   refreshProfile: (userId: string) => Promise<void>;
   getEffectiveTier: () => 'FREEMIUM' | 'PREMIUM'; // Helper to determine effective tier
@@ -44,6 +45,7 @@ const AuthContext = createContext<AuthContextType>({
     tier: null,
   },
   loading: true,
+  profileLoading: false,
   updateProfile: () => {},
   refreshProfile: async () => {},
   getEffectiveTier: () => 'FREEMIUM',
@@ -63,8 +65,8 @@ export const AuthProvider: React.FC<PropsWithChildren<object>> = ({
     bio: null,
     tier: null,
   });
-  // Usage limits removed - Edge Function handles tracking
   const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   const updateProfileLocally = (newProfileData: Partial<UserProfile>) => {
     setProfile(prevProfile => ({
@@ -93,10 +95,10 @@ export const AuthProvider: React.FC<PropsWithChildren<object>> = ({
   // Usage limits removed - Edge Function handles all tracking
 
   const fetchProfileWithRPC = async (userId: string) => {
-    console.log(
-      `AuthProvider: Fetching profile via RPC get_profile_details for user ${userId}`,
-    );
     try {
+      setProfileLoading(true);
+      console.log('AuthProvider: Fetching profile via RPC get_profile_details for user', userId);
+      
       const { data, error } = await supabase.rpc('get_profile_details', {
         p_user_id: userId,
       });
@@ -111,58 +113,90 @@ export const AuthProvider: React.FC<PropsWithChildren<object>> = ({
 
       console.log('AuthProvider: Raw RPC response:', data);
 
-      // NEW: Enhanced null/undefined checks for new users
-      if (!data || data === null || typeof data !== 'object') {
-        console.log(
-          'AuthProvider: No profile data returned from RPC (new user or profile not yet created) - using safe defaults.',
-        );
-        const defaultProfile = {
+      // 🔍 ENHANCED DEBUGGING for specific user investigation
+      const isTargetUser = userId === '4eaf7ede-53fa-488c-8e88-98a93338aa04';
+      
+      if (isTargetUser) {
+        console.log('🚨 [CREATOR DEBUG] RPC Response for target user:', JSON.stringify(data, null, 2));
+        console.log('🚨 [CREATOR DEBUG] Data type:', typeof data);
+        console.log('🚨 [CREATOR DEBUG] Data is null:', data === null);
+        console.log('🚨 [CREATOR DEBUG] Data is undefined:', data === undefined);
+      }
+
+      if (!data || !data.profile) {
+        console.warn('AuthProvider: No profile data returned from RPC.');
+        
+        if (isTargetUser) {
+          console.log('🚨 [CREATOR DEBUG] No profile data - will set defaults');
+        }
+        
+        // Set default profile structure for new users
+        const defaultProfile: UserProfile = {
           username: null,
-          role: null,
-          onboarded: false,
-          avatar_url: null,
           bio: null,
-          tier: 'FREEMIUM',
+          avatar_url: null,
+          role: null,
+          tier: null,
+          onboarded: false, // Default to false for new users
         };
         setProfile(defaultProfile);
+        setProfileLoading(false);
         return;
       }
 
-      // Extract profile data from nested structure
-      const profileData = data.profile || data;
+      // Extract profile data from RPC response
+      const profileData = data.profile;
+      
+      if (isTargetUser) {
+        console.log('🔍 DEBUG: Profile data from RPC:', profileData);
+        console.log('🔍 DEBUG: Type of onboarded:', typeof profileData.onboarded);
+        console.log('🔍 DEBUG: Value of onboarded:', profileData.onboarded);
+        console.log('🔍 DEBUG: Role:', profileData.role);
+        console.log('🔍 DEBUG: Tier:', profileData.tier);
+        console.log('🚨 [CREATOR DEBUG] Extracted profile data:', JSON.stringify(profileData, null, 2));
+        console.log('🚨 [CREATOR DEBUG] onboarded value:', profileData.onboarded);
+        console.log('🚨 [CREATOR DEBUG] role value:', profileData.role);
+      }
 
-      console.log('🔍 DEBUG: Profile data from RPC:', profileData);
-      console.log('🔍 DEBUG: Type of onboarded:', typeof profileData.onboarded);
-      console.log('🔍 DEBUG: Value of onboarded:', profileData.onboarded);
-      console.log('🔍 DEBUG: Role:', profileData.role);
-      console.log('🔍 DEBUG: Tier:', profileData.tier);
-
-      // Transform the data into our profile structure
+      // Create processed profile object
       const processedProfile: UserProfile = {
         username: profileData.username || null,
-        role: profileData.role || null,
-        onboarded: profileData.onboarded === true || profileData.onboarded === 'true',
-        avatar_url: profileData.avatar_url || null,
         bio: profileData.bio || null,
-        tier: profileData.tier || 'FREEMIUM',
+        avatar_url: profileData.avatar_url || null,
+        role: profileData.role || null,
+        tier: profileData.tier || null,
+        onboarded: profileData.onboarded || false,
       };
 
-      console.log('🔍 DEBUG: Final processed profile:', processedProfile);
+      if (isTargetUser) {
+        console.log('🔍 DEBUG: Final processed profile:', processedProfile);
+      }
 
       setProfile(processedProfile);
-
-      // Log the effective tier calculation
-      const effectiveTier = processedProfile?.role?.toLowerCase() === 'creator' ? 'PREMIUM' : (processedProfile?.tier as 'FREEMIUM' | 'PREMIUM') || 'FREEMIUM';
-      console.log('🔍 DEBUG: getEffectiveTier() returns:', effectiveTier);
-      console.log('🔍 DEBUG: isCreator() returns:', processedProfile?.role?.toLowerCase() === 'creator');
-
+      
+      if (isTargetUser) {
+        console.log('🔍 DEBUG: getEffectiveTier() returns:', getEffectiveTier());
+        console.log('🔍 DEBUG: isCreator() returns:', isCreator());
+      }
+      
       console.log('AuthProvider: Processed Profile Object:', processedProfile);
-      console.log('AuthProvider: getEffectiveTier() will return:', effectiveTier);
-
-      // Usage limits removed - Edge Function handles all tracking
-    } catch (error: any) {
-      console.error('AuthProvider: Error in fetchProfileWithRPC:', error);
-      throw error;
+      console.log('AuthProvider: getEffectiveTier() will return:', getEffectiveTier());
+      
+    } catch (error) {
+      console.error('AuthProvider: Failed to fetch profile with RPC:', error);
+      
+      // Set default profile structure on error
+      const defaultProfile: UserProfile = {
+        username: null,
+        bio: null,
+        avatar_url: null,
+        role: null,
+        tier: null,
+        onboarded: false,
+      };
+      setProfile(defaultProfile);
+    } finally {
+      setProfileLoading(false);
     }
   };
 
@@ -278,6 +312,7 @@ export const AuthProvider: React.FC<PropsWithChildren<object>> = ({
         user,
         profile,
         loading,
+        profileLoading,
         updateProfile: updateProfileLocally,
         refreshProfile,
         getEffectiveTier,
