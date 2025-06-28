@@ -13,7 +13,7 @@ import { Button } from 'react-native-paper';
 import { useQueryClient } from '@tanstack/react-query'; // Import useQueryClient
 import { useProfileStateManager } from '../hooks/useProfileStateManager'; // Import robust state manager
 import Icon from 'react-native-vector-icons/MaterialIcons'; // For CollapsibleCard
-import { AvatarEditorAndBio } from '../components/AvatarEditorAndBio'; // Check path
+import { AvatarEditorAndBio } from '../components/AvatarEditorAndBio';
 // import { COLORS } from '../constants/colors'; // Removed invalid import
 import { supabase } from '../services/supabase'; // Corrected path
 import { useAuth } from '../providers/AuthProvider'; // Corrected path
@@ -76,6 +76,7 @@ function EditProfileScreen({ navigation, route }: any) {
   const [username, setUsername] = useState('');
   const [foodPreferences, setFoodPreferences] = useState<string[]>([]); // Added state for food preferences
   const [saving, setSaving] = useState(false);
+  const [justSaved, setJustSaved] = useState(false); // Track if just saved successfully
 
   useEffect(() => {
     if (initialProfileData) {
@@ -143,43 +144,40 @@ function EditProfileScreen({ navigation, route }: any) {
         return;
       }
 
-      Alert.alert('Profile Updated', 'Your profile has been saved.', [
-        {
-          text: 'OK',
-          onPress: async () => {
-            // 🎯 ROBUST SOLUTION: Use centralized state manager
-            console.log('[EDIT_PROFILE] Using robust profile state manager...');
-            
-            try {
-              // Check if update is already in progress
-              const { isUpdating } = getUpdateStatus();
-              if (isUpdating) {
-                console.log('[EDIT_PROFILE] Update already in progress, waiting...');
-                await new Promise(resolve => setTimeout(resolve, 1000));
-              }
+      // 🎯 IMPROVED UX: No modal, direct success feedback
+      console.log('[EDIT_PROFILE] Profile updated successfully');
+      
+      // 🎯 ROBUST SOLUTION: Use centralized state manager
+      try {
+        // Check if update is already in progress
+        const { isUpdating } = getUpdateStatus();
+        if (isUpdating) {
+          console.log('[EDIT_PROFILE] Update already in progress, waiting...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
 
-              // Trigger robust profile update with debouncing
-              triggerProfileUpdate(user.id, 100); // Short delay for immediate UI response
-              
-              console.log('[EDIT_PROFILE] Robust update sequence initiated');
-              
-            } catch (updateError) {
-              console.error('[EDIT_PROFILE] Error during robust update:', updateError);
-              // Fallback to manual cache invalidation
-              queryClient.invalidateQueries({ 
-                queryKey: ['profile', user.id] 
-              });
-            }
-            
-            // Navigate back immediately (don't wait for async operations)
-            if (navigation.canGoBack()) {
-              navigation.goBack();
-            } else {
-              navigation.navigate('MainTabs', { screen: 'Profile' });
-            }
-          },
-        },
-      ]);
+        // Trigger robust profile update with debouncing
+        triggerProfileUpdate(user.id, 100); // Short delay for immediate UI response
+        
+        console.log('[EDIT_PROFILE] Robust update sequence initiated');
+        
+      } catch (updateError) {
+        console.error('[EDIT_PROFILE] Error during robust update:', updateError);
+        // Fallback to manual cache invalidation
+        queryClient.invalidateQueries({ 
+          queryKey: ['profile', user.id] 
+        });
+      }
+      
+      // Show visual success feedback immediately
+      setJustSaved(true);
+      
+      // Reset success state after 3 seconds
+      setTimeout(() => {
+        setJustSaved(false);
+      }, 3000);
+      
+      console.log('[EDIT_PROFILE] Profile saved successfully - staying on edit screen');
     } catch (e: any) {
       console.error('Update profile error (generic catch):', e);
       Alert.alert('Error', e.message || 'Could not save profile.');
@@ -227,12 +225,20 @@ function EditProfileScreen({ navigation, route }: any) {
       </CollapsibleCard>
 
       <TouchableOpacity
-        style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+        style={[
+          styles.saveButton, 
+          saving && styles.saveButtonDisabled,
+          justSaved && styles.saveButtonSuccess
+        ]}
         onPress={updateProfile}
         disabled={saving || !user || !user.id} // Disable button if no user.id
       >
         {saving ? (
           <ActivityIndicator color="#fff" />
+        ) : justSaved ? (
+          <>
+            <Text style={styles.saveButtonText}>✓ Saved Successfully!</Text>
+          </>
         ) : (
           <Text style={styles.saveButtonText}>Save Profile Changes</Text>
         )}
@@ -313,6 +319,9 @@ const styles = StyleSheet.create({
   },
   saveButtonDisabled: {
     backgroundColor: '#A3A3A3', // Disabled color
+  },
+  saveButtonSuccess: {
+    backgroundColor: '#059669', // Darker green for success state
   },
   saveButtonText: {
     color: '#fff',
