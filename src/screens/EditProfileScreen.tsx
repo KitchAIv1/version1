@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { Button } from 'react-native-paper';
 import { useQueryClient } from '@tanstack/react-query'; // Import useQueryClient
-import { useProfileStateManager } from '../hooks/useProfileStateManager'; // Import robust state manager
 import Icon from 'react-native-vector-icons/MaterialIcons'; // For CollapsibleCard
 import { AvatarEditorAndBio } from '../components/AvatarEditorAndBio';
 // import { COLORS } from '../constants/colors'; // Removed invalid import
@@ -67,9 +66,8 @@ type EditProfileRouteParams = {
 function EditProfileScreen({ navigation, route }: any) {
   // Using any temporarily for navigation/route types
   const queryClient = useQueryClient(); // Get queryClient instance
-  const { user, profile, refreshProfile } = useAuth(); // Get user, profile, and refreshProfile from useAuth
-  const { triggerProfileUpdate, cleanup, getUpdateStatus } = useProfileStateManager(); // Robust state manager
-  const { initialProfileData = {} } = route.params || {}; // userId from route.params is no longer the primary source for update
+  const { user, profile } = useAuth(); // Get user and profile from useAuth
+  const { initialProfileData = {} } = route.params || {};
 
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -77,6 +75,28 @@ function EditProfileScreen({ navigation, route }: any) {
   const [foodPreferences, setFoodPreferences] = useState<string[]>([]); // Added state for food preferences
   const [saving, setSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false); // Track if just saved successfully
+
+  // 🔍 DEBUG: Track component lifecycle and navigation changes
+  useEffect(() => {
+    console.log('[EDIT_PROFILE] Component mounted');
+    console.log('[EDIT_PROFILE] Initial navigation state:', navigation.getState());
+    
+    // Track navigation state changes
+    const unsubscribe = navigation.addListener('state', (e: any) => {
+      console.log('[EDIT_PROFILE] Navigation state changed:', e.data.state);
+    });
+    
+    // Track when component is about to unmount
+    return () => {
+      console.log('[EDIT_PROFILE] Component unmounting');
+      unsubscribe();
+    };
+  }, [navigation]);
+
+  // 🔍 DEBUG: Track when profile updates
+  useEffect(() => {
+    console.log('[EDIT_PROFILE] Profile state changed:', profile);
+  }, [profile]);
 
   useEffect(() => {
     if (initialProfileData) {
@@ -146,35 +166,24 @@ function EditProfileScreen({ navigation, route }: any) {
 
       // 🎯 IMPROVED UX: No modal, direct success feedback
       console.log('[EDIT_PROFILE] Profile updated successfully');
+      console.log('[EDIT_PROFILE] Current navigation state:', navigation.getState());
+      console.log('[EDIT_PROFILE] Can go back:', navigation.canGoBack());
       
-      // 🎯 ROBUST SOLUTION: Use centralized state manager
-      try {
-        // Check if update is already in progress
-        const { isUpdating } = getUpdateStatus();
-        if (isUpdating) {
-          console.log('[EDIT_PROFILE] Update already in progress, waiting...');
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-
-        // Trigger robust profile update with debouncing
-        triggerProfileUpdate(user.id, 100); // Short delay for immediate UI response
-        
-        console.log('[EDIT_PROFILE] Robust update sequence initiated');
-        
-      } catch (updateError) {
-        console.error('[EDIT_PROFILE] Error during robust update:', updateError);
-        // Fallback to manual cache invalidation
-        queryClient.invalidateQueries({ 
-          queryKey: ['profile', user.id] 
-        });
-      }
+      // 🎯 SIMPLE SOLUTION: Just invalidate cache without triggering profile refresh
+      // This prevents navigation stack resets while still updating the UI
+      queryClient.invalidateQueries({ 
+        queryKey: ['profile', user.id] 
+      });
+      console.log('[EDIT_PROFILE] Cache invalidated - UI will update without navigation disruption');
       
       // Show visual success feedback immediately
       setJustSaved(true);
+      console.log('[EDIT_PROFILE] Success state set to true');
       
       // Reset success state after 3 seconds
       setTimeout(() => {
         setJustSaved(false);
+        console.log('[EDIT_PROFILE] Success state reset to false');
       }, 3000);
       
       console.log('[EDIT_PROFILE] Profile saved successfully - staying on edit screen');
