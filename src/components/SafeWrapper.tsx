@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Sentry from '@sentry/react-native';
 
 interface Props {
   children: ReactNode;
@@ -37,8 +38,15 @@ class SafeWrapper extends Component<Props, State> {
 
     // In production, send to crash reporting service
     if (!__DEV__) {
-      // TODO: Send to Sentry/Crashlytics
-      console.log('📊 [Production] Error logged for crash reporting');
+      Sentry.withScope((scope) => {
+        scope.setTag('component', this.props.componentName || 'Unknown');
+        scope.setContext('errorInfo', {
+          componentStack: errorInfo.componentStack,
+        });
+        scope.setLevel('error');
+        Sentry.captureException(error);
+      });
+      console.log('📊 [Production] Error sent to Sentry for crash reporting');
     }
   }
 
@@ -61,8 +69,19 @@ class SafeWrapper extends Component<Props, State> {
         {
           text: 'Report',
           onPress: () => {
+            // Send to Sentry as user feedback
+            if (!__DEV__) {
+              const eventId = Sentry.lastEventId();
+              if (eventId) {
+                Sentry.captureUserFeedback({
+                  event_id: eventId,
+                  name: 'User',
+                  email: 'user@kitchai.app',
+                  comments: `Error Report: ${JSON.stringify(errorDetails, null, 2)}`,
+                });
+              }
+            }
             console.log('📧 [Issue Report]:', errorDetails);
-            // TODO: Send to support system
             Alert.alert('Thank you!', 'Issue reported successfully.');
           },
         },

@@ -47,9 +47,7 @@ export default function RecipeResultsScreen({
       try {
         const availability = await checkAIRecipeAvailability();
         setAiAvailability(availability);
-        console.log('[RecipeResultsScreen] AI availability check result:', availability);
       } catch (error) {
-        console.error('[RecipeResultsScreen] Error checking AI availability:', error);
         // On error, assume available (backend will handle)
         setAiAvailability({
           canGenerate: true,
@@ -157,14 +155,6 @@ export default function RecipeResultsScreen({
   // Success state with data
   const { recipe_matches, total_matches, ai_generation_available } =
     suggestionsData || {};
-
-  // DEBUGGING: Log the total_matches value being used
-  console.log('[RecipeResultsScreen] 🔍 TOTAL MATCHES DEBUG:', {
-    total_matches,
-    recipe_matches_length: recipe_matches?.length || 0,
-    suggestionsData_keys: Object.keys(suggestionsData || {}),
-    full_suggestionsData: suggestionsData,
-  });
 
   return (
     <SafeAreaView style={styles.container}>

@@ -12,6 +12,10 @@ import { NetworkProvider } from './src/providers/NetworkProvider';
 import AppNavigator from './src/navigation/AppNavigator';
 import GlobalOfflineIndicator from './src/components/GlobalOfflineIndicator';
 import DeepLinkingService from './src/services/DeepLinkingService';
+import { initializeSentry } from './src/config/sentry';
+
+// Initialize Sentry for production error reporting
+initializeSentry();
 
 // Create a client with optimized caching and global retry configuration
 const queryClient = new QueryClient({

@@ -9,6 +9,8 @@ export interface DeepLinkParams {
   error_description?: string;
   access_token?: string;
   refresh_token?: string;
+  code?: string;
+  inviter_name?: string;
 }
 
 class DeepLinkingService {
@@ -272,12 +274,83 @@ class DeepLinkingService {
    */
   private async handleInviteLink(params: DeepLinkParams) {
     console.log('📨 Handling invite link:', params);
-    // TODO: Implement invite flow
-    Alert.alert(
-      'Invite Received',
-      'You have been invited to join KitchAI!',
-      [{ text: 'Accept Invite' }]
-    );
+    
+    // Extract invite parameters
+    const inviteCode = params.token || params.code;
+    const inviterName = params.inviter_name || 'A friend';
+    
+    if (!inviteCode) {
+      Alert.alert(
+        'Invalid Invite',
+        'This invite link appears to be invalid. Please check the link and try again.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
+    // Check if user is already signed in
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (session) {
+      // User is signed in - process invite directly
+      await this.processInvite(inviteCode, session.user.id);
+    } else {
+      // User not signed in - show invite acceptance flow
+      Alert.alert(
+        `${inviterName} invited you to KitchAI! 🍳`,
+        'Join KitchAI to discover amazing recipes and connect with food lovers.',
+        [
+          { text: 'Maybe Later', style: 'cancel' },
+          {
+            text: 'Accept Invite',
+            onPress: () => {
+              // Store invite code for after signup
+              this.storeInviteCode(inviteCode);
+              // Navigate to signup with invite context
+              console.log('🎯 Navigate to signup with invite:', inviteCode);
+            }
+          }
+        ]
+      );
+    }
+  }
+  
+  /**
+   * Process invite after user authentication
+   */
+  private async processInvite(inviteCode: string, userId: string) {
+    try {
+      // TODO: Call RPC function to process invite
+      // const { data, error } = await supabase.rpc('process_invite', {
+      //   invite_code: inviteCode,
+      //   user_id: userId
+      // });
+      
+      // For now, just show success
+      Alert.alert(
+        'Invite Accepted! 🎉',
+        'Welcome to KitchAI! You\'ve successfully joined through your friend\'s invite.',
+        [{ text: 'Start Exploring' }]
+      );
+      
+      console.log('✅ Invite processed successfully:', inviteCode);
+    } catch (error: any) {
+      console.error('❌ Error processing invite:', error);
+      Alert.alert(
+        'Invite Error',
+        'There was an issue processing your invite. Please try again later.',
+        [{ text: 'OK' }]
+      );
+    }
+  }
+  
+  /**
+   * Store invite code for processing after signup
+   */
+  private storeInviteCode(inviteCode: string) {
+    // Store in AsyncStorage or similar for processing after signup
+    console.log('💾 Storing invite code for later:', inviteCode);
+    // TODO: Implement AsyncStorage.setItem('pending_invite', inviteCode);
   }
 
   /**

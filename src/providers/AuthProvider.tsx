@@ -113,22 +113,8 @@ export const AuthProvider: React.FC<PropsWithChildren<object>> = ({
 
       console.log('AuthProvider: Raw RPC response:', data);
 
-      // 🔍 ENHANCED DEBUGGING for specific user investigation
-      const isTargetUser = userId === '4eaf7ede-53fa-488c-8e88-98a93338aa04';
-      
-      if (isTargetUser) {
-        console.log('🚨 [CREATOR DEBUG] RPC Response for target user:', JSON.stringify(data, null, 2));
-        console.log('🚨 [CREATOR DEBUG] Data type:', typeof data);
-        console.log('🚨 [CREATOR DEBUG] Data is null:', data === null);
-        console.log('🚨 [CREATOR DEBUG] Data is undefined:', data === undefined);
-      }
-
       if (!data || !data.profile) {
         console.warn('AuthProvider: No profile data returned from RPC.');
-        
-        if (isTargetUser) {
-          console.log('🚨 [CREATOR DEBUG] No profile data - will set defaults');
-        }
         
         // Set default profile structure for new users
         const defaultProfile: UserProfile = {
@@ -146,17 +132,6 @@ export const AuthProvider: React.FC<PropsWithChildren<object>> = ({
 
       // Extract profile data from RPC response
       const profileData = data.profile;
-      
-      if (isTargetUser) {
-        console.log('🔍 DEBUG: Profile data from RPC:', profileData);
-        console.log('🔍 DEBUG: Type of onboarded:', typeof profileData.onboarded);
-        console.log('🔍 DEBUG: Value of onboarded:', profileData.onboarded);
-        console.log('🔍 DEBUG: Role:', profileData.role);
-        console.log('🔍 DEBUG: Tier:', profileData.tier);
-        console.log('🚨 [CREATOR DEBUG] Extracted profile data:', JSON.stringify(profileData, null, 2));
-        console.log('🚨 [CREATOR DEBUG] onboarded value:', profileData.onboarded);
-        console.log('🚨 [CREATOR DEBUG] role value:', profileData.role);
-      }
 
       // Create processed profile object
       const processedProfile: UserProfile = {
@@ -168,16 +143,7 @@ export const AuthProvider: React.FC<PropsWithChildren<object>> = ({
         onboarded: profileData.onboarded || false,
       };
 
-      if (isTargetUser) {
-        console.log('🔍 DEBUG: Final processed profile:', processedProfile);
-      }
-
       setProfile(processedProfile);
-      
-      if (isTargetUser) {
-        console.log('🔍 DEBUG: getEffectiveTier() returns:', getEffectiveTier());
-        console.log('🔍 DEBUG: isCreator() returns:', isCreator());
-      }
       
       console.log('AuthProvider: Processed Profile Object:', processedProfile);
       console.log('AuthProvider: getEffectiveTier() will return:', getEffectiveTier());
