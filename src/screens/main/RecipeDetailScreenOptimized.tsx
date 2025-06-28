@@ -170,8 +170,6 @@ OptimizedTabNavigator.displayName = 'OptimizedTabNavigator';
 const OptimizedVideoPlayer = React.memo<{
   videoUrl?: string;
   isScreenFocused: boolean;
-  isMuted: boolean;
-  onToggleMute: () => void;
   onLoad: (status: AVPlaybackStatus) => void;
   onError: (error: string) => void;
   initialSeekTime: number;
@@ -180,8 +178,6 @@ const OptimizedVideoPlayer = React.memo<{
   ({
     videoUrl,
     isScreenFocused,
-    isMuted,
-    onToggleMute,
     onLoad,
     onError,
     initialSeekTime,
@@ -189,6 +185,31 @@ const OptimizedVideoPlayer = React.memo<{
   }) => {
     const videoRef = useRef<Video>(null);
     const [isLoaded, setIsLoaded] = useState(false);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [currentPosition, setCurrentPosition] = useState(0);
+    const [duration, setDuration] = useState(0);
+    const [isDragging, setIsDragging] = useState(false);
+    const [isMuted, setIsMuted] = useState(false);
+
+    // Utility function to format time
+    const formatTime = (milliseconds: number): string => {
+      const totalSeconds = Math.floor(milliseconds / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    };
+
+    // Toggle mute function (Instagram style)
+    const toggleMute = useCallback(async () => {
+      if (videoRef.current) {
+        try {
+          await videoRef.current.setIsMutedAsync(!isMuted);
+          setIsMuted(!isMuted);
+        } catch (error) {
+          console.error('Error toggling mute:', error);
+        }
+      }
+    }, [isMuted]);
 
     // Optimized video playback control
     useEffect(() => {
@@ -197,12 +218,14 @@ const OptimizedVideoPlayer = React.memo<{
         if (isScreenFocused) {
           videoElement
             .playAsync()
+            .then(() => setIsPlaying(true))
             .catch(e =>
               console.error(`Video ${recipeId}: Focus play error:`, e),
             );
         } else {
           videoElement
             .pauseAsync()
+            .then(() => setIsPlaying(false))
             .catch(e =>
               console.error(`Video ${recipeId}: Focus pause error:`, e),
             );
@@ -220,16 +243,34 @@ const OptimizedVideoPlayer = React.memo<{
                 toleranceMillisAfter: 100,
               });
             }
-            await videoRef.current.setIsMutedAsync(isMuted);
           }
           setIsLoaded(true);
+          setDuration(status.durationMillis || 0);
+          setCurrentPosition(status.positionMillis || 0);
           onLoad(status);
         } else if (status.error) {
           onError(status.error);
         }
       },
-      [initialSeekTime, isMuted, onLoad, onError],
+      [initialSeekTime, onLoad, onError],
     );
+
+    // Progress tracking effect
+    useEffect(() => {
+      if (!isLoaded || !isPlaying || isDragging) return;
+      
+      const interval = setInterval(() => {
+        if (videoRef.current) {
+          videoRef.current.getStatusAsync().then((status) => {
+            if (status.isLoaded && status.positionMillis !== undefined) {
+              setCurrentPosition(status.positionMillis);
+            }
+          });
+        }
+      }, 500);
+      
+      return () => clearInterval(interval);
+    }, [isLoaded, isPlaying, isDragging]);
 
     if (!videoUrl) {
       return (
@@ -242,25 +283,53 @@ const OptimizedVideoPlayer = React.memo<{
 
     return (
       <View style={styles.videoContainer}>
-        <Video
-          ref={videoRef}
-          style={styles.videoPlayer}
-          source={{ uri: videoUrl }}
-          useNativeControls={false}
-          resizeMode={ResizeMode.COVER}
-          isLooping
-          onLoad={handleLoad}
-          onError={onError}
-          progressUpdateIntervalMillis={500}
-          isMuted={isMuted}
-        />
-        <TouchableOpacity style={styles.muteButton} onPress={onToggleMute}>
-          <Ionicons
-            name={isMuted ? 'volume-mute' : 'volume-high'}
-            size={24}
-            color="white"
+        <TouchableOpacity
+          style={styles.videoTouchArea}
+          onPress={toggleMute}
+          activeOpacity={1}>
+          <Video
+            ref={videoRef}
+            style={styles.videoPlayer}
+            source={{ uri: videoUrl }}
+            useNativeControls={false}
+            resizeMode={ResizeMode.COVER}
+            isLooping
+            onLoad={handleLoad}
+            onError={onError}
+            progressUpdateIntervalMillis={500}
+            shouldPlay={isScreenFocused}
+            isMuted={isMuted}
           />
         </TouchableOpacity>
+        
+        {/* Custom Video Controls - Instagram Style */}
+        {isLoaded && (
+          <View style={styles.instagramProgressContainer}>
+            <TouchableOpacity
+              onPress={(event) => {
+                const { locationX } = event.nativeEvent;
+                const progressBarWidth = screenWidth; // Full screen width
+                const percentage = Math.max(0, Math.min(1, locationX / progressBarWidth));
+                const newPosition = percentage * duration;
+                
+                if (videoRef.current && duration > 0) {
+                  videoRef.current.setPositionAsync(newPosition);
+                  setCurrentPosition(newPosition);
+                }
+              }}
+              activeOpacity={1}
+              style={{ flex: 1, height: 20, justifyContent: 'center' }}>
+              <View style={styles.instagramProgressBar}>
+                <View 
+                  style={[
+                    styles.instagramProgressFill, 
+                    { width: `${duration > 0 ? (currentPosition / duration) * 100 : 0}%` }
+                  ]} 
+                />
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     );
   },
@@ -273,77 +342,97 @@ const OptimizedRecipeInfo = React.memo<{
   matchedCount: number;
   totalCount: number;
   onNavigateToAuthor: () => void;
-}>(({ recipeDetails, matchedCount, totalCount, onNavigateToAuthor }) => {
-  const prepTime = recipeDetails?.prep_time_minutes;
-  const cookTime = recipeDetails?.cook_time_minutes;
-  const totalTime = (prepTime || 0) + (cookTime || 0);
+  navigation: any;
+}>(
+  ({
+    recipeDetails,
+    matchedCount,
+    totalCount,
+    onNavigateToAuthor,
+    navigation,
+  }) => {
+    const prepTime = recipeDetails?.prep_time_minutes;
+    const cookTime = recipeDetails?.cook_time_minutes;
+    const totalTime = (prepTime || 0) + (cookTime || 0);
 
-  return (
-    <View style={styles.recipeInfoSection}>
-      <Text
-        style={styles.recipeTitleText}
-        numberOfLines={3}
-        ellipsizeMode="tail">
-        {recipeDetails.title}
-      </Text>
-
-      {/* Author Info Row */}
-      {(recipeDetails?.username || recipeDetails?.is_ai_generated) && (
-        <TouchableOpacity
-          style={styles.authorInfoRow}
-          onPress={
-            recipeDetails?.is_ai_generated ? undefined : onNavigateToAuthor
-          }
-          disabled={recipeDetails?.is_ai_generated}>
-          {recipeDetails?.is_ai_generated ? (
-            <View style={styles.authorAvatarPlaceholder}>
-              <Ionicons name="sparkles" size={18} color="#10b981" />
-            </View>
-          ) : recipeDetails.avatar_url ? (
-            <Image
-              source={{ uri: recipeDetails.avatar_url }}
-              style={styles.authorAvatarImage}
-            />
-          ) : (
-            <View style={styles.authorAvatarPlaceholder}>
-              <Ionicons
-                name="person-outline"
-                size={18}
-                color={COLORS.primary || '#00796b'}
-              />
-            </View>
-          )}
-          <Text style={styles.authorNameText}>
-            {recipeDetails?.is_ai_generated
-              ? 'Kitch AI'
-              : recipeDetails.username || 'Unknown Author'}
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Pantry Badge Row */}
-      <View style={styles.pantryBadgeRow}>
-        <Ionicons name="restaurant-outline" style={styles.pantryBadgeIcon} />
-        <Text style={styles.pantryBadgeInfoText}>
-          {matchedCount}/{totalCount} Ingredients in pantry
+    return (
+      <View style={styles.recipeInfoSection}>
+        {/* Recipe Title - Centered without interference */}
+        <Text
+          style={styles.recipeTitleText}
+          numberOfLines={3}
+          ellipsizeMode="tail">
+          {recipeDetails.title}
         </Text>
-      </View>
+        
+        {/* View Count - Separate layer, doesn't affect layout */}
+        {typeof recipeDetails.views_count === 'number' && (
+          <View style={styles.viewCountBadge}>
+            <Ionicons name="eye-outline" size={16} color={COLORS.textSecondary || '#666'} />
+            <Text style={styles.viewCountText}>
+              {recipeDetails.views_count.toLocaleString()}
+            </Text>
+          </View>
+        )}
 
-      {/* Time Info Row */}
-      <View style={styles.timeInfoRow}>
-        {prepTime !== null && (
-          <Text style={styles.timeDetailText}>Prep: {prepTime} min</Text>
+        {/* Author Info Row */}
+        {(recipeDetails?.username || recipeDetails?.is_ai_generated) && (
+          <TouchableOpacity
+            style={styles.authorInfoRow}
+            onPress={
+              recipeDetails?.is_ai_generated ? undefined : onNavigateToAuthor
+            }
+            disabled={recipeDetails?.is_ai_generated}>
+            {recipeDetails?.is_ai_generated ? (
+              <View style={styles.authorAvatarPlaceholder}>
+                <Ionicons name="sparkles" size={18} color="#10b981" />
+              </View>
+            ) : recipeDetails.avatar_url ? (
+              <Image
+                source={{ uri: recipeDetails.avatar_url }}
+                style={styles.authorAvatarImage}
+              />
+            ) : (
+              <View style={styles.authorAvatarPlaceholder}>
+                <Ionicons
+                  name="person-outline"
+                  size={18}
+                  color={COLORS.primary || '#00796b'}
+                />
+              </View>
+            )}
+            <Text style={styles.authorNameText}>
+              {recipeDetails?.is_ai_generated
+                ? 'Kitch AI'
+                : recipeDetails.username || 'Unknown Author'}
+            </Text>
+          </TouchableOpacity>
         )}
-        {cookTime !== null && (
-          <Text style={styles.timeDetailText}>Cook: {cookTime} min</Text>
-        )}
-        {totalTime > 0 && (
-          <Text style={styles.timeDetailText}>Total: {totalTime} min</Text>
-        )}
+
+        {/* Pantry Badge Row */}
+        <View style={styles.pantryBadgeRow}>
+          <Ionicons name="restaurant-outline" style={styles.pantryBadgeIcon} />
+          <Text style={styles.pantryBadgeInfoText}>
+            {matchedCount}/{totalCount} Ingredients in pantry
+          </Text>
+        </View>
+
+        {/* Time Info Row */}
+        <View style={styles.timeInfoRow}>
+          {prepTime !== null && (
+            <Text style={styles.timeDetailText}>Prep: {prepTime} min</Text>
+          )}
+          {cookTime !== null && (
+            <Text style={styles.timeDetailText}>Cook: {cookTime} min</Text>
+          )}
+          {totalTime > 0 && (
+            <Text style={styles.timeDetailText}>Total: {totalTime} min</Text>
+          )}
+        </View>
       </View>
-    </View>
-  );
-});
+    );
+  },
+);
 OptimizedRecipeInfo.displayName = 'OptimizedRecipeInfo';
 
 // Optimized Action Row Component
@@ -460,6 +549,8 @@ OptimizedActionRow.displayName = 'OptimizedActionRow';
 
 // Main RecipeDetailScreen component
 export const RecipeDetailScreenOptimized = React.memo(() => {
+
+  
   const route = useRoute<RecipeDetailScreenRouteProp>();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -479,7 +570,6 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
   const initialTabFromParams = route.params?.initialTab;
 
   // State
-  const [isMuted, setIsMuted] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [videoPlayerError, setVideoPlayerError] = useState<string | null>(null);
   const [currentScrollPosition, setCurrentScrollPosition] = useState(0);
@@ -605,10 +695,6 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
   const totalCount = ingredients.length;
 
   // Optimized handlers
-  const toggleMute = useCallback(() => {
-    setIsMuted(prev => !prev);
-  }, []);
-
   const handleLoad = useCallback((status: AVPlaybackStatus) => {
     if (status.isLoaded) {
       setIsLoaded(true);
@@ -663,9 +749,6 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
       // PHASE 3: Log tab performance in development
       if (__DEV__) {
         const tabDuration = Date.now() - tabStartTime;
-        if (tabDuration > 50) { // Only log if slower than 50ms
-          console.log(`[Performance] 📑 Tab switch to ${tab}: ${tabDuration}ms`);
-        }
       }
     },
     [currentScrollPosition],
@@ -820,17 +903,28 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
             </View>
           </View>
         ) : (
-          <OptimizedVideoPlayer
-            videoUrl={recipeDetails?.video_url || undefined}
-            isScreenFocused={isScreenFocused}
-            isMuted={isMuted}
-            onToggleMute={toggleMute}
-            onLoad={handleLoad}
-            onError={handleError}
-            initialSeekTime={initialSeekTime}
-            recipeId={id || ''}
-          />
+          (() => {
+        
+            return (
+              <OptimizedVideoPlayer
+                videoUrl={recipeDetails?.video_url || undefined}
+                isScreenFocused={isScreenFocused}
+                onLoad={handleLoad}
+                onError={handleError}
+                initialSeekTime={initialSeekTime}
+                recipeId={id || ''}
+              />
+            );
+          })()
         )}
+
+        {/* Back Arrow Button - Following React Navigation Best Practices */}
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
+          <Ionicons name="arrow-back" size={28} color="#ffffff" />
+        </TouchableOpacity>
 
         {/* Cart Icon with Badge */}
         <TouchableOpacity
@@ -849,26 +943,6 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
             </View>
           )}
         </TouchableOpacity>
-
-        {/* View Count */}
-        {recipeDetails && typeof recipeDetails.views_count === 'number' && (
-          <View style={styles.videoViewCountContainer}>
-            <Ionicons name="eye-outline" style={styles.videoViewCountIcon} />
-            <Text style={styles.videoViewCountText}>
-              {recipeDetails.views_count.toLocaleString()}
-            </Text>
-          </View>
-        )}
-
-        {/* Action Overlay */}
-        <Suspense fallback={null}>
-          <ActionOverlay
-            item={recipeDetails as any}
-            onLike={() => likeMutation.mutate(id)}
-            onSave={() => saveMutation.mutate(id)}
-            onCommentPress={handleCommentPress}
-          />
-        </Suspense>
       </View>
 
       <ScrollView
@@ -887,6 +961,7 @@ export const RecipeDetailScreenOptimized = React.memo(() => {
           matchedCount={matchedCount}
           totalCount={totalCount}
           onNavigateToAuthor={handleNavigateToAuthorProfile}
+          navigation={navigation}
         />
 
         {/* Divider */}
@@ -985,61 +1060,19 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingHorizontal: 20,
   },
-  muteButton: {
+  backButton: {
     position: 'absolute',
     top: 50,
     left: 20,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 20,
-    padding: 8,
-    zIndex: 10,
-  },
-  cartButtonContainer: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 20,
-    padding: 8,
-    zIndex: 10,
-  },
-  badge: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: COLORS.error || '#ff0000',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badgeText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  videoViewCountContainer: {
-    position: 'absolute',
-    bottom: 12,
-    left: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    zIndex: 5,
-  },
-  videoViewCountIcon: {
-    fontSize: 15,
-    color: 'white',
-    marginRight: 5,
-  },
-  videoViewCountText: {
-    fontSize: 13,
-    color: 'white',
-    fontWeight: '600',
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    borderRadius: 25,
+    padding: 12,
+    zIndex: 20,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   aiRecipeImageContainer: {
     ...StyleSheet.absoluteFillObject,
@@ -1077,6 +1110,7 @@ const styles = StyleSheet.create({
   recipeInfoSection: {
     padding: 16,
     backgroundColor: COLORS.white || '#fff',
+    position: 'relative',
   },
   recipeTitleText: {
     fontSize: 24,
@@ -1084,10 +1118,12 @@ const styles = StyleSheet.create({
     color: COLORS.text || '#000',
     marginBottom: 12,
     lineHeight: 30,
+    textAlign: 'center',
   },
   authorInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 12,
   },
   authorAvatarImage: {
@@ -1113,6 +1149,7 @@ const styles = StyleSheet.create({
   pantryBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 8,
   },
   pantryBadgeIcon: {
@@ -1204,6 +1241,75 @@ const styles = StyleSheet.create({
   },
   tabContentContainer: {
     // No padding/margin here since individual tab components have their own
+  },
+  cartButtonContainer: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 20,
+    padding: 8,
+    zIndex: 10,
+  },
+  badge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: COLORS.error || '#ff0000',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  videoTouchArea: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+  },
+  instagramProgressContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 20,
+    zIndex: 15,
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+  },
+  instagramProgressBar: {
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 0,
+    overflow: 'hidden',
+    marginHorizontal: 0,
+  },
+  instagramProgressFill: {
+    height: '100%',
+    backgroundColor: COLORS.primary || '#00796b',
+    borderRadius: 0,
+  },
+  viewCountBadge: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    zIndex: 10,
+  },
+  viewCountText: {
+    fontSize: 12,
+    color: COLORS.textSecondary || '#666',
+    fontWeight: '500',
+    marginLeft: 4,
   },
 });
 

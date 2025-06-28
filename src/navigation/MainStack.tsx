@@ -3,7 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MainTabs from './MainTabs'; // Import the tabs navigator
 // import SearchResultsScreen from '../screens/main/SearchResultsScreen'; // Commented out
 // Revert to original screen temporarily to fix crash
-import RecipeDetailScreen from '../screens/main/RecipeDetailScreen';
+import { RecipeDetailScreenOptimized as RecipeDetailScreen } from '../screens/main/RecipeDetailScreenOptimized';
 import PantryScanningScreen from '../screens/pantry/PantryScanningScreen'; // Uncommented
 import EditProfileScreen from '../screens/EditProfileScreen'; // Uncommented
 import VideoRecipeUploaderScreen from '../screens/recipe/VideoRecipeUploaderScreen';
