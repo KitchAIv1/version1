@@ -209,7 +209,25 @@ export const useAccessControl = () => {
 
         console.log('[useAccessControl] Extracted recipes data:', recipesData);
 
-        // The Edge Function already handles usage tracking, so we don't need to call RPC here
+        // CRITICAL FIX: The Edge Function does NOT handle usage tracking, we need to call it here
+        // Call the usage tracking RPC function for FREEMIUM users
+        try {
+          console.log('[useAccessControl] Logging AI recipe generation usage...');
+          const { error: usageError } = await supabase.rpc('log_ai_recipe_generation', {
+            p_user_id: user.id,
+          });
+          
+          if (usageError) {
+            console.error('[useAccessControl] Error logging AI recipe usage:', usageError);
+            // Don't fail the generation - usage tracking is secondary
+          } else {
+            console.log('[useAccessControl] ✅ AI recipe usage logged successfully');
+          }
+        } catch (usageTrackingError) {
+          console.error('[useAccessControl] Usage tracking error:', usageTrackingError);
+          // Don't fail the generation - usage tracking is secondary
+        }
+
         return recipesData; // Should be array of 3 recipes with recipe_id
       } catch (error: any) {
         console.error('[useAccessControl] AI recipe generation error:', error);

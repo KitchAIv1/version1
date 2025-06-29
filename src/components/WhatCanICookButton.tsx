@@ -1,5 +1,7 @@
-import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ViewStyle } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { TouchableOpacity, Text, StyleSheet, ViewStyle, View } from 'react-native';
+import { useAccessControl } from '../hooks/useAccessControl';
+import { useAuth } from '../providers/AuthProvider';
 
 interface WhatCanICookButtonProps {
   pantryItemCount: number;
@@ -76,6 +78,15 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
+  usageText: {
+    fontSize: 11,
+    color: '#ffffff',
+    marginLeft: 4,
+    fontStyle: 'italic',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
 });
 
 function WhatCanICookButton({
@@ -85,6 +96,38 @@ function WhatCanICookButton({
   variant = 'primary',
 }: WhatCanICookButtonProps) {
   const isEnabled = pantryItemCount >= 3;
+  const { getAIRecipeUsageDisplay, getUsageDisplay } = useAccessControl();
+  const { user } = useAuth();
+  
+  // State for AI recipe usage display
+  const [aiUsageText, setAiUsageText] = useState('Loading...');
+  const [showUsage, setShowUsage] = useState(false);
+
+  // Check if we should show usage (FREEMIUM users only)
+  useEffect(() => {
+    const usageData = getUsageDisplay();
+    setShowUsage(usageData.showUsage);
+  }, [getUsageDisplay]);
+
+  // Fetch AI recipe usage for display
+  useEffect(() => {
+    if (!showUsage || !user?.id) {
+      setAiUsageText('');
+      return;
+    }
+
+    const fetchUsage = async () => {
+      try {
+        const usage = await getAIRecipeUsageDisplay();
+        setAiUsageText(usage);
+      } catch (error) {
+        console.error('[WhatCanICookButton] Error fetching AI usage:', error);
+        setAiUsageText('Error');
+      }
+    };
+
+    fetchUsage();
+  }, [showUsage, user?.id, getAIRecipeUsageDisplay]);
 
   // Extract nested ternary to helper function
   const getButtonVariantStyle = () => {
@@ -120,8 +163,12 @@ function WhatCanICookButton({
       disabled={!isEnabled}
       activeOpacity={0.8}>
       <Text style={textStyle}>What Can I Cook?</Text>
-      {!isEnabled && (
+      {!isEnabled ? (
         <Text style={styles.requirementText}>(Need 3+ items)</Text>
+      ) : (
+        showUsage && aiUsageText && aiUsageText !== 'Unlimited' && (
+          <Text style={styles.usageText}>{aiUsageText} AI recipes</Text>
+        )
       )}
     </TouchableOpacity>
   );

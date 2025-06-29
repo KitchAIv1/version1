@@ -14,6 +14,7 @@ import { RecipeResultsScreenProps } from '../../navigation/types';
 import { useRecipeSuggestions } from '../../hooks/useRecipeSuggestions';
 import { useAccessControl } from '../../hooks/useAccessControl';
 import { LimitReachedModal } from '../../components/modals/LimitReachedModal';
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function RecipeResultsScreen({
   navigation,
@@ -30,7 +31,7 @@ export default function RecipeResultsScreen({
   } = useRecipeSuggestions(selectedIngredients);
 
   // Access control for AI recipe generation
-  const { checkAIRecipeAvailability } = useAccessControl();
+  const { checkAIRecipeAvailability, getAIRecipeUsageDisplay } = useAccessControl();
   
   // State for AI recipe availability and limit modal
   const [aiAvailability, setAiAvailability] = useState<{
@@ -40,26 +41,45 @@ export default function RecipeResultsScreen({
     reason: string | null;
   } | null>(null);
   const [showLimitModal, setShowLimitModal] = useState(false);
+  const [aiUsageText, setAiUsageText] = useState('Loading...');
+
+  // Function to check AI availability and usage
+  const checkAvailability = async () => {
+    try {
+      console.log('[RecipeResultsScreen] Checking AI availability...');
+      const availability = await checkAIRecipeAvailability();
+      console.log('[RecipeResultsScreen] AI availability result:', availability);
+      setAiAvailability(availability);
+
+      // Also get the usage display text
+      const usageText = await getAIRecipeUsageDisplay();
+      console.log('[RecipeResultsScreen] AI usage text:', usageText);
+      setAiUsageText(usageText);
+    } catch (error) {
+      console.error('[RecipeResultsScreen] Error checking availability:', error);
+      // On error, assume available (backend will handle)
+      setAiAvailability({
+        canGenerate: true,
+        isLimitReached: false,
+        usage: null,
+        reason: null,
+      });
+      setAiUsageText('Error');
+    }
+  };
 
   // Check AI recipe availability when component mounts
   useEffect(() => {
-    const checkAvailability = async () => {
-      try {
-        const availability = await checkAIRecipeAvailability();
-        setAiAvailability(availability);
-      } catch (error) {
-        // On error, assume available (backend will handle)
-        setAiAvailability({
-          canGenerate: true,
-          isLimitReached: false,
-          usage: null,
-          reason: null,
-        });
-      }
-    };
-
     checkAvailability();
-  }, [checkAIRecipeAvailability]);
+  }, []);
+
+  // Refresh availability when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('[RecipeResultsScreen] Screen focused - refreshing AI availability');
+      checkAvailability();
+    }, [])
+  );
 
   const handleGoBack = () => {
     navigation.goBack();
@@ -89,15 +109,7 @@ export default function RecipeResultsScreen({
 
   const handleUpgradeSuccess = () => {
     console.log('[RecipeResultsScreen] Upgrade successful - refreshing availability');
-    // Refresh AI availability after upgrade
-    const checkAvailability = async () => {
-      try {
-        const availability = await checkAIRecipeAvailability();
-        setAiAvailability(availability);
-      } catch (error) {
-        console.error('[RecipeResultsScreen] Error refreshing availability:', error);
-      }
-    };
+    // Refresh AI availability after upgrade using centralized function
     checkAvailability();
   };
 
@@ -293,9 +305,9 @@ export default function RecipeResultsScreen({
               </Text>
               
               {/* Show usage info for FREEMIUM users */}
-              {aiAvailability?.usage && (
+              {(aiAvailability?.usage || aiUsageText !== 'Unlimited') && aiUsageText !== 'Loading...' && (
                 <Text style={styles.usageInfo}>
-                  {aiAvailability.usage.remaining} of {aiAvailability.usage.limit} AI recipes remaining this month
+                  {aiUsageText}
                 </Text>
               )}
             </View>
