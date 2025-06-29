@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { TouchableOpacity, Text, StyleSheet, ViewStyle, View } from 'react-native';
 import { useAccessControl } from '../hooks/useAccessControl';
 import { useAuth } from '../providers/AuthProvider';
+import { useFocusEffect } from '@react-navigation/native';
 
 interface WhatCanICookButtonProps {
   pantryItemCount: number;
@@ -109,25 +110,48 @@ function WhatCanICookButton({
     setShowUsage(usageData.showUsage);
   }, [getUsageDisplay]);
 
-  // Fetch AI recipe usage for display
-  useEffect(() => {
+  // Function to fetch and update usage display
+  const fetchUsageDisplay = React.useCallback(async () => {
     if (!showUsage || !user?.id) {
       setAiUsageText('');
       return;
     }
 
-    const fetchUsage = async () => {
-      try {
-        const usage = await getAIRecipeUsageDisplay();
-        setAiUsageText(usage);
-      } catch (error) {
-        console.error('[WhatCanICookButton] Error fetching AI usage:', error);
-        setAiUsageText('Error');
-      }
-    };
-
-    fetchUsage();
+    try {
+      console.log('[WhatCanICookButton] Fetching AI usage display...');
+      const usage = await getAIRecipeUsageDisplay();
+      console.log('[WhatCanICookButton] AI usage display result:', usage);
+      setAiUsageText(usage);
+    } catch (error) {
+      console.error('[WhatCanICookButton] Error fetching AI usage:', error);
+      setAiUsageText('Error');
+    }
   }, [showUsage, user?.id, getAIRecipeUsageDisplay]);
+
+  // Initial fetch on mount
+  useEffect(() => {
+    fetchUsageDisplay();
+  }, [fetchUsageDisplay]);
+
+  // 🔧 CRITICAL FIX: Refresh usage when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('[WhatCanICookButton] Screen focused - refreshing AI usage display');
+      fetchUsageDisplay();
+    }, [fetchUsageDisplay])
+  );
+
+  // 🔧 PERFORMANCE: Refresh usage every 30 seconds while component is mounted
+  useEffect(() => {
+    if (!showUsage || !user?.id) return;
+    
+    const interval = setInterval(() => {
+      console.log('[WhatCanICookButton] Periodic refresh of AI usage display');
+      fetchUsageDisplay();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [showUsage, user?.id, fetchUsageDisplay]);
 
   // Extract nested ternary to helper function
   const getButtonVariantStyle = () => {

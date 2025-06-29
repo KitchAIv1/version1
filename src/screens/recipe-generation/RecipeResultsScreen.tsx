@@ -81,6 +81,16 @@ export default function RecipeResultsScreen({
     }, [])
   );
 
+  // 🔧 CRITICAL FIX: Periodic refresh to ensure data stays current
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('[RecipeResultsScreen] Periodic refresh of AI availability');
+      checkAvailability();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
   const handleGoBack = () => {
     navigation.goBack();
   };

@@ -105,15 +105,21 @@ export const GlobalUploadIndicator: React.FC<GlobalUploadIndicatorProps> = ({ vi
       const uploadingCount = allUploads.filter(item => item.status === 'uploading').length;
       const pendingCount = allUploads.filter(item => item.status === 'pending').length;
       
-      console.log(`🔄 GlobalUploadIndicator: ${originalCount} original + ${userAwareCount} secure uploads = ${allUploads.length} total (${activeCount} active: ${uploadingCount} uploading, ${pendingCount} pending) - Visible: ${shouldShow}`);
+      // 🔧 PERFORMANCE FIX: Only log when there are uploads or state changes
+      const hasUploads = allUploads.length > 0;
+      const hasActiveUploads = activeCount > 0;
       
-      // CRITICAL DEBUG: Show individual upload statuses
-      if (userAwareItems.length > 0) {
-        console.log(`🔍 GlobalUploadIndicator DEBUG: UserAware uploads:`, userAwareItems.map(item => ({
-          id: item.id.substring(item.id.length - 6),
-          status: item.status,
-          progress: Math.round(item.progress * 100) + '%'
-        })));
+      if (hasUploads || hasActiveUploads) {
+        console.log(`🔄 GlobalUploadIndicator: ${originalCount} original + ${userAwareCount} secure uploads = ${allUploads.length} total (${activeCount} active: ${uploadingCount} uploading, ${pendingCount} pending) - Visible: ${shouldShow}`);
+        
+        // CRITICAL DEBUG: Show individual upload statuses
+        if (userAwareItems.length > 0) {
+          console.log(`🔍 GlobalUploadIndicator DEBUG: UserAware uploads:`, userAwareItems.map(item => ({
+            id: item.id.substring(item.id.length - 6),
+            status: item.status,
+            progress: Math.round(item.progress * 100) + '%'
+          })));
+        }
       }
     }
   }, []);
@@ -197,7 +203,7 @@ export const GlobalUploadIndicator: React.FC<GlobalUploadIndicatorProps> = ({ vi
       const originalItems = uploadService.getQueueStatus();
       updateQueue(originalItems, queueItems);
       
-      if (__DEV__) {
+      if (__DEV__ && queueItems.length > 0) {
         console.log(`🔄 GlobalUploadIndicator: UserAware queue update - ${queueItems.length} items for user ${user.id}`);
       }
     };
@@ -211,9 +217,12 @@ export const GlobalUploadIndicator: React.FC<GlobalUploadIndicatorProps> = ({ vi
       // Force immediate queue refresh when upload is added
       const queueItems = userAwareService.getQueueStatus();
       handleUserAwareQueueUpdate(queueItems);
+      
+      // Start periodic sync when new upload is added
+      startPeriodicSync();
     });
 
-    // CRITICAL FIX: Force immediate sync and periodic sync to catch missed events
+    // CRITICAL FIX: Force immediate sync and conditional periodic sync
     const forceSync = () => {
       const queueItems = userAwareService.getQueueStatus();
       handleUserAwareQueueUpdate(queueItems);
@@ -222,11 +231,51 @@ export const GlobalUploadIndicator: React.FC<GlobalUploadIndicatorProps> = ({ vi
     // Initial sync
     forceSync();
     
-    // Periodic sync every 2 seconds to catch any missed events
-    const syncInterval = setInterval(forceSync, 2000);
+    // 🔧 PERFORMANCE FIX: Only run periodic sync when there are active uploads
+    let syncInterval: NodeJS.Timeout | null = null;
+    
+    const startPeriodicSync = () => {
+      if (!syncInterval) {
+        syncInterval = setInterval(() => {
+          const queueItems = userAwareService.getQueueStatus();
+          const hasActiveUploads = queueItems.some(item => 
+            item.status === 'uploading' || item.status === 'pending'
+          );
+          
+          if (hasActiveUploads) {
+            handleUserAwareQueueUpdate(queueItems);
+          } else {
+            // Stop periodic sync when no active uploads
+            if (syncInterval) {
+              clearInterval(syncInterval);
+              syncInterval = null;
+              if (__DEV__) {
+                console.log('🔄 GlobalUploadIndicator: Stopped periodic sync (no active uploads)');
+              }
+            }
+          }
+        }, 2000);
+        
+        if (__DEV__) {
+          console.log('🔄 GlobalUploadIndicator: Started periodic sync (active uploads detected)');
+        }
+      }
+    };
+    
+    // Start periodic sync if there are active uploads initially
+    const initialQueueItems = userAwareService.getQueueStatus();
+    const hasInitialActiveUploads = initialQueueItems.some(item => 
+      item.status === 'uploading' || item.status === 'pending'
+    );
+    
+    if (hasInitialActiveUploads) {
+      startPeriodicSync();
+    }
 
     return () => {
-      clearInterval(syncInterval);
+      if (syncInterval) {
+        clearInterval(syncInterval);
+      }
       userAwareService.off('queueUpdated', handleUserAwareQueueUpdate);
       userAwareService.off('uploadProgress', updateProgress);
       userAwareService.off('uploadSuccess', handleUploadSuccess);

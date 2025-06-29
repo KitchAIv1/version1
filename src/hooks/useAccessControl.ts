@@ -115,7 +115,7 @@ export const useAccessControl = () => {
 
   // Generate AI recipe with access control
   const generateAIRecipe = useCallback(
-    async (recipeData: any) => {
+    async (recipeData: any, retryCount = 0) => {
       if (!user?.id) {
         Alert.alert('Error', 'User not authenticated');
         return null;
@@ -128,9 +128,18 @@ export const useAccessControl = () => {
           recipeData,
         );
 
-        // Call the Edge Function directly as instructed by backend team
+        // Call the Edge Function with proper user authentication
         const supabaseUrl = 'https://btpmaqffdmxhugvybgfn.supabase.co';
-        const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON;
+        
+        // 🔧 CRITICAL FIX: Use user's JWT token, not anon key
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+          console.error('[useAccessControl] No user session found');
+          Alert.alert('Error', 'Authentication required');
+          return null;
+        }
+
+        console.log('[useAccessControl] Using user JWT token for Edge Function authentication');
 
         const response = await fetch(
           `${supabaseUrl}/functions/v1/generate-recipe`,
@@ -138,7 +147,7 @@ export const useAccessControl = () => {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${supabaseAnonKey}`,
+              Authorization: `Bearer ${session.access_token}`,
             },
             body: JSON.stringify({
               user_id: user.id,
@@ -158,17 +167,112 @@ export const useAccessControl = () => {
           rawResponse,
         );
 
+        // 🔧 ENHANCED ERROR HANDLING: Better OpenAI error diagnosis
         let data;
         try {
           data = JSON.parse(rawResponse);
         } catch (parseError) {
-          console.error('[useAccessControl] Failed to parse response as JSON:', parseError);
-          Alert.alert('Error', 'Invalid response from AI service');
-          return null;
+          console.error('[useAccessControl] 🚨 JSON Parse Error Details:');
+          console.error('[useAccessControl] ❌ Parse Error:', parseError);
+          console.error('[useAccessControl] 📄 Raw Response Length:', rawResponse.length);
+          console.error('[useAccessControl] 📄 Raw Response Preview (first 500 chars):', rawResponse.substring(0, 500));
+          console.error('[useAccessControl] 📄 Raw Response End (last 200 chars):', rawResponse.substring(Math.max(0, rawResponse.length - 200)));
+          
+          // 🔧 SMART FALLBACK: Try to extract JSON from markdown or partial response
+          console.log('[useAccessControl] 🔧 Attempting smart JSON extraction...');
+          
+          // Try to extract JSON from markdown blocks
+          const jsonMatch = rawResponse.match(/```json\s*([\s\S]*?)\s*```/);
+          if (jsonMatch && jsonMatch[1]) {
+            try {
+              data = JSON.parse(jsonMatch[1].trim());
+              console.log('[useAccessControl] ✅ Successfully extracted JSON from markdown block');
+            } catch (markdownError) {
+              console.error('[useAccessControl] ❌ Markdown JSON extraction failed:', markdownError);
+            }
+          }
+          
+          // Try to fix common JSON truncation issues
+          if (!data && rawResponse.includes('{')) {
+            try {
+              // Find the last complete JSON object
+              const lastBraceIndex = rawResponse.lastIndexOf('}');
+              if (lastBraceIndex > 0) {
+                const truncatedJson = rawResponse.substring(0, lastBraceIndex + 1);
+                data = JSON.parse(truncatedJson);
+                console.log('[useAccessControl] ✅ Successfully parsed truncated JSON');
+              }
+            } catch (truncationError) {
+              console.error('[useAccessControl] ❌ Truncated JSON parsing failed:', truncationError);
+            }
+          }
+          
+          // If all parsing attempts fail, provide detailed error
+          if (!data) {
+            console.error('[useAccessControl] 💥 All JSON parsing attempts failed');
+            
+            // 🔧 FALLBACK: Return structured error for user feedback
+            Alert.alert(
+              'AI Service Temporarily Unavailable',
+              'The AI recipe service is experiencing issues. Please try again in a moment.',
+              [
+                { text: 'Retry', onPress: () => {} },
+                { text: 'Cancel', style: 'cancel' }
+              ]
+            );
+            return null;
+          }
         }
 
         if (!response.ok) {
           console.error('[useAccessControl] Edge Function error:', data);
+
+          // 🔧 ENHANCED ERROR CATEGORIZATION
+          const errorMessage = data.error || 'Unknown error';
+          console.error('[useAccessControl] 📊 Error Analysis:');
+          console.error('[useAccessControl] - Status Code:', response.status);
+          console.error('[useAccessControl] - Response Size:', rawResponse.length, 'bytes');
+          console.error('[useAccessControl] - Error Type:', typeof data.error);
+          console.error('[useAccessControl] - Error Contains OpenAI:', errorMessage.includes('OpenAI'));
+          console.error('[useAccessControl] - Error Contains JSON:', errorMessage.includes('JSON'));
+          console.error('[useAccessControl] - Error Contains Token:', errorMessage.includes('token'));
+
+          // 🔧 SPECIFIC HANDLING FOR 500 ERRORS (Edge Function Internal Errors)
+          if (response.status === 500) {
+            console.error('[useAccessControl] 🚨 Edge Function Internal Server Error (500)');
+            console.error('[useAccessControl] 🚨 This indicates an issue with the OpenAI service or Edge Function itself');
+            
+            // 🔧 SMART RETRY LOGIC for 500 errors
+            const maxRetries = 2;
+            if (retryCount < maxRetries) {
+              const delayMs = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s
+              console.log(`[useAccessControl] 🔄 Retrying in ${delayMs}ms (attempt ${retryCount + 1}/${maxRetries + 1})`);
+              
+              setIsProcessing(false); // Allow UI to update
+              await new Promise(resolve => setTimeout(resolve, delayMs));
+              setIsProcessing(true);
+              
+              return generateAIRecipe(recipeData, retryCount + 1);
+            }
+            
+            // Max retries reached, show user-friendly error
+            Alert.alert(
+              'AI Service Temporarily Down',
+              'The AI recipe generator is experiencing technical difficulties. This is usually temporary and resolves within a few minutes.',
+              [
+                { 
+                  text: 'Try Again Later', 
+                  onPress: () => {},
+                  style: 'default'
+                },
+                { 
+                  text: 'Cancel', 
+                  style: 'cancel' 
+                }
+              ]
+            );
+            return null;
+          }
 
           // Handle specific error cases for limits
           if (
@@ -187,10 +291,27 @@ export const useAccessControl = () => {
               message: data.error || 'AI recipe generation limit reached',
               usageInfo: data.usage_info,
             };
-          } else {
+          } 
+          
+          // 🔧 OPENAI-SPECIFIC ERROR HANDLING
+          else if (errorMessage.includes('OpenAI') || errorMessage.includes('JSON')) {
+            console.error('[useAccessControl] 🤖 OpenAI Service Error Detected');
+            Alert.alert(
+              'AI Service Issue',
+              'The AI recipe generator encountered a temporary issue. This is usually resolved by trying again.',
+              [
+                { text: 'Try Again', onPress: () => {} },
+                { text: 'Cancel', style: 'cancel' }
+              ]
+            );
+            return null;
+          } 
+          
+          // Generic error handling
+          else {
             Alert.alert('Error', data.error || 'Failed to generate AI recipe');
+            return null;
           }
-          return null;
         }
 
         console.log('[useAccessControl] Edge Function returned recipes:', data);
@@ -209,29 +330,111 @@ export const useAccessControl = () => {
 
         console.log('[useAccessControl] Extracted recipes data:', recipesData);
 
+        // ✅ SUCCESS: AI recipe generated successfully, now track usage
+        console.log('[useAccessControl] 🎯 AI recipe generation successful - proceeding with usage tracking');
+        
         // CRITICAL FIX: The Edge Function does NOT handle usage tracking, we need to call it here
-        // Call the usage tracking RPC function for FREEMIUM users
+        // Update usage tracking to work with backend's table structure
         try {
           console.log('[useAccessControl] Logging AI recipe generation usage...');
-          const { error: usageError } = await supabase.rpc('log_ai_recipe_generation', {
-            p_user_id: user.id,
+          console.log('[useAccessControl] User ID:', user.id);
+          
+          // 🔧 BACKEND FIX: Work with actual table structure
+          // First, get current usage to calculate new value
+          const { data: currentUsage, error: fetchError } = await supabase
+            .from('user_usage_limits')
+            .select('used_value, ai_recipe_count')
+            .eq('user_id', user.id)
+            .eq('limit_type', 'ai_recipe')
+            .single();
+
+          console.log('[useAccessControl] Current usage fetch result:', { 
+            data: currentUsage, 
+            error: fetchError?.message,
+            hasData: !!currentUsage 
           });
+
+          let newUsedValue = 1;
+          let newAiRecipeCount = 1;
+
+          if (!fetchError && currentUsage) {
+            newUsedValue = (currentUsage.used_value || 0) + 1;
+            newAiRecipeCount = (currentUsage.ai_recipe_count || 0) + 1;
+            console.log('[useAccessControl] Incrementing existing usage:', {
+              oldUsed: currentUsage.used_value,
+              oldCount: currentUsage.ai_recipe_count,
+              newUsed: newUsedValue,
+              newCount: newAiRecipeCount,
+            });
+          } else {
+            console.log('[useAccessControl] Creating new usage record (no existing data found)');
+          }
+
+          // Backend uses separate rows for each limit_type
+          const upsertData = {
+            user_id: user.id,
+            limit_type: 'ai_recipe',
+            limit_value: FREEMIUM_AI_RECIPE_LIMIT,
+            used_value: newUsedValue,
+            ai_recipe_count: newAiRecipeCount,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+
+          console.log('[useAccessControl] Upserting usage data:', upsertData);
+
+          const { data: upsertResult, error: usageError } = await supabase
+            .from('user_usage_limits')
+            .upsert(upsertData, {
+              onConflict: 'user_id,limit_type',
+              ignoreDuplicates: false,
+            })
+            .select();
           
           if (usageError) {
-            console.error('[useAccessControl] Error logging AI recipe usage:', usageError);
-            // Don't fail the generation - usage tracking is secondary
+            console.error('[useAccessControl] ❌ Error logging AI recipe usage:', usageError);
+            console.error('[useAccessControl] ❌ Error details:', {
+              message: usageError.message,
+              details: usageError.details,
+              hint: usageError.hint,
+              code: usageError.code,
+            });
           } else {
-            console.log('[useAccessControl] ✅ AI recipe usage logged successfully');
+            console.log('[useAccessControl] ✅ AI recipe usage logged successfully!');
+            console.log('[useAccessControl] ✅ Upsert result:', upsertResult);
+            console.log('[useAccessControl] ✅ New usage stats:', {
+              used_value: newUsedValue,
+              ai_recipe_count: newAiRecipeCount,
+              remaining: FREEMIUM_AI_RECIPE_LIMIT - newUsedValue,
+            });
           }
-        } catch (usageTrackingError) {
-          console.error('[useAccessControl] Usage tracking error:', usageTrackingError);
+        } catch (usageTrackingError: any) {
+          console.error('[useAccessControl] ❌ Usage tracking exception:', usageTrackingError);
+          console.error('[useAccessControl] ❌ Exception details:', {
+            name: usageTrackingError?.name,
+            message: usageTrackingError?.message,
+            stack: usageTrackingError?.stack,
+          });
           // Don't fail the generation - usage tracking is secondary
         }
 
         return recipesData; // Should be array of 3 recipes with recipe_id
       } catch (error: any) {
         console.error('[useAccessControl] AI recipe generation error:', error);
-        Alert.alert('Error', error.message || 'Failed to generate AI recipe');
+        
+        // 🔧 NETWORK ERROR HANDLING
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+          Alert.alert(
+            'Connection Error',
+            'Unable to connect to AI service. Please check your internet connection and try again.',
+            [
+              { text: 'Retry', onPress: () => {} },
+              { text: 'Cancel', style: 'cancel' }
+            ]
+          );
+        } else {
+          Alert.alert('Error', error.message || 'Failed to generate AI recipe');
+        }
         return null;
       } finally {
         setIsProcessing(false);
@@ -245,17 +448,65 @@ export const useAccessControl = () => {
     if (!user?.id) return null;
 
     try {
-      const { data, error } = await supabase.rpc('get_user_usage_status', {
-        p_user_id: user.id,
-      });
+      // 🔧 CRITICAL FIX: Work with actual backend table structure
+      // Backend uses separate rows for each limit_type, not a single row
+      const { data, error } = await supabase
+        .from('user_usage_limits')
+        .select('limit_type, limit_value, used_value, scan_count, ai_recipe_count')
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('[useAccessControl] Error fetching usage status:', error);
         return null;
       }
 
-      console.log('[useAccessControl] Usage status from backend:', data);
-      return data;
+      console.log('[useAccessControl] Raw usage data from backend:', data);
+
+      if (!data || data.length === 0) {
+        // No usage data found, return defaults for FREEMIUM user
+        return {
+          tier: 'FREEMIUM',
+          unlimited_access: false,
+          scan_count: 0,
+          ai_recipe_count: 0,
+          scan_limit: FREEMIUM_SCAN_LIMIT,
+          ai_recipe_limit: FREEMIUM_AI_RECIPE_LIMIT,
+          scans_remaining: FREEMIUM_SCAN_LIMIT,
+          ai_recipes_remaining: FREEMIUM_AI_RECIPE_LIMIT,
+        };
+      }
+
+      // Parse the backend data structure
+      let scanUsage = 0;
+      let aiRecipeUsage = 0;
+      let scanLimit = FREEMIUM_SCAN_LIMIT;
+      let aiRecipeLimit = FREEMIUM_AI_RECIPE_LIMIT;
+
+      // Process each row (one for each limit_type)
+      data.forEach(row => {
+        if (row.limit_type === 'scan') {
+          scanUsage = row.used_value || row.scan_count || 0;
+          scanLimit = row.limit_value || FREEMIUM_SCAN_LIMIT;
+        } else if (row.limit_type === 'ai_recipe') {
+          aiRecipeUsage = row.used_value || row.ai_recipe_count || 0;
+          aiRecipeLimit = row.limit_value || FREEMIUM_AI_RECIPE_LIMIT;
+        }
+      });
+
+      const result = {
+        tier: 'FREEMIUM',
+        unlimited_access: false,
+        scan_count: scanUsage,
+        ai_recipe_count: aiRecipeUsage,
+        scan_limit: scanLimit,
+        ai_recipe_limit: aiRecipeLimit,
+        scans_remaining: Math.max(0, scanLimit - scanUsage),
+        ai_recipes_remaining: Math.max(0, aiRecipeLimit - aiRecipeUsage),
+      };
+
+      console.log('[useAccessControl] Processed usage status:', result);
+      return result;
+
     } catch (error) {
       console.error('[useAccessControl] Error in getUserUsageStatus:', error);
       return null;
