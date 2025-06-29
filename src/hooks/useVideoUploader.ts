@@ -228,6 +228,13 @@ export const useVideoUploader = ({
           'Selected file is empty on the device (0 bytes based on FileSystem.getInfoAsync).',
         );
       }
+
+      // CRITICAL FIX: Add file size validation to direct upload path too
+      const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB in bytes (Supabase paid tier limit)
+      if (fileInfo.size && fileInfo.size > MAX_FILE_SIZE) {
+        const fileSizeMB = Math.round(fileInfo.size / (1024 * 1024));
+        throw new Error(`Video file is too large (${fileSizeMB}MB). Maximum allowed size is 100MB. Please compress your video and try again.`);
+      }
       console.log(
         `[EXPO-FS METHOD] File exists. Size: ${fileInfo.size} bytes. Proceeding to read.`,
       );

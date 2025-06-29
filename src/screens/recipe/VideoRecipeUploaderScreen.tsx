@@ -34,9 +34,11 @@ import {
 } from '../../hooks/useVideoUploader';
 import { MainStackParamList } from '../../navigation/types';
 import { useAuth } from '../../providers/AuthProvider';
-import { useBackgroundUpload } from '../../hooks/useBackgroundUpload';
+import { useUserAwareBackgroundUpload } from '../../hooks/useUserAwareBackgroundUpload';
 import { useToast } from '../../providers/ToastProvider';
 import { UploadQueueModal } from '../../components/UploadQueueModal';
+
+import * as FileSystem from 'expo-file-system';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BRAND_PRIMARY = '#10B981';
@@ -138,13 +140,18 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
 
-  // Upload queue management
-  const { uploads: queueUploads } = useBackgroundUpload();
   const [showQueueModal, setShowQueueModal] = useState(false);
   
-  // Calculate queue stats
-  const pendingUploads = queueUploads.filter(u => u.status === 'pending' || u.status === 'uploading').length;
-  const failedUploads = queueUploads.filter(u => u.status === 'failed').length;
+  // 🔒 SECURE Upload queue management (New - user-aware) - NOW PRIMARY
+  const { 
+    queue: secureQueueUploads, 
+    startUpload: secureStartBackgroundUpload,
+    isUploading: isSecureUploading 
+  } = useUserAwareBackgroundUpload();
+  
+  // Calculate queue stats from secure uploads only
+  const pendingUploads = secureQueueUploads.filter((u: any) => u.status === 'pending' || u.status === 'uploading').length;
+  const failedUploads = secureQueueUploads.filter((u: any) => u.status === 'failed').length;
 
   // Animation values
   const fadeAnim = useState(new Animated.Value(0))[0];
@@ -227,7 +234,93 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
   const [cookTimeMinutes, setCookTimeMinutes] = useState('');
   const [servings, setServings] = useState('');
 
-  const handleSelectVideo = () => selectVideo();
+  // CRITICAL: File size validation state
+  const [videoFileSize, setVideoFileSize] = useState<number | null>(null);
+  const [videoFileSizeError, setVideoFileSizeError] = useState<string | null>(null);
+  const [showFileSizeWarning, setShowFileSizeWarning] = useState(false);
+  
+  // File size constants
+  const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB in bytes
+  const MAX_FILE_SIZE_MB = 100;
+
+  // Enhanced video selection with immediate file size validation
+  const handleSelectVideo = async () => {
+    try {
+      // Clear previous errors
+      setVideoFileSizeError(null);
+      setShowFileSizeWarning(false);
+      
+      // Call the original selectVideo function
+      await selectVideo();
+      
+      // After video is selected, validate its size immediately
+      // Note: We'll use a useEffect to monitor videoUri changes
+    } catch (error) {
+      console.error('Error selecting video:', error);
+    }
+  };
+
+  // Monitor videoUri changes to validate file size immediately
+  useEffect(() => {
+    const validateVideoFileSize = async () => {
+      if (videoUri) {
+        try {
+          const fileInfo = await FileSystem.getInfoAsync(videoUri);
+          
+          if (fileInfo.exists && fileInfo.size) {
+            setVideoFileSize(fileInfo.size);
+            const fileSizeMB = Math.round(fileInfo.size / (1024 * 1024));
+            
+            if (fileInfo.size > MAX_FILE_SIZE) {
+              const errorMessage = `Video file is too large (${fileSizeMB}MB). Maximum allowed size is ${MAX_FILE_SIZE_MB}MB.`;
+              setVideoFileSizeError(errorMessage);
+              setShowFileSizeWarning(true);
+              
+              // Show immediate alert to user
+              Alert.alert(
+                '⚠️ File Size Too Large',
+                `Your video is ${fileSizeMB}MB, but the maximum allowed size is ${MAX_FILE_SIZE_MB}MB.\n\nPlease compress your video and try again. You can use apps like:\n• Video Compressor\n• Media Converter\n• iMovie (iOS)\n• Photos app compression`,
+                [
+                  {
+                    text: 'Choose Different Video',
+                    onPress: () => {
+                      // Clear the oversized video
+                      setVideoFileSize(null);
+                      setVideoFileSizeError(null);
+                      setShowFileSizeWarning(false);
+                    }
+                  },
+                  { text: 'OK', style: 'default' }
+                ]
+              );
+            } else {
+              // File size is acceptable
+              setVideoFileSizeError(null);
+              setShowFileSizeWarning(false);
+              
+              // Show success feedback
+              showToast({
+                message: `✅ Video selected (${fileSizeMB}MB) - Ready to upload!`,
+                type: 'success',
+                duration: 3000
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Error validating video file size:', error);
+          setVideoFileSizeError('Unable to validate file size');
+        }
+      } else {
+        // Video was cleared
+        setVideoFileSize(null);
+        setVideoFileSizeError(null);
+        setShowFileSizeWarning(false);
+      }
+    };
+
+    validateVideoFileSize();
+  }, [videoUri, showToast]);
+
   const handleSelectThumbnail = () => selectThumbnail();
 
   const handleTagToggle = (tag: string) => {
@@ -311,6 +404,22 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
   };
 
   const handlePublish = async () => {
+    // CRITICAL: Check file size before any other validation
+    if (videoFileSizeError || showFileSizeWarning) {
+      Alert.alert(
+        '⚠️ Cannot Upload', 
+        `${videoFileSizeError}\n\nPlease select a smaller video file (max ${MAX_FILE_SIZE_MB}MB) or compress your current video before uploading.`,
+        [
+          {
+            text: 'Choose Different Video',
+            onPress: handleSelectVideo
+          },
+          { text: 'OK', style: 'default' }
+        ]
+      );
+      return;
+    }
+
     if (!videoUri) {
       Alert.alert('Validation Error', 'Please select a video.');
       return;
@@ -411,21 +520,30 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
       type: 'error',
       message: `Upload failed: ${error}`,
       duration: 6000,
-      action: {
-        label: 'Retry',
-        onPress: () => {
-          // Could implement retry logic here
-        },
-      },
     });
   }, [showToast]);
 
-  const { startBackgroundUpload } = useBackgroundUpload({
-    onUploadSuccess: onBackgroundUploadSuccess,
-    onUploadError: onBackgroundUploadError,
-  });
+  // Old upload system removed - now using only secure user-aware uploads
+
+  // Secure upload is now integrated into the main handleUpload function
 
   const handleUpload = async () => {
+    // CRITICAL: Check file size before any other validation
+    if (videoFileSizeError || showFileSizeWarning) {
+      Alert.alert(
+        '⚠️ Cannot Upload', 
+        `${videoFileSizeError}\n\nPlease select a smaller video file (max ${MAX_FILE_SIZE_MB}MB) or compress your current video before uploading.`,
+        [
+          {
+            text: 'Choose Different Video',
+            onPress: handleSelectVideo
+          },
+          { text: 'OK', style: 'default' }
+        ]
+      );
+      return;
+    }
+
     // First validate the form like in handlePublish
     if (!videoUri) {
       Alert.alert('Validation Error', 'Please select a video.');
@@ -508,29 +626,24 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
       servings: parseInt(servings) || 0,
     };
 
-    if (useBackgroundUploadMode) {
-      // Use background upload - non-blocking
-      try {
-        await startBackgroundUpload(videoUri, thumbnailUri, metadata);
-        
-        // Show immediate feedback and navigate back
-        Alert.alert(
-          '🚀 Upload Started!',
-          'Your recipe is uploading in the background. You can continue using the app.',
-          [
-            {
-              text: 'Continue',
-              onPress: () => navigation.goBack(),
-            },
-          ]
-        );
-      } catch (error) {
-        console.error('Failed to start background upload:', error);
-        Alert.alert('Error', 'Failed to start upload. Please try again.');
-      }
-    } else {
-      // Use existing blocking upload
-      uploadRecipe(metadata);
+    // Use secure background upload - always non-blocking
+    try {
+      await secureStartBackgroundUpload(videoUri, thumbnailUri, metadata);
+      
+      // Show immediate feedback and navigate back
+      Alert.alert(
+        '🔒 Secure Upload Started!',
+        'Your recipe is uploading securely in the background with user isolation. You can continue using the app.',
+        [
+          {
+            text: 'Continue',
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Failed to start secure background upload:', error);
+      Alert.alert('Error', 'Failed to start secure upload. Please try again.');
     }
   };
 
@@ -617,6 +730,37 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
                 {videoUri ? 'Change Video' : 'Select Video'}
               </Text>
             </TouchableOpacity>
+            
+            {/* File Size Information & Warnings */}
+            {videoUri && (
+              <View style={styles.fileSizeContainer}>
+                {videoFileSize && !videoFileSizeError && (
+                  <View style={styles.fileSizeInfo}>
+                    <Feather name="check-circle" size={16} color={BRAND_PRIMARY} />
+                    <Text style={styles.fileSizeText}>
+                      {Math.round(videoFileSize / (1024 * 1024))}MB • Ready to upload
+                    </Text>
+                  </View>
+                )}
+                
+                {videoFileSizeError && (
+                  <View style={styles.fileSizeError}>
+                    <Feather name="alert-triangle" size={16} color="#ef4444" />
+                    <Text style={styles.fileSizeErrorText}>
+                      {Math.round((videoFileSize || 0) / (1024 * 1024))}MB • Too large (max {MAX_FILE_SIZE_MB}MB)
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+            
+            {/* File Size Disclaimer */}
+            <View style={styles.fileSizeDisclaimer}>
+              <Feather name="info" size={14} color="#6b7280" />
+              <Text style={styles.disclaimerText}>
+                Maximum video size: {MAX_FILE_SIZE_MB}MB. High-quality videos welcome!
+              </Text>
+            </View>
           </View>
 
           <View style={styles.mediaPreviewWrapper}>
@@ -657,6 +801,8 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* All uploads are now secure by default */}
 
         {/* Enhanced collapsible cards with icons */}
         <View style={styles.formContainer}>
@@ -877,33 +1023,16 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
           </CollapsibleCard>
         </View>
 
-        {/* Add background upload toggle in the UI */}
-        <View style={styles.uploadOptionsContainer}>
-          <Text style={styles.uploadOptionsLabel}>Upload Options</Text>
-          <TouchableOpacity
-            style={[styles.uploadModeToggle, useBackgroundUploadMode && styles.uploadModeToggleActive]}
-            onPress={() => setUseBackgroundUploadMode(!useBackgroundUploadMode)}
-          >
-            <Text style={[styles.uploadModeText, useBackgroundUploadMode && styles.uploadModeTextActive]}>
-              {useBackgroundUploadMode ? '🚀 Background Upload (Recommended)' : '📤 Standard Upload'}
-            </Text>
-            <Text style={styles.uploadModeDescription}>
-              {useBackgroundUploadMode 
-                ? 'Upload continues in background. Navigate freely!'
-                : 'Wait for upload to complete before navigating.'
-              }
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {/* Secure upload is now the default and only option */}
 
         {/* Modified upload button */}
         <TouchableOpacity
           style={[
             styles.publishButton,
-            isUploading && styles.saveButtonDisabled,
+            (isUploading || videoFileSizeError) && styles.saveButtonDisabled,
           ]}
           onPress={handleUpload}
-          disabled={isUploading}
+          disabled={isUploading || !!videoFileSizeError}
           activeOpacity={0.8}>
           {isUploading ? (
             <View style={styles.publishButtonContentLoading}>
@@ -913,7 +1042,7 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
                 style={{ marginRight: 10 }}
               />
               <Text style={styles.publishButtonText}>
-                {useBackgroundUploadMode ? 'Starting Background Upload...' : 'Uploading...'}
+                Starting Secure Upload...
               </Text>
             </View>
           ) : (
@@ -925,7 +1054,10 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
                 style={{ marginRight: 10 }}
               />
               <Text style={styles.publishButtonText}>
-                {useBackgroundUploadMode ? '🚀 Start Background Upload' : 'Publish Recipe'}
+                {videoFileSizeError 
+                  ? '⚠️ File Too Large - Cannot Upload' 
+                  : '🔒 Publish Recipe Securely'
+                }
               </Text>
             </View>
           )}
@@ -945,6 +1077,7 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
               }>{`${(uploadProgress * 100).toFixed(0)}%`}</Text>
           </View>
         )}
+
         </Animated.View>
         </ScrollView>
       </PanGestureHandler>
@@ -1428,37 +1561,59 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  uploadOptionsContainer: {
-    padding: 16,
+  // Upload mode toggle styles removed - secure upload is now default
+  // File size validation styles
+  fileSizeContainer: {
+    marginTop: 8,
   },
-  uploadOptionsLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 12,
-  },
-  uploadModeToggle: {
-    padding: 12,
+  fileSizeInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    backgroundColor: '#f0fdf4',
+    borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 8,
-    backgroundColor: 'transparent',
+    borderColor: '#bbf7d0',
   },
-  uploadModeToggleActive: {
-    borderColor: BRAND_PRIMARY,
-  },
-  uploadModeText: {
-    color: '#6b7280',
-    fontSize: 14,
-  },
-  uploadModeTextActive: {
-    color: BRAND_PRIMARY,
-  },
-  uploadModeDescription: {
+  fileSizeText: {
     fontSize: 12,
-    color: '#6b7280',
-    marginTop: 4,
+    color: '#059669',
+    fontWeight: '500',
+    marginLeft: 6,
   },
+  fileSizeError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    backgroundColor: '#fef2f2',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  fileSizeErrorText: {
+    fontSize: 12,
+    color: '#dc2626',
+    fontWeight: '500',
+    marginLeft: 6,
+  },
+  fileSizeDisclaimer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    backgroundColor: '#f9fafb',
+    borderRadius: 6,
+  },
+  disclaimerText: {
+    fontSize: 11,
+    color: '#6b7280',
+    marginLeft: 6,
+    flex: 1,
+  },
+  // Secure upload section styles removed - integrated into main upload button
 });
 
 export default VideoRecipeUploaderScreen;

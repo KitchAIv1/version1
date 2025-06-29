@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,226 +6,187 @@ import {
   Animated,
   StyleSheet,
   Dimensions,
-  Modal,
-  FlatList,
-  StatusBar,
-  Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BackgroundUploadService, { UploadQueueItem, UploadProgress } from '../services/BackgroundUploadService';
+import UserAwareBackgroundUploadService, { UserAwareUploadQueueItem, UserAwareUploadProgress } from '../services/UserAwareBackgroundUploadService';
+import { useAuth } from '../providers/AuthProvider';
+import { UploadQueueModal } from './UploadQueueModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const INDICATOR_SIZE = 60;
 const INDICATOR_MARGIN = 16;
 
+// Development logging flag
+const __DEV__ = process.env.NODE_ENV === 'development';
+
 interface GlobalUploadIndicatorProps {
   visible: boolean;
 }
+
+// Unified upload types for display
+type UnifiedUploadItem = UploadQueueItem | UserAwareUploadQueueItem;
+type UnifiedUploadProgress = UploadProgress | UserAwareUploadProgress;
 
 const formatProgress = (progress: number): string => {
   return `${Math.round(progress * 100)}%`;
 };
 
-const formatUploadStage = (stage: string): string => {
-  switch (stage) {
-    case 'thumbnail': return 'Processing thumbnail...';
-    case 'video': return 'Uploading video...';
-    case 'processing': return 'Processing video...';
-    case 'completed': return 'Complete!';
-    default: return 'Uploading...';
-  }
+const isUserAwareItem = (item: UnifiedUploadItem): item is UserAwareUploadQueueItem => {
+  return 'userId' in item;
 };
 
-const UploadQueueModal: React.FC<{
-  visible: boolean;
-  onClose: () => void;
-  uploads: UploadQueueItem[];
-  onCancel: (uploadId: string) => void;
-  onRetry: (uploadId: string) => void;
-}> = ({ visible, onClose, uploads, onCancel, onRetry }) => {
-  const insets = useSafeAreaInsets();
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'uploading': return '#10b981';
-      case 'completed': return '#22c55e';
-      case 'failed': return '#ef4444';
-      case 'paused': return '#f59e0b';
-      default: return '#6b7280';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'uploading': return 'upload-cloud';
-      case 'completed': return 'check-circle';
-      case 'failed': return 'x-circle';
-      case 'paused': return 'pause-circle';
-      default: return 'clock';
-    }
-  };
-
-  const renderUploadItem = ({ item }: { item: UploadQueueItem }) => (
-    <View style={styles.uploadItem}>
-      <View style={styles.uploadItemHeader}>
-        <View style={[styles.statusIcon, { backgroundColor: `${getStatusColor(item.status)}20` }]}>
-          <Feather name={getStatusIcon(item.status) as any} size={16} color={getStatusColor(item.status)} />
-        </View>
-        <View style={styles.uploadItemContent}>
-          <Text style={styles.uploadTitle} numberOfLines={1}>
-            {item.metadata.title}
-          </Text>
-          <Text style={styles.uploadStatus}>
-            {item.status === 'uploading' 
-              ? `${formatProgress(item.progress)} - Uploading...`
-              : item.status.charAt(0).toUpperCase() + item.status.slice(1)
-            }
-          </Text>
-          {item.error && (
-            <Text style={styles.uploadError} numberOfLines={2}>
-              Error: {item.error}
-            </Text>
-          )}
-        </View>
-        <View style={styles.uploadItemActions}>
-          {item.status === 'failed' && (
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => onRetry(item.id)}
-            >
-              <Feather name="refresh-cw" size={18} color="#10b981" />
-            </TouchableOpacity>
-          )}
-          {(item.status === 'pending' || item.status === 'uploading' || item.status === 'failed') && (
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => onCancel(item.id)}
-            >
-              <Feather name="x" size={18} color="#ef4444" />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-      
-      {item.status === 'uploading' && (
-        <View style={styles.progressBarContainer}>
-          <View style={[styles.progressBar, { width: `${item.progress * 100}%` }]} />
-        </View>
-      )}
-    </View>
-  );
-
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
-      <View style={[styles.modalContainer, { paddingTop: insets.top }]}>
-        <StatusBar barStyle="dark-content" />
-        
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>Upload Queue</Text>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Feather name="x" size={24} color="#6b7280" />
-          </TouchableOpacity>
-        </View>
-
-        <FlatList
-          data={uploads}
-          renderItem={renderUploadItem}
-          keyExtractor={item => item.id}
-          style={styles.uploadList}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Feather name="upload-cloud" size={48} color="#d1d5db" />
-              <Text style={styles.emptyText}>No uploads in queue</Text>
-            </View>
-          }
-        />
-      </View>
-    </Modal>
-  );
+const isUserAwareProgress = (progress: UnifiedUploadProgress): progress is UserAwareUploadProgress => {
+  return 'userId' in progress;
 };
 
 export const GlobalUploadIndicator: React.FC<GlobalUploadIndicatorProps> = ({ visible }) => {
-  const [uploads, setUploads] = useState<UploadQueueItem[]>([]);
-  const [currentProgress, setCurrentProgress] = useState<UploadProgress | null>(null);
-  const [showModal, setShowModal] = useState(false);
+  const [uploads, setUploads] = useState<UnifiedUploadItem[]>([]);
   const [isVisible, setIsVisible] = useState(false);
-  const [lastProgress, setLastProgress] = useState<number>(0); // Track last progress to prevent jumps
+  const [showModal, setShowModal] = useState(false);
+  const [currentProgress, setCurrentProgress] = useState<UnifiedUploadProgress | null>(null);
+  const [lastProgress, setLastProgress] = useState(0);
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  const uploadService = BackgroundUploadService.getInstance();
+  const { user } = useAuth();
+
+  // PERFORMANCE FIX: Memoize upload service instances
+  const uploadService = useMemo(() => BackgroundUploadService.getInstance(), []);
+  const userAwareService = useMemo(() => 
+    user?.id ? UserAwareBackgroundUploadService.getInstance(user.id) : null, 
+    [user?.id]
+  );
   const insets = useSafeAreaInsets();
 
-  useEffect(() => {
-    const updateQueue = (queueItems: UploadQueueItem[]) => {
-      setUploads(queueItems);
-      const hasActiveUploads = queueItems.some(item => 
-        item.status === 'uploading' || item.status === 'pending'
-      );
-      setIsVisible(hasActiveUploads && visible);
-      
-      // Reset progress tracking when queue changes
-      if (!hasActiveUploads) {
-        setLastProgress(0);
-      }
-    };
+  // PERFORMANCE FIX: Unified update functions for both services
+  const updateQueue = useCallback((
+    originalItems: UploadQueueItem[] = [], 
+    userAwareItems: UserAwareUploadQueueItem[] = []
+  ) => {
+    // Combine uploads from both services
+    const allUploads: UnifiedUploadItem[] = [...originalItems, ...userAwareItems];
+    setUploads(allUploads);
+    
+    const hasActiveUploads = allUploads.some(item => 
+      item.status === 'uploading' || item.status === 'pending'
+    );
+    setIsVisible(hasActiveUploads && visible);
+    
+    // Reset progress tracking when queue changes
+    if (!hasActiveUploads) {
+      setLastProgress(0);
+      setCurrentProgress(null);
+    }
 
-    const updateProgress = (progress: UploadProgress) => {
-      console.log(`🔄 GlobalUploadIndicator received progress: ${Math.round(progress.progress * 100)}% - ${progress.stage} for upload ${progress.uploadId}`);
+    if (__DEV__ && allUploads.length > 0) {
+      const originalCount = originalItems.length;
+      const userAwareCount = userAwareItems.length;
+      console.log(`🔄 GlobalUploadIndicator: ${originalCount} original + ${userAwareCount} secure uploads = ${allUploads.length} total`);
+    }
+  }, [visible]);
+
+  // PERFORMANCE FIX: More responsive progress updates for both services
+  const updateProgress = useCallback((progress: UnifiedUploadProgress) => {
+    // 🔧 PERFORMANCE FIX: Improved throttling - only update on significant changes
+    const progressChange = Math.abs(progress.progress - lastProgress);
+    const shouldUpdate = (
+      progressChange >= 0.05 || // 5% change threshold
+      progress.progress >= 1.0 || // Always show completion
+      progress.progress === 0 || // Always show start
+      progress.stage === 'completed' // Always show final stage
+    );
+    
+    if (shouldUpdate) {
       setCurrentProgress(progress);
-    };
-
-    const handleUploadSuccess = () => {
-      // Reset progress tracking
-      setLastProgress(0);
+      setLastProgress(progress.progress);
       
-      // Show completion animation
-      Animated.sequence([
-        Animated.timing(scaleAnim, {
-          toValue: 1.2,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      if (__DEV__) {
+        const serviceType = isUserAwareProgress(progress) ? '🔒 Secure' : '📁 Original';
+        console.log(`🔄 GlobalUploadIndicator ${serviceType} progress: ${Math.round(progress.progress * 100)}% - ${progress.stage}`);
+      }
+    }
+  }, [lastProgress]);
+
+  const handleUploadSuccess = useCallback(() => {
+    // Reset progress tracking
+    setLastProgress(0);
+    setCurrentProgress(null);
+    
+    // Show completion animation
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 1.2,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [scaleAnim]);
+
+  const handleUploadFailed = useCallback(() => {
+    // Reset progress tracking on failure
+    setLastProgress(0);
+    setCurrentProgress(null);
+  }, []);
+
+  // Subscribe to original upload service
+  useEffect(() => {
+    const handleOriginalQueueUpdate = (queueItems: UploadQueueItem[]) => {
+      const userAwareItems = userAwareService?.getQueueStatus() || [];
+      updateQueue(queueItems, userAwareItems);
     };
 
-    const handleUploadFailed = () => {
-      // Reset progress tracking on failure
-      setLastProgress(0);
-    };
-
-    // Subscribe to upload service events with correct event names
-    uploadService.on('queueUpdated', updateQueue);
+    uploadService.on('queueUpdated', handleOriginalQueueUpdate);
     uploadService.on('uploadProgress', updateProgress);
-    uploadService.on('uploadSuccess', handleUploadSuccess); // Fixed event name
+    uploadService.on('uploadSuccess', handleUploadSuccess);
     uploadService.on('uploadFailed', handleUploadFailed);
 
     // Initial load
-    updateQueue(uploadService.getQueueStatus());
+    handleOriginalQueueUpdate(uploadService.getQueueStatus());
 
     return () => {
-      uploadService.off('queueUpdated', updateQueue);
+      uploadService.off('queueUpdated', handleOriginalQueueUpdate);
       uploadService.off('uploadProgress', updateProgress);
-      uploadService.off('uploadSuccess', handleUploadSuccess); // Fixed event name
+      uploadService.off('uploadSuccess', handleUploadSuccess);
       uploadService.off('uploadFailed', handleUploadFailed);
     };
-  }, [visible, scaleAnim, lastProgress]); // Added lastProgress dependency
+  }, [uploadService, updateQueue, updateProgress, handleUploadSuccess, handleUploadFailed, userAwareService]);
 
+  // Subscribe to user-aware upload service
+  useEffect(() => {
+    if (!userAwareService || !user?.id) return;
+
+    const handleUserAwareQueueUpdate = (queueItems: UserAwareUploadQueueItem[]) => {
+      const originalItems = uploadService.getQueueStatus();
+      updateQueue(originalItems, queueItems);
+    };
+
+    userAwareService.on('queueUpdated', handleUserAwareQueueUpdate);
+    userAwareService.on('uploadProgress', updateProgress);
+    userAwareService.on('uploadSuccess', handleUploadSuccess);
+    userAwareService.on('uploadFailed', handleUploadFailed);
+
+    // Initial load
+    handleUserAwareQueueUpdate(userAwareService.getQueueStatus());
+
+    return () => {
+      userAwareService.off('queueUpdated', handleUserAwareQueueUpdate);
+      userAwareService.off('uploadProgress', updateProgress);
+      userAwareService.off('uploadSuccess', handleUploadSuccess);
+      userAwareService.off('uploadFailed', handleUploadFailed);
+    };
+  }, [userAwareService, user?.id, updateQueue, updateProgress, handleUploadSuccess, handleUploadFailed, uploadService]);
+
+  // PERFORMANCE FIX: Reduced animation complexity and frequency
   useEffect(() => {
     if (isVisible) {
       // Fade in and scale animation
@@ -243,30 +204,30 @@ export const GlobalUploadIndicator: React.FC<GlobalUploadIndicatorProps> = ({ vi
         }),
       ]).start();
 
-      // Start rotation and pulse only if there's an active upload
+      // PERFORMANCE FIX: Only start animations if there's an active upload
       const activeUpload = uploads.find(upload => upload.status === 'uploading');
       if (activeUpload) {
-        // Continuous rotation for uploading state
+        // Slower rotation for less CPU usage
         const rotationAnimation = Animated.loop(
           Animated.timing(rotateAnim, {
             toValue: 1,
-            duration: 3000,
+            duration: 4000, // Slower rotation
             useNativeDriver: true,
           })
         );
         rotationAnimation.start();
 
-        // Pulse animation
+        // Slower pulse animation
         const pulseAnimation = Animated.loop(
           Animated.sequence([
             Animated.timing(pulseAnim, {
-              toValue: 1.1,
-              duration: 1000,
+              toValue: 1.05, // Smaller pulse
+              duration: 1500, // Slower pulse
               useNativeDriver: true,
             }),
             Animated.timing(pulseAnim, {
               toValue: 1,
-              duration: 1000,
+              duration: 1500,
               useNativeDriver: true,
             }),
           ])
@@ -287,24 +248,38 @@ export const GlobalUploadIndicator: React.FC<GlobalUploadIndicatorProps> = ({ vi
         useNativeDriver: true,
       }).start();
     }
-  }, [isVisible, fadeAnim, scaleAnim, rotateAnim, pulseAnim]); // Removed uploads dependency
+  }, [isVisible, fadeAnim, scaleAnim, rotateAnim, pulseAnim, uploads]);
 
-  const handleIndicatorPress = () => {
+  const handleIndicatorPress = useCallback(() => {
     setShowModal(true);
-  };
+  }, []);
 
-  const handleCancelUpload = async (uploadId: string) => {
-    await uploadService.cancelUpload(uploadId);
-  };
+  // PERFORMANCE FIX: Memoize computed values for unified upload types
+  const activeUpload = useMemo(() => 
+    uploads.find(upload => upload.status === 'uploading'), 
+    [uploads]
+  );
+  
+  // CRITICAL FIX: Use currentProgress instead of activeUpload.progress for real-time updates
+  const progress = useMemo(() => {
+    if (currentProgress && currentProgress.progress !== undefined) {
+      return currentProgress.progress;
+    }
+    return activeUpload?.progress || 0;
+  }, [currentProgress, activeUpload]);
 
-  const handleRetryUpload = async (uploadId: string) => {
-    await uploadService.resumeUpload(uploadId);
-  };
-
-  const activeUpload = uploads.find(upload => upload.status === 'uploading');
-  const progress = activeUpload?.progress || 0;
-  const totalUploads = uploads.length;
-  const completedUploads = uploads.filter(upload => upload.status === 'completed').length;
+  // Enhanced upload info for display
+  const uploadInfo = useMemo(() => {
+    if (!activeUpload) return null;
+    
+    const isSecure = isUserAwareItem(activeUpload);
+    return {
+      isSecure,
+      serviceType: isSecure ? '🔒 Secure Upload' : '📁 Standard Upload',
+      count: uploads.length,
+      activeCount: uploads.filter(u => u.status === 'uploading' || u.status === 'pending').length
+    };
+  }, [activeUpload, uploads]);
 
   if (!isVisible) return null;
 
@@ -353,37 +328,34 @@ export const GlobalUploadIndicator: React.FC<GlobalUploadIndicatorProps> = ({ vi
             </View>
           </View>
 
-          {/* Icon */}
+          {/* Icon - Enhanced to show service type */}
           <View style={styles.iconContainer}>
             {activeUpload ? (
-              <Feather name="upload-cloud" size={24} color="#fff" />
+              uploadInfo?.isSecure ? (
+                <Feather name="shield" size={24} color="#fff" />
+              ) : (
+                <Feather name="upload-cloud" size={24} color="#fff" />
+              )
             ) : (
-              <Feather name="check" size={24} color="#fff" />
+              <Feather name="check-circle" size={24} color="#fff" />
             )}
           </View>
 
-          {/* Progress text */}
-          <View style={styles.progressTextContainer}>
-            <Text style={styles.progressText}>
-              {activeUpload ? formatProgress(progress) : `${completedUploads}/${totalUploads}`}
-            </Text>
-          </View>
-
-          {/* Upload count badge */}
-          {totalUploads > 1 && (
-            <View style={styles.countBadge}>
-              <Text style={styles.countText}>{totalUploads}</Text>
+          {/* Progress text - FIXED: Now shows real-time progress */}
+          {activeUpload && (
+            <View style={styles.progressTextContainer}>
+              <Text style={styles.progressPercentage}>
+                {formatProgress(progress)}
+              </Text>
             </View>
           )}
         </TouchableOpacity>
       </Animated.View>
 
+      {/* FIXED: Use the proper UploadQueueModal component */}
       <UploadQueueModal
         visible={showModal}
         onClose={() => setShowModal(false)}
-        uploads={uploads}
-        onCancel={handleCancelUpload}
-        onRetry={handleRetryUpload}
       />
     </>
   );
@@ -442,119 +414,10 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 8,
   },
-  progressText: {
+  progressPercentage: {
     color: '#fff',
     fontSize: 10,
     fontWeight: '600',
-  },
-  countBadge: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: '#ef4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  countText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  // Modal styles
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  uploadList: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  uploadItem: {
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  uploadItemHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  statusIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  uploadItemContent: {
-    flex: 1,
-  },
-  uploadTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  uploadStatus: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  uploadError: {
-    fontSize: 12,
-    color: '#ef4444',
-    marginTop: 4,
-  },
-  uploadItemActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  actionButton: {
-    padding: 8,
-    marginLeft: 4,
-  },
-  progressBarContainer: {
-    height: 3,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 1.5,
-    marginTop: 12,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: '#10b981',
-    borderRadius: 1.5,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#9ca3af',
-    marginTop: 16,
   },
 });
 

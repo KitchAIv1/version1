@@ -3,12 +3,8 @@ import Toast from '../components/Toast';
 
 interface ToastConfig {
   message: string;
-  type: 'success' | 'error' | 'info';
+  type: 'success' | 'error' | 'info' | 'warning';
   duration?: number;
-  action?: {
-    label: string;
-    onPress: () => void;
-  };
 }
 
 interface ToastContextType {
@@ -57,7 +53,6 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
           type={toastConfig.type}
           duration={toastConfig.duration}
           onHide={hideToast}
-          action={toastConfig.action}
         />
       )}
     </ToastContext.Provider>
