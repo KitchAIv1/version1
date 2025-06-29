@@ -876,10 +876,10 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
          <TouchableOpacity
            style={[
              styles.publishButton,
-             (isUploading || videoFileSizeError) && styles.saveButtonDisabled,
+             isUploading && styles.saveButtonDisabled,
            ]}
            onPress={handleUpload}
-           disabled={isUploading || !!videoFileSizeError}
+           disabled={isUploading}
            activeOpacity={0.8}>
            {isUploading ? (
              <View style={styles.publishButtonContentLoading}>
@@ -901,10 +901,7 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
                  style={{ marginRight: 10 }}
                />
                <Text style={styles.publishButtonText}>
-                 {videoFileSizeError 
-                   ? '⚠️ File Too Large - Cannot Upload' 
-                   : '🔒 Publish Recipe Securely'
-                 }
+                 🔒 Publish Recipe Securely
                </Text>
              </View>
            )}
