@@ -41,6 +41,8 @@ function OnboardingStep1Screen() {
   const buttonScale2 = new Animated.Value(0.95);
 
   useEffect(() => {
+    console.log('🎬 OnboardingStep1: Starting animations');
+    
     // Entrance animations
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -59,7 +61,19 @@ function OnboardingStep1Screen() {
         friction: 7,
         useNativeDriver: true,
       }),
-    ]).start();
+    ]).start((finished) => {
+      console.log('🎬 OnboardingStep1 animations finished:', finished);
+    });
+
+    // 🚨 CRITICAL FIX: Failsafe to ensure content is visible (shorter timeout, less intrusive)
+    const failsafeTimeout = setTimeout(() => {
+      console.log('🚨 OnboardingStep1 FAILSAFE: Ensuring content visibility');
+      fadeAnim.setValue(1);
+      slideAnim.setValue(0);
+      logoScale.setValue(1);
+    }, 1000); // Reduced from 2000ms to 1000ms
+
+    return () => clearTimeout(failsafeTimeout);
   }, []);
 
   const animateButton = (scaleValue: Animated.Value) => {
