@@ -790,14 +790,14 @@ class UserAwareBackgroundUploadService extends EventEmitter {
 
     console.log(`[UserAwareUpload] Uploading raw video to: ${rawUploadPath} for user ${this.userId}`);
 
-    // PERFORMANCE FIX: Reduced progress updates to prevent UI spam - MATCHING ORIGINAL
+    // CRITICAL FIX: Proper progress interval management to prevent conflicts
     let currentProgress = 0.3;
     const progressInterval = setInterval(() => {
-      if (currentProgress < 0.8) {
-        currentProgress += 0.1; // Slower increment - MATCHING ORIGINAL
+      if (currentProgress < 0.75) { // Stop before manual progress calls to prevent conflicts
+        currentProgress += 0.1;
         onProgress?.(currentProgress);
       }
-    }, 1500); // Longer intervals - MATCHING ORIGINAL
+    }, 1500);
 
     try {
       // MATCH WORKING UPLOADER: Use exact same upload parameters
@@ -808,6 +808,7 @@ class UserAwareBackgroundUploadService extends EventEmitter {
           upsert: false, // MATCH WORKING UPLOADER: upsert: false
         });
 
+      // CRITICAL FIX: Clear interval BEFORE setting manual progress to prevent conflicts
       clearInterval(progressInterval);
       
       // CRITICAL: Clear array buffer from memory immediately - MATCHING ORIGINAL
@@ -856,8 +857,6 @@ class UserAwareBackgroundUploadService extends EventEmitter {
     } catch (error: any) {
       clearInterval(progressInterval);
       throw error;
-    } finally {
-      clearInterval(progressInterval);
     }
   }
 

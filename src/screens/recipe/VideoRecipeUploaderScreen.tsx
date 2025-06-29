@@ -37,7 +37,6 @@ import { useAuth } from '../../providers/AuthProvider';
 import { useUserAwareBackgroundUpload } from '../../hooks/useUserAwareBackgroundUpload';
 import { useToast } from '../../providers/ToastProvider';
 import { UploadQueueModal } from '../../components/UploadQueueModal';
-
 import * as FileSystem from 'expo-file-system';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -234,92 +233,7 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
   const [cookTimeMinutes, setCookTimeMinutes] = useState('');
   const [servings, setServings] = useState('');
 
-  // CRITICAL: File size validation state
-  const [videoFileSize, setVideoFileSize] = useState<number | null>(null);
-  const [videoFileSizeError, setVideoFileSizeError] = useState<string | null>(null);
-  const [showFileSizeWarning, setShowFileSizeWarning] = useState(false);
-  
-  // File size constants
-  const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB in bytes
-  const MAX_FILE_SIZE_MB = 100;
-
-  // Enhanced video selection with immediate file size validation
-  const handleSelectVideo = async () => {
-    try {
-      // Clear previous errors
-      setVideoFileSizeError(null);
-      setShowFileSizeWarning(false);
-      
-      // Call the original selectVideo function
-      await selectVideo();
-      
-      // After video is selected, validate its size immediately
-      // Note: We'll use a useEffect to monitor videoUri changes
-    } catch (error) {
-      console.error('Error selecting video:', error);
-    }
-  };
-
-  // Monitor videoUri changes to validate file size immediately
-  useEffect(() => {
-    const validateVideoFileSize = async () => {
-      if (videoUri) {
-        try {
-          const fileInfo = await FileSystem.getInfoAsync(videoUri);
-          
-          if (fileInfo.exists && fileInfo.size) {
-            setVideoFileSize(fileInfo.size);
-            const fileSizeMB = Math.round(fileInfo.size / (1024 * 1024));
-            
-            if (fileInfo.size > MAX_FILE_SIZE) {
-              const errorMessage = `Video file is too large (${fileSizeMB}MB). Maximum allowed size is ${MAX_FILE_SIZE_MB}MB.`;
-              setVideoFileSizeError(errorMessage);
-              setShowFileSizeWarning(true);
-              
-              // Show immediate alert to user
-              Alert.alert(
-                '⚠️ File Size Too Large',
-                `Your video is ${fileSizeMB}MB, but the maximum allowed size is ${MAX_FILE_SIZE_MB}MB.\n\nPlease compress your video and try again. You can use apps like:\n• Video Compressor\n• Media Converter\n• iMovie (iOS)\n• Photos app compression`,
-                [
-                  {
-                    text: 'Choose Different Video',
-                    onPress: () => {
-                      // Clear the oversized video
-                      setVideoFileSize(null);
-                      setVideoFileSizeError(null);
-                      setShowFileSizeWarning(false);
-                    }
-                  },
-                  { text: 'OK', style: 'default' }
-                ]
-              );
-            } else {
-              // File size is acceptable
-              setVideoFileSizeError(null);
-              setShowFileSizeWarning(false);
-              
-              // Show success feedback
-              showToast({
-                message: `✅ Video selected (${fileSizeMB}MB) - Ready to upload!`,
-                type: 'success',
-                duration: 3000
-              });
-            }
-          }
-        } catch (error) {
-          console.error('Error validating video file size:', error);
-          setVideoFileSizeError('Unable to validate file size');
-        }
-      } else {
-        // Video was cleared
-        setVideoFileSize(null);
-        setVideoFileSizeError(null);
-        setShowFileSizeWarning(false);
-      }
-    };
-
-    validateVideoFileSize();
-  }, [videoUri, showToast]);
+  const handleSelectVideo = () => selectVideo();
 
   const handleSelectThumbnail = () => selectThumbnail();
 
@@ -404,21 +318,6 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
   };
 
   const handlePublish = async () => {
-    // CRITICAL: Check file size before any other validation
-    if (videoFileSizeError || showFileSizeWarning) {
-      Alert.alert(
-        '⚠️ Cannot Upload', 
-        `${videoFileSizeError}\n\nPlease select a smaller video file (max ${MAX_FILE_SIZE_MB}MB) or compress your current video before uploading.`,
-        [
-          {
-            text: 'Choose Different Video',
-            onPress: handleSelectVideo
-          },
-          { text: 'OK', style: 'default' }
-        ]
-      );
-      return;
-    }
 
     if (!videoUri) {
       Alert.alert('Validation Error', 'Please select a video.');
@@ -528,21 +427,6 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
   // Secure upload is now integrated into the main handleUpload function
 
   const handleUpload = async () => {
-    // CRITICAL: Check file size before any other validation
-    if (videoFileSizeError || showFileSizeWarning) {
-      Alert.alert(
-        '⚠️ Cannot Upload', 
-        `${videoFileSizeError}\n\nPlease select a smaller video file (max ${MAX_FILE_SIZE_MB}MB) or compress your current video before uploading.`,
-        [
-          {
-            text: 'Choose Different Video',
-            onPress: handleSelectVideo
-          },
-          { text: 'OK', style: 'default' }
-        ]
-      );
-      return;
-    }
 
     // First validate the form like in handlePublish
     if (!videoUri) {
@@ -730,37 +614,6 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
                 {videoUri ? 'Change Video' : 'Select Video'}
               </Text>
             </TouchableOpacity>
-            
-            {/* File Size Information & Warnings */}
-            {videoUri && (
-              <View style={styles.fileSizeContainer}>
-                {videoFileSize && !videoFileSizeError && (
-                  <View style={styles.fileSizeInfo}>
-                    <Feather name="check-circle" size={16} color={BRAND_PRIMARY} />
-                    <Text style={styles.fileSizeText}>
-                      {Math.round(videoFileSize / (1024 * 1024))}MB • Ready to upload
-                    </Text>
-                  </View>
-                )}
-                
-                {videoFileSizeError && (
-                  <View style={styles.fileSizeError}>
-                    <Feather name="alert-triangle" size={16} color="#ef4444" />
-                    <Text style={styles.fileSizeErrorText}>
-                      {Math.round((videoFileSize || 0) / (1024 * 1024))}MB • Too large (max {MAX_FILE_SIZE_MB}MB)
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
-            
-            {/* File Size Disclaimer */}
-            <View style={styles.fileSizeDisclaimer}>
-              <Feather name="info" size={14} color="#6b7280" />
-              <Text style={styles.disclaimerText}>
-                Maximum video size: {MAX_FILE_SIZE_MB}MB. High-quality videos welcome!
-              </Text>
-            </View>
           </View>
 
           <View style={styles.mediaPreviewWrapper}>
@@ -793,290 +646,284 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
                 style={{ marginRight: 8 }}
               />
               <Text
-                style={
-                  thumbnailUri ? styles.buttonOutlineText : styles.buttonText
-                }>
+                style={thumbnailUri ? styles.buttonOutlineText : styles.buttonText}>
                 {thumbnailUri ? 'Change Thumbnail' : 'Select Thumbnail'}
               </Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* All uploads are now secure by default */}
+         {/* Enhanced collapsible cards with icons */}
+         <View style={styles.formContainer}>
+           <CollapsibleCard
+             title="Recipe Details"
+             icon="info"
+             defaultCollapsed={false}>
+             <TextInput
+               placeholder="Recipe Title"
+               value={title}
+               onChangeText={setTitle}
+               style={styles.input}
+               placeholderTextColor="#999"
+             />
+             <TextInput
+               placeholder="Description (tell the story behind your recipe)"
+               value={description}
+               onChangeText={setDescription}
+               style={styles.inputMulti}
+               multiline
+               numberOfLines={4}
+               placeholderTextColor="#999"
+             />
+           </CollapsibleCard>
 
-        {/* Enhanced collapsible cards with icons */}
-        <View style={styles.formContainer}>
-          <CollapsibleCard
-            title="Recipe Details"
-            icon="info"
-            defaultCollapsed={false}>
-            <TextInput
-              placeholder="Recipe Title"
-              value={title}
-              onChangeText={setTitle}
-              style={styles.input}
-              placeholderTextColor="#999"
-            />
-            <TextInput
-              placeholder="Description (tell the story behind your recipe)"
-              value={description}
-              onChangeText={setDescription}
-              style={styles.inputMulti}
-              multiline
-              numberOfLines={4}
-              placeholderTextColor="#999"
-            />
-          </CollapsibleCard>
+           <CollapsibleCard title="Timings & Servings" icon="clock">
+             <View style={styles.timeInputRow}>
+               <View style={styles.timeInputContainer}>
+                 <Text style={styles.inputLabel}>Prep Time</Text>
+                 <View style={styles.timeInputWrapper}>
+                   <TextInput
+                     placeholder="0"
+                     value={prepTimeMinutes}
+                     onChangeText={setPrepTimeMinutes}
+                     style={styles.timeInput}
+                     keyboardType="numeric"
+                     placeholderTextColor="#999"
+                   />
+                   <Text style={styles.timeUnitText}>min</Text>
+                 </View>
+               </View>
 
-          <CollapsibleCard title="Timings & Servings" icon="clock">
-            <View style={styles.timeInputRow}>
-              <View style={styles.timeInputContainer}>
-                <Text style={styles.inputLabel}>Prep Time</Text>
-                <View style={styles.timeInputWrapper}>
-                  <TextInput
-                    placeholder="0"
-                    value={prepTimeMinutes}
-                    onChangeText={setPrepTimeMinutes}
-                    style={styles.timeInput}
-                    keyboardType="numeric"
-                    placeholderTextColor="#999"
-                  />
-                  <Text style={styles.timeUnitText}>min</Text>
-                </View>
-              </View>
+               <View style={styles.timeInputContainer}>
+                 <Text style={styles.inputLabel}>Cook Time</Text>
+                 <View style={styles.timeInputWrapper}>
+                   <TextInput
+                     placeholder="0"
+                     value={cookTimeMinutes}
+                     onChangeText={setCookTimeMinutes}
+                     style={styles.timeInput}
+                     keyboardType="numeric"
+                     placeholderTextColor="#999"
+                   />
+                   <Text style={styles.timeUnitText}>min</Text>
+                 </View>
+               </View>
 
-              <View style={styles.timeInputContainer}>
-                <Text style={styles.inputLabel}>Cook Time</Text>
-                <View style={styles.timeInputWrapper}>
-                  <TextInput
-                    placeholder="0"
-                    value={cookTimeMinutes}
-                    onChangeText={setCookTimeMinutes}
-                    style={styles.timeInput}
-                    keyboardType="numeric"
-                    placeholderTextColor="#999"
-                  />
-                  <Text style={styles.timeUnitText}>min</Text>
-                </View>
-              </View>
+               <View style={styles.timeInputContainer}>
+                 <Text style={styles.inputLabel}>Servings</Text>
+                 <View style={styles.timeInputWrapper}>
+                   <TextInput
+                     placeholder="0"
+                     value={servings}
+                     onChangeText={setServings}
+                     style={styles.timeInput}
+                     keyboardType="numeric"
+                     placeholderTextColor="#999"
+                   />
+                   <Text style={styles.timeUnitText}>portions</Text>
+                 </View>
+               </View>
+             </View>
+           </CollapsibleCard>
 
-              <View style={styles.timeInputContainer}>
-                <Text style={styles.inputLabel}>Servings</Text>
-                <View style={styles.timeInputWrapper}>
-                  <TextInput
-                    placeholder="0"
-                    value={servings}
-                    onChangeText={setServings}
-                    style={styles.timeInput}
-                    keyboardType="numeric"
-                    placeholderTextColor="#999"
-                  />
-                  <Text style={styles.timeUnitText}>portions</Text>
-                </View>
-              </View>
-            </View>
-          </CollapsibleCard>
+           <CollapsibleCard
+             title={`Ingredients (${ingredients.filter(i => i.name.trim()).length})`}
+             icon="shopping-bag">
+             {ingredients.map((ing, index) => (
+               <View key={index} style={styles.listItemContainer}>
+                 <TextInput
+                   placeholder="Ingredient name"
+                   value={ing.name}
+                   onChangeText={val =>
+                     handleIngredientChange(index, 'name', val)
+                   }
+                   style={styles.inputFlex}
+                   placeholderTextColor="#999"
+                 />
+                 <TextInput
+                   placeholder="Qty"
+                   value={ing.quantity}
+                   onChangeText={val =>
+                     handleIngredientChange(index, 'quantity', val)
+                   }
+                   style={styles.inputQty}
+                   keyboardType="numeric"
+                   placeholderTextColor="#999"
+                 />
+                 <TextInput
+                   placeholder="Unit"
+                   value={ing.unit}
+                   onChangeText={val =>
+                     handleIngredientChange(index, 'unit', val)
+                   }
+                   style={styles.inputUnit}
+                   placeholderTextColor="#999"
+                 />
+                 <TouchableOpacity
+                   onPress={() => handleRemoveIngredient(index)}
+                   style={styles.removeButton}>
+                   <Feather name="x-circle" size={24} color="#ff6347" />
+                 </TouchableOpacity>
+               </View>
+             ))}
+             <TouchableOpacity
+               style={styles.addButton}
+               onPress={handleAddIngredient}
+               activeOpacity={0.8}>
+               <Feather
+                 name="plus-circle"
+                 size={20}
+                 color={BRAND_PRIMARY}
+                 style={{ marginRight: 8 }}
+               />
+               <Text style={styles.addButtonText}>Add Ingredient</Text>
+             </TouchableOpacity>
+           </CollapsibleCard>
 
-          <CollapsibleCard
-            title={`Ingredients (${ingredients.filter(i => i.name.trim()).length})`}
-            icon="shopping-bag">
-            {ingredients.map((ing, index) => (
-              <View key={index} style={styles.listItemContainer}>
-                <TextInput
-                  placeholder="Ingredient name"
-                  value={ing.name}
-                  onChangeText={val =>
-                    handleIngredientChange(index, 'name', val)
-                  }
-                  style={styles.inputFlex}
-                  placeholderTextColor="#999"
-                />
-                <TextInput
-                  placeholder="Qty"
-                  value={ing.quantity}
-                  onChangeText={val =>
-                    handleIngredientChange(index, 'quantity', val)
-                  }
-                  style={styles.inputQty}
-                  keyboardType="numeric"
-                  placeholderTextColor="#999"
-                />
-                <TextInput
-                  placeholder="Unit"
-                  value={ing.unit}
-                  onChangeText={val =>
-                    handleIngredientChange(index, 'unit', val)
-                  }
-                  style={styles.inputUnit}
-                  placeholderTextColor="#999"
-                />
-                <TouchableOpacity
-                  onPress={() => handleRemoveIngredient(index)}
-                  style={styles.removeButton}>
-                  <Feather name="x-circle" size={24} color="#ff6347" />
-                </TouchableOpacity>
-              </View>
-            ))}
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={handleAddIngredient}
-              activeOpacity={0.8}>
-              <Feather
-                name="plus-circle"
-                size={20}
-                color={BRAND_PRIMARY}
-                style={{ marginRight: 8 }}
-              />
-              <Text style={styles.addButtonText}>Add Ingredient</Text>
-            </TouchableOpacity>
-          </CollapsibleCard>
+           <CollapsibleCard
+             title={`Preparation Steps (${preparationSteps.filter(s => s.trim()).length})`}
+             icon="list">
+             {preparationSteps.map((step, index) => (
+               <View key={index} style={styles.listItemContainer}>
+                 <View style={styles.stepNumberBadge}>
+                   <Text style={styles.stepNumberText}>{index + 1}</Text>
+                 </View>
+                 <TextInput
+                   placeholder="Describe this step in detail..."
+                   value={step}
+                   onChangeText={val => handleStepChange(index, val)}
+                   style={styles.inputFlexMulti}
+                   multiline
+                   placeholderTextColor="#999"
+                 />
+                 <TouchableOpacity
+                   onPress={() => handleRemoveStep(index)}
+                   style={styles.removeButtonPadding}>
+                   <Feather name="x-circle" size={24} color="#ff6347" />
+                 </TouchableOpacity>
+               </View>
+             ))}
+             <TouchableOpacity
+               style={styles.addButton}
+               onPress={handleAddStep}
+               activeOpacity={0.8}>
+               <Feather
+                 name="plus-circle"
+                 size={20}
+                 color={BRAND_PRIMARY}
+                 style={{ marginRight: 8 }}
+               />
+               <Text style={styles.addButtonText}>Add Step</Text>
+             </TouchableOpacity>
+           </CollapsibleCard>
 
-          <CollapsibleCard
-            title={`Preparation Steps (${preparationSteps.filter(s => s.trim()).length})`}
-            icon="list">
-            {preparationSteps.map((step, index) => (
-              <View key={index} style={styles.listItemContainer}>
-                <View style={styles.stepNumberBadge}>
-                  <Text style={styles.stepNumberText}>{index + 1}</Text>
-                </View>
-                <TextInput
-                  placeholder="Describe this step in detail..."
-                  value={step}
-                  onChangeText={val => handleStepChange(index, val)}
-                  style={styles.inputFlexMulti}
-                  multiline
-                  placeholderTextColor="#999"
-                />
-                <TouchableOpacity
-                  onPress={() => handleRemoveStep(index)}
-                  style={styles.removeButtonPadding}>
-                  <Feather name="x-circle" size={24} color="#ff6347" />
-                </TouchableOpacity>
-              </View>
-            ))}
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={handleAddStep}
-              activeOpacity={0.8}>
-              <Feather
-                name="plus-circle"
-                size={20}
-                color={BRAND_PRIMARY}
-                style={{ marginRight: 8 }}
-              />
-              <Text style={styles.addButtonText}>Add Step</Text>
-            </TouchableOpacity>
-          </CollapsibleCard>
+           <CollapsibleCard title="Dietary Tags" icon="tag">
+             <Text style={styles.tagSectionLabel}>
+               Help others discover your recipe with relevant tags
+             </Text>
+             <View style={styles.tagsContainer}>
+               {DIET_TAGS_OPTIONS.map(tag => (
+                 <TouchableOpacity
+                   key={tag}
+                   style={[
+                     styles.tag,
+                     dietTags.includes(tag) && styles.tagSelected,
+                   ]}
+                   onPress={() => handleTagToggle(tag)}
+                   activeOpacity={0.7}>
+                   {dietTags.includes(tag) && (
+                     <Feather
+                       name="check"
+                       size={12}
+                       color="#fff"
+                       style={{ marginRight: 4 }}
+                     />
+                   )}
+                   <Text
+                     style={[
+                       styles.tagText,
+                       dietTags.includes(tag) && styles.tagTextSelected,
+                     ]}>
+                     {tag}
+                   </Text>
+                 </TouchableOpacity>
+               ))}
+             </View>
+           </CollapsibleCard>
 
-          <CollapsibleCard title="Dietary Tags" icon="tag">
-            <Text style={styles.tagSectionLabel}>
-              Help others discover your recipe with relevant tags
-            </Text>
-            <View style={styles.tagsContainer}>
-              {DIET_TAGS_OPTIONS.map(tag => (
-                <TouchableOpacity
-                  key={tag}
-                  style={[
-                    styles.tag,
-                    dietTags.includes(tag) && styles.tagSelected,
-                  ]}
-                  onPress={() => handleTagToggle(tag)}
-                  activeOpacity={0.7}>
-                  {dietTags.includes(tag) && (
-                    <Feather
-                      name="check"
-                      size={12}
-                      color="#fff"
-                      style={{ marginRight: 4 }}
-                    />
-                  )}
-                  <Text
-                    style={[
-                      styles.tagText,
-                      dietTags.includes(tag) && styles.tagTextSelected,
-                    ]}>
-                    {tag}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </CollapsibleCard>
+           <CollapsibleCard title="Visibility" icon="eye">
+             <View style={styles.visibilityContainer}>
+               <View>
+                 <Text style={styles.visibilityTitle}>Make Recipe Public</Text>
+                 <Text style={styles.visibilitySubtitle}>
+                   {isPublic
+                     ? 'Your recipe will be discoverable by all users'
+                     : 'Only you will be able to see this recipe'}
+                 </Text>
+               </View>
+               <Switch
+                 value={isPublic}
+                 onValueChange={setIsPublic}
+                 trackColor={{ false: '#e0e0e0', true: '#a7f3d0' }}
+                 thumbColor={isPublic ? BRAND_PRIMARY : '#f4f3f4'}
+                 ios_backgroundColor="#e0e0e0"
+               />
+             </View>
+           </CollapsibleCard>
+         </View>
 
-          <CollapsibleCard title="Visibility" icon="eye">
-            <View style={styles.visibilityContainer}>
-              <View>
-                <Text style={styles.visibilityTitle}>Make Recipe Public</Text>
-                <Text style={styles.visibilitySubtitle}>
-                  {isPublic
-                    ? 'Your recipe will be discoverable by all users'
-                    : 'Only you will be able to see this recipe'}
-                </Text>
-              </View>
-              <Switch
-                value={isPublic}
-                onValueChange={setIsPublic}
-                trackColor={{ false: '#e0e0e0', true: '#a7f3d0' }}
-                thumbColor={isPublic ? BRAND_PRIMARY : '#f4f3f4'}
-                ios_backgroundColor="#e0e0e0"
-              />
-            </View>
-          </CollapsibleCard>
-        </View>
+         {/* Modified upload button */}
+         <TouchableOpacity
+           style={[
+             styles.publishButton,
+             (isUploading || videoFileSizeError) && styles.saveButtonDisabled,
+           ]}
+           onPress={handleUpload}
+           disabled={isUploading || !!videoFileSizeError}
+           activeOpacity={0.8}>
+           {isUploading ? (
+             <View style={styles.publishButtonContentLoading}>
+               <ActivityIndicator
+                 color="#fff"
+                 size="small"
+                 style={{ marginRight: 10 }}
+               />
+               <Text style={styles.publishButtonText}>
+                 Starting Secure Upload...
+               </Text>
+             </View>
+           ) : (
+             <View style={styles.publishButtonContent}>
+               <Feather
+                 name="upload-cloud"
+                 size={20}
+                 color="#fff"
+                 style={{ marginRight: 10 }}
+               />
+               <Text style={styles.publishButtonText}>
+                 {videoFileSizeError 
+                   ? '⚠️ File Too Large - Cannot Upload' 
+                   : '🔒 Publish Recipe Securely'
+                 }
+               </Text>
+             </View>
+           )}
+         </TouchableOpacity>
 
-        {/* Secure upload is now the default and only option */}
-
-        {/* Modified upload button */}
-        <TouchableOpacity
-          style={[
-            styles.publishButton,
-            (isUploading || videoFileSizeError) && styles.saveButtonDisabled,
-          ]}
-          onPress={handleUpload}
-          disabled={isUploading || !!videoFileSizeError}
-          activeOpacity={0.8}>
-          {isUploading ? (
-            <View style={styles.publishButtonContentLoading}>
-              <ActivityIndicator
-                color="#fff"
-                size="small"
-                style={{ marginRight: 10 }}
-              />
-              <Text style={styles.publishButtonText}>
-                Starting Secure Upload...
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.publishButtonContent}>
-              <Feather
-                name="upload-cloud"
-                size={20}
-                color="#fff"
-                style={{ marginRight: 10 }}
-              />
-              <Text style={styles.publishButtonText}>
-                {videoFileSizeError 
-                  ? '⚠️ File Too Large - Cannot Upload' 
-                  : '🔒 Publish Recipe Securely'
-                }
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        {isUploading && uploadProgress > 0 && (
-          <View style={styles.progressBarContainer}>
-            <View
-              style={[
-                styles.progressBar,
-                { width: `${uploadProgress * 100}%` },
-              ]}
-            />
-            <Text
-              style={
-                styles.progressText
-              }>{`${(uploadProgress * 100).toFixed(0)}%`}</Text>
-          </View>
-        )}
+         {isUploading && uploadProgress > 0 && (
+           <View style={styles.progressBarContainer}>
+             <View
+               style={[
+                 styles.progressBar,
+                 { width: `${uploadProgress * 100}%` },
+               ]}
+             />
+             <Text
+               style={
+                 styles.progressText
+               }>{`${(uploadProgress * 100).toFixed(0)}%`}</Text>
+           </View>
+         )}
 
         </Animated.View>
         </ScrollView>
@@ -1090,6 +937,8 @@ const VideoRecipeUploaderScreen: React.FC<VideoRecipeUploaderScreenProps> = ({
     </View>
   );
 };
+
+// DIET_TAGS_OPTIONS already defined at the top of the file
 
 // Enhanced styles
 const styles = StyleSheet.create({
@@ -1170,119 +1019,6 @@ const styles = StyleSheet.create({
   },
   scrollContentContainer: {
     paddingBottom: 100,
-  },
-  headerContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 16,
-  },
-  screenTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    textAlign: 'center',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  screenSubtitle: {
-    fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
-    fontWeight: '400',
-  },
-  mediaSelectionContainer: {
-    marginVertical: 16,
-  },
-  mediaPreviewWrapper: {
-    marginBottom: 20,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  videoPreview: {
-    width: '100%',
-    aspectRatio: 16 / 9,
-    borderRadius: 12,
-    marginBottom: 16,
-    backgroundColor: '#f0f0f0',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  thumbnailContainer: {
-    position: 'relative',
-    marginBottom: 16,
-  },
-  thumbnailOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingVertical: 6,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-  },
-  thumbnailOverlayText: {
-    color: '#fff',
-    textAlign: 'center',
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  thumbnailPreview: {
-    width: SCREEN_WIDTH * 0.6,
-    height: (SCREEN_WIDTH * 0.6) / (16 / 9),
-    borderRadius: 12,
-    backgroundColor: '#f0f0f0',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  mediaPlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fafafa',
-  },
-  mediaPlaceholderText: {
-    marginTop: 12,
-    color: '#9ca3af',
-    fontSize: 14,
-    textAlign: 'center',
-    maxWidth: '80%',
-  },
-  button: {
-    backgroundColor: BRAND_PRIMARY,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  buttonOutline: {
-    paddingVertical: 11,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: BRAND_PRIMARY,
-    backgroundColor: 'transparent',
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 15,
-  },
-  buttonOutlineText: {
-    color: BRAND_PRIMARY,
-    fontWeight: '600',
-    fontSize: 15,
   },
   formContainer: {
     paddingHorizontal: 12,
@@ -1561,59 +1297,98 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  // Upload mode toggle styles removed - secure upload is now default
-  // File size validation styles
-  fileSizeContainer: {
-    marginTop: 8,
+  // Media selection styles
+  mediaSelectionContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
-  fileSizeInfo: {
-    flexDirection: 'row',
+  mediaPreviewWrapper: {
+    marginBottom: 16,
     alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    backgroundColor: '#f0fdf4',
-    borderRadius: 6,
+  },
+  videoPreview: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 12,
+    marginBottom: 16,
+    backgroundColor: '#f3f4f6',
     borderWidth: 1,
-    borderColor: '#bbf7d0',
+    borderColor: '#e5e7eb',
   },
-  fileSizeText: {
-    fontSize: 12,
-    color: '#059669',
-    fontWeight: '500',
-    marginLeft: 6,
-  },
-  fileSizeError: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    backgroundColor: '#fef2f2',
-    borderRadius: 6,
+  thumbnailPreview: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 12,
+    marginBottom: 16,
+    backgroundColor: '#f3f4f6',
     borderWidth: 1,
-    borderColor: '#fecaca',
+    borderColor: '#e5e7eb',
   },
-  fileSizeErrorText: {
-    fontSize: 12,
-    color: '#dc2626',
-    fontWeight: '500',
-    marginLeft: 6,
+  thumbnailContainer: {
+    position: 'relative',
+    marginBottom: 16,
   },
-  fileSizeDisclaimer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    paddingVertical: 6,
+  thumbnailOverlay: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     paddingHorizontal: 8,
-    backgroundColor: '#f9fafb',
+    paddingVertical: 4,
     borderRadius: 6,
   },
-  disclaimerText: {
-    fontSize: 11,
-    color: '#6b7280',
-    marginLeft: 6,
-    flex: 1,
+  thumbnailOverlayText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '500',
   },
-  // Secure upload section styles removed - integrated into main upload button
+  mediaPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fafafa',
+  },
+  mediaPlaceholderText: {
+    marginTop: 12,
+    color: '#9ca3af',
+    fontSize: 14,
+    textAlign: 'center',
+    maxWidth: '80%',
+  },
+  button: {
+    backgroundColor: BRAND_PRIMARY,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  buttonOutline: {
+    paddingVertical: 11,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: BRAND_PRIMARY,
+    backgroundColor: 'transparent',
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  buttonOutlineText: {
+    color: BRAND_PRIMARY,
+    fontWeight: '600',
+    fontSize: 15,
+  },
 });
 
 export default VideoRecipeUploaderScreen;

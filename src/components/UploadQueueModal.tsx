@@ -16,11 +16,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import BackgroundUploadService, { UploadQueueItem } from '../services/BackgroundUploadService';
+import UserAwareBackgroundUploadService, { UserAwareUploadQueueItem } from '../services/UserAwareBackgroundUploadService';
+import { useAuth } from '../providers/AuthProvider';
 import { MainStackParamList } from '../navigation/types';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
+
+// Unified upload types for queue management
+type UnifiedUploadItem = UploadQueueItem | UserAwareUploadQueueItem;
+
+const isUserAwareItem = (item: UnifiedUploadItem): item is UserAwareUploadQueueItem => {
+  return 'userId' in item;
+};
 
 interface UploadQueueModalProps {
   visible: boolean;
@@ -29,13 +38,18 @@ interface UploadQueueModalProps {
 
 export const UploadQueueModal: React.FC<UploadQueueModalProps> = ({ visible, onClose }) => {
   const navigation = useNavigation<NavigationProp>();
-  const [queueItems, setQueueItems] = useState<UploadQueueItem[]>([]);
+  const { user } = useAuth();
+  const [queueItems, setQueueItems] = useState<UnifiedUploadItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const uploadService = useMemo(() => BackgroundUploadService.getInstance(), []);
+  const userAwareService = useMemo(() => 
+    user?.id ? UserAwareBackgroundUploadService.getInstance(user.id) : null, 
+    [user?.id]
+  );
   const insets = useSafeAreaInsets();
 
-  // Memoized filter function for performance
-  const filterRelevantItems = useCallback((items: UploadQueueItem[]): UploadQueueItem[] => {
+  // Memoized filter function for performance - now handles both upload types
+  const filterRelevantItems = useCallback((items: UnifiedUploadItem[]): UnifiedUploadItem[] => {
     const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
     return items.filter(item => 
       item.status === 'failed' || 
@@ -47,15 +61,22 @@ export const UploadQueueModal: React.FC<UploadQueueModalProps> = ({ visible, onC
 
   const loadQueueData = useCallback(() => {
     try {
-      const allItems = uploadService.getQueueStatus();
+      // CRITICAL FIX: Load from both services
+      const originalItems = uploadService.getQueueStatus();
+      const userAwareItems = userAwareService?.getQueueStatus() || [];
+      const allItems: UnifiedUploadItem[] = [...originalItems, ...userAwareItems];
       const relevantItems = filterRelevantItems(allItems);
       setQueueItems(relevantItems);
+      
+      if (allItems.length > 0) {
+        console.log(`[UploadQueueModal] 🔄 Loaded ${originalItems.length} original + ${userAwareItems.length} secure uploads = ${allItems.length} total`);
+      }
     } catch (error) {
       console.error('[UploadQueueModal] Error loading queue data:', error);
       // Show user-friendly error
       Alert.alert('Error', 'Failed to load upload queue. Please try again.');
     }
-  }, [uploadService, filterRelevantItems]);
+  }, [uploadService, userAwareService, filterRelevantItems]);
 
   useEffect(() => {
     if (!visible) return;
@@ -63,26 +84,49 @@ export const UploadQueueModal: React.FC<UploadQueueModalProps> = ({ visible, onC
     // Load initial data
     loadQueueData();
     
-    const handleQueueUpdate = (updatedQueue: UploadQueueItem[]) => {
-      const relevantItems = filterRelevantItems(updatedQueue);
+    // CRITICAL FIX: Handle updates from both services
+    const handleOriginalQueueUpdate = (updatedQueue: UploadQueueItem[]) => {
+      const userAwareItems = userAwareService?.getQueueStatus() || [];
+      const allItems: UnifiedUploadItem[] = [...updatedQueue, ...userAwareItems];
+      const relevantItems = filterRelevantItems(allItems);
+      setQueueItems(relevantItems);
+    };
+
+    const handleUserAwareQueueUpdate = (updatedQueue: UserAwareUploadQueueItem[]) => {
+      const originalItems = uploadService.getQueueStatus();
+      const allItems: UnifiedUploadItem[] = [...originalItems, ...updatedQueue];
+      const relevantItems = filterRelevantItems(allItems);
       setQueueItems(relevantItems);
     };
 
     const handleUploadRetried = () => loadQueueData();
     const handleUploadCancelled = () => loadQueueData();
 
-    // Subscribe to events
-    uploadService.on('queueUpdated', handleQueueUpdate);
+    // Subscribe to original upload service events
+    uploadService.on('queueUpdated', handleOriginalQueueUpdate);
     uploadService.on('uploadRetried', handleUploadRetried);
     uploadService.on('uploadCancelled', handleUploadCancelled);
 
+    // Subscribe to user-aware upload service events
+    if (userAwareService) {
+      userAwareService.on('queueUpdated', handleUserAwareQueueUpdate);
+      userAwareService.on('uploadRetried', handleUploadRetried);
+      userAwareService.on('uploadCancelled', handleUploadCancelled);
+    }
+
     // Cleanup function
     return () => {
-      uploadService.off('queueUpdated', handleQueueUpdate);
+      uploadService.off('queueUpdated', handleOriginalQueueUpdate);
       uploadService.off('uploadRetried', handleUploadRetried);
       uploadService.off('uploadCancelled', handleUploadCancelled);
+      
+      if (userAwareService) {
+        userAwareService.off('queueUpdated', handleUserAwareQueueUpdate);
+        userAwareService.off('uploadRetried', handleUploadRetried);
+        userAwareService.off('uploadCancelled', handleUploadCancelled);
+      }
     };
-  }, [visible, loadQueueData, uploadService, filterRelevantItems]);
+  }, [visible, loadQueueData, uploadService, userAwareService, filterRelevantItems]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -97,19 +141,61 @@ export const UploadQueueModal: React.FC<UploadQueueModalProps> = ({ visible, onC
 
   const handleRetry = useCallback(async (uploadId: string) => {
     try {
-      const success = await uploadService.retryFailedUpload(uploadId);
+      // CRITICAL FIX: Enhanced retry logic with proper service detection
+      let success = false;
+      let errorMessage = '';
+      
+      // Find the item to determine which service it belongs to
+      const item = queueItems.find(item => item.id === uploadId);
+      
+      if (item && isUserAwareItem(item)) {
+        // Item belongs to UserAware service
+        if (userAwareService) {
+          try {
+            success = await userAwareService.retryFailedUpload(uploadId);
+            if (__DEV__) {
+              console.log(`[UploadQueueModal] ✅ Retried in UserAware service: ${uploadId}`);
+            }
+          } catch (userAwareError) {
+            errorMessage = `UserAware service error: ${userAwareError}`;
+            if (__DEV__) {
+              console.error('[UploadQueueModal] UserAware retry failed:', userAwareError);
+            }
+          }
+        } else {
+          errorMessage = 'UserAware service not available';
+        }
+      } else if (item) {
+        // Item belongs to original service
+        try {
+          success = await uploadService.retryFailedUpload(uploadId);
+          if (__DEV__) {
+            console.log(`[UploadQueueModal] ✅ Retried in original service: ${uploadId}`);
+          }
+        } catch (originalError) {
+          errorMessage = `Original service error: ${originalError}`;
+          if (__DEV__) {
+            console.error('[UploadQueueModal] Original retry failed:', originalError);
+          }
+        }
+      } else {
+        errorMessage = 'Upload item not found in queue';
+      }
+      
       if (success) {
         Alert.alert('Upload Retried', 'Your recipe upload has been added back to the queue.');
+        // Force refresh the queue data
+        loadQueueData();
       } else {
-        Alert.alert('Retry Failed', 'Unable to retry this upload. Please try again.');
+        Alert.alert('Retry Failed', `Unable to retry this upload: ${errorMessage}`);
       }
     } catch (error) {
-      console.error('[UploadQueueModal] Error retrying upload:', error);
-      Alert.alert('Error', 'Failed to retry upload. Please try again.');
+      console.error('[UploadQueueModal] Critical error retrying upload:', error);
+      Alert.alert('Error', 'Critical error occurred while retrying upload. Please restart the app.');
     }
-  }, [uploadService]);
+  }, [uploadService, userAwareService, queueItems, loadQueueData]);
 
-  const handleEdit = useCallback((item: UploadQueueItem) => {
+  const handleEdit = useCallback((item: UnifiedUploadItem) => {
     Alert.alert(
       'Edit Recipe', 
       `Create a new recipe based on "${item.metadata.title}"? The failed upload will be removed from the queue.`,
@@ -120,8 +206,12 @@ export const UploadQueueModal: React.FC<UploadQueueModalProps> = ({ visible, onC
           onPress: async () => {
             try {
               onClose(); // Close modal first
-              // Remove the failed upload from queue since user is starting fresh
-              await uploadService.cancelUpload(item.id);
+              // CRITICAL FIX: Remove from appropriate service
+              if (isUserAwareItem(item) && userAwareService) {
+                await userAwareService.cancelUpload(item.id);
+              } else {
+                await uploadService.cancelUpload(item.id);
+              }
             } catch (error) {
               console.error('[UploadQueueModal] Error cancelling upload for edit:', error);
             }
@@ -129,7 +219,7 @@ export const UploadQueueModal: React.FC<UploadQueueModalProps> = ({ visible, onC
         }
       ]
     );
-  }, [uploadService, onClose]);
+  }, [uploadService, userAwareService, onClose]);
 
   const handleDelete = useCallback((uploadId: string, title: string) => {
     Alert.alert(
@@ -142,16 +232,62 @@ export const UploadQueueModal: React.FC<UploadQueueModalProps> = ({ visible, onC
           style: 'destructive',
           onPress: async () => {
             try {
-              await uploadService.cancelUpload(uploadId);
+              // CRITICAL FIX: Enhanced delete logic with proper service detection
+              let success = false;
+              let errorMessage = '';
+              
+              // Find the item to determine which service it belongs to
+              const item = queueItems.find(item => item.id === uploadId);
+              
+              if (item && isUserAwareItem(item)) {
+                // Item belongs to UserAware service
+                if (userAwareService) {
+                  try {
+                    success = await userAwareService.cancelUpload(uploadId);
+                    if (__DEV__) {
+                      console.log(`[UploadQueueModal] ✅ Deleted from UserAware service: ${uploadId}`);
+                    }
+                  } catch (userAwareError) {
+                    errorMessage = `UserAware service error: ${userAwareError}`;
+                    if (__DEV__) {
+                      console.error('[UploadQueueModal] UserAware delete failed:', userAwareError);
+                    }
+                  }
+                } else {
+                  errorMessage = 'UserAware service not available';
+                }
+              } else if (item) {
+                // Item belongs to original service
+                try {
+                  success = await uploadService.cancelUpload(uploadId);
+                  if (__DEV__) {
+                    console.log(`[UploadQueueModal] ✅ Deleted from original service: ${uploadId}`);
+                  }
+                } catch (originalError) {
+                  errorMessage = `Original service error: ${originalError}`;
+                  if (__DEV__) {
+                    console.error('[UploadQueueModal] Original delete failed:', originalError);
+                  }
+                }
+              } else {
+                errorMessage = 'Upload item not found in queue';
+              }
+              
+              if (!success) {
+                Alert.alert('Delete Failed', `Failed to delete upload: ${errorMessage}`);
+              } else {
+                // Force refresh the queue data
+                loadQueueData();
+              }
             } catch (error) {
-              console.error('[UploadQueueModal] Error deleting upload:', error);
-              Alert.alert('Error', 'Failed to delete upload. Please try again.');
+              console.error('[UploadQueueModal] Critical error deleting upload:', error);
+              Alert.alert('Error', 'Critical error occurred while deleting upload. Please restart the app.');
             }
           },
         },
       ]
     );
-  }, [uploadService]);
+  }, [uploadService, userAwareService, queueItems, loadQueueData]);
 
   const handleClearCompleted = useCallback(() => {
     const completedCount = queueItems.filter(item => item.status === 'completed').length;
@@ -166,19 +302,63 @@ export const UploadQueueModal: React.FC<UploadQueueModalProps> = ({ visible, onC
           text: 'Clear',
           onPress: async () => {
             try {
-              await uploadService.clearCompletedUploads();
+              // CRITICAL FIX: Enhanced clear logic with proper error handling
+              let originalSuccess = false;
+              let userAwareSuccess = false;
+              let errors: string[] = [];
+              
+              // Clear from original service
+              try {
+                await uploadService.clearCompletedUploads();
+                originalSuccess = true;
+                if (__DEV__) {
+                  console.log('[UploadQueueModal] ✅ Cleared completed uploads from original service');
+                }
+              } catch (originalError) {
+                errors.push(`Original service: ${originalError}`);
+                if (__DEV__) {
+                  console.error('[UploadQueueModal] Original clear failed:', originalError);
+                }
+              }
+              
+              // Clear from user-aware service
+              if (userAwareService) {
+                try {
+                  await userAwareService.clearCompletedUploads();
+                  userAwareSuccess = true;
+                  if (__DEV__) {
+                    console.log('[UploadQueueModal] ✅ Cleared completed uploads from UserAware service');
+                  }
+                } catch (userAwareError) {
+                  errors.push(`UserAware service: ${userAwareError}`);
+                  if (__DEV__) {
+                    console.error('[UploadQueueModal] UserAware clear failed:', userAwareError);
+                  }
+                }
+              }
+              
+              // Show results to user
+              if (originalSuccess || userAwareSuccess) {
+                // Force refresh the queue data
+                loadQueueData();
+                if (errors.length > 0) {
+                  Alert.alert('Partially Completed', `Some uploads were cleared, but errors occurred: ${errors.join(', ')}`);
+                }
+              } else {
+                Alert.alert('Clear Failed', `Failed to clear completed uploads: ${errors.join(', ')}`);
+              }
             } catch (error) {
-              console.error('[UploadQueueModal] Error clearing completed uploads:', error);
-              Alert.alert('Error', 'Failed to clear completed uploads. Please try again.');
+              console.error('[UploadQueueModal] Critical error clearing completed uploads:', error);
+              Alert.alert('Error', 'Critical error occurred while clearing uploads. Please restart the app.');
             }
           },
         },
       ]
     );
-  }, [queueItems, uploadService]);
+  }, [queueItems, uploadService, userAwareService, loadQueueData]);
 
-  // Memoized utility functions for performance
-  const getStatusColor = useCallback((status: UploadQueueItem['status']) => {
+  // Memoized utility functions for performance - now handles unified types
+  const getStatusColor = useCallback((status: UnifiedUploadItem['status']) => {
     switch (status) {
       case 'completed': return '#10b981';
       case 'failed': return '#ef4444';
@@ -188,7 +368,7 @@ export const UploadQueueModal: React.FC<UploadQueueModalProps> = ({ visible, onC
     }
   }, []);
 
-  const getStatusIcon = useCallback((status: UploadQueueItem['status']) => {
+  const getStatusIcon = useCallback((status: UnifiedUploadItem['status']) => {
     switch (status) {
       case 'completed': return 'check-circle';
       case 'failed': return 'x-circle';
@@ -198,7 +378,7 @@ export const UploadQueueModal: React.FC<UploadQueueModalProps> = ({ visible, onC
     }
   }, []);
 
-  const getStatusText = useCallback((status: UploadQueueItem['status']) => {
+  const getStatusText = useCallback((status: UnifiedUploadItem['status']) => {
     switch (status) {
       case 'completed': return 'Completed';
       case 'failed': return 'Failed';
@@ -221,8 +401,8 @@ export const UploadQueueModal: React.FC<UploadQueueModalProps> = ({ visible, onC
     return 'Just now';
   }, []);
 
-  // Memoized render function for performance
-  const renderQueueItem = useCallback(({ item }: { item: UploadQueueItem }) => (
+  // Memoized render function for performance - now handles unified types
+  const renderQueueItem = useCallback(({ item }: { item: UnifiedUploadItem }) => (
     <View style={styles.queueItem}>
       {/* Thumbnail */}
       <View style={styles.thumbnailContainer}>
@@ -250,6 +430,8 @@ export const UploadQueueModal: React.FC<UploadQueueModalProps> = ({ visible, onC
       <View style={styles.contentContainer}>
         <Text style={styles.title} numberOfLines={1}>
           {item.metadata.title || 'Untitled Recipe'}
+          {/* Show service type indicator */}
+          {isUserAwareItem(item) && <Text style={styles.serviceIndicator}> 🔒</Text>}
         </Text>
         
         <View style={styles.statusRow}>
@@ -332,8 +514,8 @@ export const UploadQueueModal: React.FC<UploadQueueModalProps> = ({ visible, onC
     return { completedCount, failedCount, activeCount };
   }, [queueItems]);
 
-  // Memoized key extractor for FlatList performance
-  const keyExtractor = useCallback((item: UploadQueueItem) => item.id, []);
+  // Memoized key extractor for FlatList performance - now handles unified types
+  const keyExtractor = useCallback((item: UnifiedUploadItem) => item.id, []);
 
   return (
     <Modal
@@ -525,6 +707,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1e293b',
     marginBottom: 2,
+  },
+  serviceIndicator: {
+    fontSize: 11,
+    color: '#10b981',
   },
   statusRow: {
     flexDirection: 'row',

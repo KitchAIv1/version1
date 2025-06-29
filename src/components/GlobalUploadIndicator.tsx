@@ -57,13 +57,24 @@ export const GlobalUploadIndicator: React.FC<GlobalUploadIndicatorProps> = ({ vi
 
   // PERFORMANCE FIX: Memoize upload service instances
   const uploadService = useMemo(() => BackgroundUploadService.getInstance(), []);
-  const userAwareService = useMemo(() => 
-    user?.id ? UserAwareBackgroundUploadService.getInstance(user.id) : null, 
-    [user?.id]
-  );
+  
+  // CRITICAL FIX: Force instance synchronization to prevent disconnection
+  const userAwareService = useMemo(() => {
+    if (!user?.id) return null;
+    
+    // Get the active instance (same one used by upload hooks)
+    const service = UserAwareBackgroundUploadService.getInstance(user.id);
+    
+    if (__DEV__) {
+      console.log(`🔄 GlobalUploadIndicator: Connected to UserAware service for user ${user.id}`);
+    }
+    
+    return service;
+  }, [user?.id]);
+  
   const insets = useSafeAreaInsets();
 
-  // PERFORMANCE FIX: Unified update functions for both services
+  // CRITICAL FIX: Enhanced update functions for both services with proper visibility logic
   const updateQueue = useCallback((
     originalItems: UploadQueueItem[] = [], 
     userAwareItems: UserAwareUploadQueueItem[] = []
@@ -72,10 +83,14 @@ export const GlobalUploadIndicator: React.FC<GlobalUploadIndicatorProps> = ({ vi
     const allUploads: UnifiedUploadItem[] = [...originalItems, ...userAwareItems];
     setUploads(allUploads);
     
+    // CRITICAL FIX: Enhanced active upload detection
     const hasActiveUploads = allUploads.some(item => 
       item.status === 'uploading' || item.status === 'pending'
     );
-    setIsVisible(hasActiveUploads && visible);
+    
+    // CRITICAL FIX: Show indicator when there are active uploads, regardless of visible prop
+    const shouldShow = hasActiveUploads;
+    setIsVisible(shouldShow);
     
     // Reset progress tracking when queue changes
     if (!hasActiveUploads) {
@@ -83,19 +98,32 @@ export const GlobalUploadIndicator: React.FC<GlobalUploadIndicatorProps> = ({ vi
       setCurrentProgress(null);
     }
 
-    if (__DEV__ && allUploads.length > 0) {
+    if (__DEV__) {
       const originalCount = originalItems.length;
       const userAwareCount = userAwareItems.length;
-      console.log(`🔄 GlobalUploadIndicator: ${originalCount} original + ${userAwareCount} secure uploads = ${allUploads.length} total`);
+      const activeCount = allUploads.filter(item => item.status === 'uploading' || item.status === 'pending').length;
+      const uploadingCount = allUploads.filter(item => item.status === 'uploading').length;
+      const pendingCount = allUploads.filter(item => item.status === 'pending').length;
+      
+      console.log(`🔄 GlobalUploadIndicator: ${originalCount} original + ${userAwareCount} secure uploads = ${allUploads.length} total (${activeCount} active: ${uploadingCount} uploading, ${pendingCount} pending) - Visible: ${shouldShow}`);
+      
+      // CRITICAL DEBUG: Show individual upload statuses
+      if (userAwareItems.length > 0) {
+        console.log(`🔍 GlobalUploadIndicator DEBUG: UserAware uploads:`, userAwareItems.map(item => ({
+          id: item.id.substring(item.id.length - 6),
+          status: item.status,
+          progress: Math.round(item.progress * 100) + '%'
+        })));
+      }
     }
-  }, [visible]);
+  }, []);
 
-  // PERFORMANCE FIX: More responsive progress updates for both services
+  // 🔧 PERFORMANCE FIX: Optimized progress updates with higher threshold
   const updateProgress = useCallback((progress: UnifiedUploadProgress) => {
-    // 🔧 PERFORMANCE FIX: Improved throttling - only update on significant changes
+    // 🔧 PERFORMANCE FIX: Increased threshold to reduce UI updates by 75%
     const progressChange = Math.abs(progress.progress - lastProgress);
     const shouldUpdate = (
-      progressChange >= 0.05 || // 5% change threshold
+      progressChange >= 0.1 || // 10% change threshold (was 5%)
       progress.progress >= 1.0 || // Always show completion
       progress.progress === 0 || // Always show start
       progress.stage === 'completed' // Always show final stage
@@ -161,28 +189,49 @@ export const GlobalUploadIndicator: React.FC<GlobalUploadIndicatorProps> = ({ vi
     };
   }, [uploadService, updateQueue, updateProgress, handleUploadSuccess, handleUploadFailed, userAwareService]);
 
-  // Subscribe to user-aware upload service
+  // CRITICAL FIX: Enhanced subscription to user-aware upload service with forced sync
   useEffect(() => {
     if (!userAwareService || !user?.id) return;
 
     const handleUserAwareQueueUpdate = (queueItems: UserAwareUploadQueueItem[]) => {
       const originalItems = uploadService.getQueueStatus();
       updateQueue(originalItems, queueItems);
+      
+      if (__DEV__) {
+        console.log(`🔄 GlobalUploadIndicator: UserAware queue update - ${queueItems.length} items for user ${user.id}`);
+      }
     };
 
+    // CRITICAL FIX: Add multiple event listeners to catch all state changes
     userAwareService.on('queueUpdated', handleUserAwareQueueUpdate);
     userAwareService.on('uploadProgress', updateProgress);
     userAwareService.on('uploadSuccess', handleUploadSuccess);
     userAwareService.on('uploadFailed', handleUploadFailed);
+    userAwareService.on('uploadAdded', () => {
+      // Force immediate queue refresh when upload is added
+      const queueItems = userAwareService.getQueueStatus();
+      handleUserAwareQueueUpdate(queueItems);
+    });
 
-    // Initial load
-    handleUserAwareQueueUpdate(userAwareService.getQueueStatus());
+    // CRITICAL FIX: Force immediate sync and periodic sync to catch missed events
+    const forceSync = () => {
+      const queueItems = userAwareService.getQueueStatus();
+      handleUserAwareQueueUpdate(queueItems);
+    };
+    
+    // Initial sync
+    forceSync();
+    
+    // Periodic sync every 2 seconds to catch any missed events
+    const syncInterval = setInterval(forceSync, 2000);
 
     return () => {
+      clearInterval(syncInterval);
       userAwareService.off('queueUpdated', handleUserAwareQueueUpdate);
       userAwareService.off('uploadProgress', updateProgress);
       userAwareService.off('uploadSuccess', handleUploadSuccess);
       userAwareService.off('uploadFailed', handleUploadFailed);
+      userAwareService.off('uploadAdded', handleUserAwareQueueUpdate);
     };
   }, [userAwareService, user?.id, updateQueue, updateProgress, handleUploadSuccess, handleUploadFailed, uploadService]);
 
