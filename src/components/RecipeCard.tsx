@@ -23,6 +23,7 @@ import { prefetchRecipeDetails } from '../hooks/useRecipeDetails';
 import { useAuth } from '../providers/AuthProvider';
 import WhatCanICookButton from './WhatCanICookButton';
 import { useNetworkQuality } from '../hooks/useNetworkQuality';
+import { useVideoPreloader } from '../hooks/useVideoPreloader';
 
 // Move styles to top to fix "styles used before defined" errors
 const styles = StyleSheet.create({
@@ -194,31 +195,8 @@ const getOptimizedVideoUrl = (baseUrl: string, quality: 'low' | 'medium' | 'high
   return baseUrl;
 };
 
-// 🚀 TIKTOK-LEVEL OPTIMIZATIONS: React Native compatible video preloading
-const useVideoPreloader = () => {
-  const [preloadedVideos] = useState(() => new Map<string, { isPreloaded: boolean; quality: string }>());
-  
-  const preloadVideo = useCallback((videoUrl: string, quality: 'low' | 'medium' | 'high' = 'medium') => {
-    if (!videoUrl || preloadedVideos.has(videoUrl)) return;
-    
-    const optimizedUrl = getOptimizedVideoUrl(videoUrl, quality);
-    
-    // Use fetch HEAD request to preload video metadata in React Native
-    fetch(optimizedUrl, { 
-      method: 'HEAD',
-      cache: 'force-cache',
-    })
-      .then(() => {
-        preloadedVideos.set(videoUrl, { isPreloaded: true, quality });
-        console.log(`🎬 Video preloaded: ${videoUrl.substring(0, 50)}...`);
-      })
-      .catch((error) => {
-        console.warn(`🎬 Video preload failed: ${videoUrl.substring(0, 50)}...`, error);
-      });
-  }, [preloadedVideos]);
-  
-  return { preloadVideo, preloadedVideos };
-};
+// 🚀 OPTIMIZED: Removed duplicate video preloader - using main useVideoPreloader.ts hook
+// This reduces resource conflicts and improves video loading performance
 
 // Helper function to safely access ingredient counts
 function getIngredientCounts(item: RecipeItem): {
@@ -298,19 +276,13 @@ export default React.memo(function RecipeCard({
 
   const hasValidVideoUrl = videoUrl && videoUrl.trim() !== '';
 
-  // 🚀 TIKTOK-LEVEL OPTIMIZATIONS: Preload adjacent videos when this card becomes active
+  // 🚀 OPTIMIZED: Reduced adjacent video preloading for performance - only preload next video
   useEffect(() => {
-    if (isActive && isScreenFocused) {
-      // Preload next video with high priority
-      if (nextVideoUrl) {
-        setTimeout(() => preloadVideo(nextVideoUrl, videoQuality), 100);
-      }
-      // Preload previous video with medium priority
-      if (prevVideoUrl) {
-        setTimeout(() => preloadVideo(prevVideoUrl, videoQuality), 500);
-      }
+    if (isActive && isScreenFocused && nextVideoUrl) {
+      // Only preload next video to reduce resource competition
+      setTimeout(() => preloadVideo(nextVideoUrl, 'high', videoQuality), 200);
     }
-  }, [isActive, isScreenFocused, nextVideoUrl, prevVideoUrl, preloadVideo, videoQuality]);
+  }, [isActive, isScreenFocused, nextVideoUrl, preloadVideo, videoQuality]);
   
   // Simple cleanup on unmount only
   useEffect(() => {
@@ -485,7 +457,7 @@ export default React.memo(function RecipeCard({
             shouldPlay={isActive && isScreenFocused}
             onLoad={handleLoad}
             onError={handleError}
-            progressUpdateIntervalMillis={1000} // Reduced from 500ms to 1000ms for better performance
+            progressUpdateIntervalMillis={1500} // Further reduced to 1.5s for video loading performance
             onPlaybackStatusUpdate={
               isActive && isScreenFocused ? onPlaybackStatusUpdate : undefined
             }

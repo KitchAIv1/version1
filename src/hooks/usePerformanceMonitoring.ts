@@ -95,10 +95,12 @@ export const usePerformanceMonitoring = () => {
 
       setMetrics(prev => ({ ...prev, screenLoadTime: loadTime }));
 
-      // Log performance data (can be sent to analytics)
-      console.log(
-        `[Performance] Screen "${screenName}" loaded in ${loadTime}ms`,
-      );
+      // 🚀 OPTIMIZED: Only log performance data in development for video performance
+      if (__DEV__) {
+        console.log(
+          `[Performance] Screen "${screenName}" loaded in ${loadTime}ms`,
+        );
+      }
 
       return loadTime;
     },
@@ -121,9 +123,13 @@ export const usePerformanceMonitoring = () => {
       const navigationTime = Date.now() - (startTime || startTimeRef.current);
 
       setMetrics(prev => ({ ...prev, navigationTime }));
-      console.log(
-        `[Performance] Navigation from "${fromScreen}" to "${toScreen}" took ${navigationTime}ms`,
-      );
+      
+      // 🚀 OPTIMIZED: Only log performance data in development for video performance
+      if (__DEV__) {
+        console.log(
+          `[Performance] Navigation from "${fromScreen}" to "${toScreen}" took ${navigationTime}ms`,
+        );
+      }
 
       return navigationTime;
     },
@@ -136,9 +142,13 @@ export const usePerformanceMonitoring = () => {
       const responseTime = Date.now() - (startTime || startTimeRef.current);
 
       setMetrics(prev => ({ ...prev, searchResponseTime: responseTime }));
-      console.log(
-        `[Performance] Search for "${query}" returned ${resultCount} results in ${responseTime}ms`,
-      );
+      
+      // 🚀 OPTIMIZED: Only log performance data in development for video performance
+      if (__DEV__) {
+        console.log(
+          `[Performance] Search for "${query}" returned ${resultCount} results in ${responseTime}ms`,
+        );
+      }
 
       return responseTime;
     },
@@ -151,9 +161,13 @@ export const usePerformanceMonitoring = () => {
       const responseTime = Date.now() - (startTime || startTimeRef.current);
 
       setMetrics(prev => ({ ...prev, apiResponseTime: responseTime }));
-      console.log(
-        `[Performance] API call to "${endpoint}" completed in ${responseTime}ms`,
-      );
+      
+      // 🚀 OPTIMIZED: Only log performance data in development for video performance
+      if (__DEV__) {
+        console.log(
+          `[Performance] API call to "${endpoint}" completed in ${responseTime}ms`,
+        );
+      }
 
       return responseTime;
     },

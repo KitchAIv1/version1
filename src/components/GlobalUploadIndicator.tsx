@@ -126,10 +126,10 @@ export const GlobalUploadIndicator: React.FC<GlobalUploadIndicatorProps> = ({ vi
 
   // 🔧 PERFORMANCE FIX: Optimized progress updates with higher threshold
   const updateProgress = useCallback((progress: UnifiedUploadProgress) => {
-    // 🔧 PERFORMANCE FIX: Increased threshold to reduce UI updates by 75%
+    // 🔧 PERFORMANCE FIX: Increased threshold to reduce UI updates for video performance
     const progressChange = Math.abs(progress.progress - lastProgress);
     const shouldUpdate = (
-      progressChange >= 0.1 || // 10% change threshold (was 5%)
+      progressChange >= 0.15 || // 15% change threshold (was 10%) - further reduced for video performance
       progress.progress >= 1.0 || // Always show completion
       progress.progress === 0 || // Always show start
       progress.stage === 'completed' // Always show final stage

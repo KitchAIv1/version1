@@ -10,7 +10,7 @@ export interface NetworkQuality {
 // 🚀 TIKTOK-LEVEL OPTIMIZATIONS: Global network state cache to avoid redundant checks
 let globalNetworkState: NetworkQuality | null = null;
 let lastNetworkCheck = 0;
-const NETWORK_CHECK_COOLDOWN = 60000; // 1 minute instead of 30 seconds
+const NETWORK_CHECK_COOLDOWN = 300000; // 5 minutes - reduced overhead for video performance
 
 export const useNetworkQuality = () => {
   const [networkQuality, setNetworkQuality] = useState<NetworkQuality>(() => {
@@ -135,10 +135,10 @@ export const useNetworkQuality = () => {
       updateNetworkInfo();
     }
 
-    // 🚀 TIKTOK-LEVEL OPTIMIZATIONS: Less frequent speed checks (every 2 minutes)
+    // 🚀 TIKTOK-LEVEL OPTIMIZATIONS: Less frequent speed checks (every 5 minutes)
     const speedCheckInterval = setInterval(() => {
       updateNetworkInfo();
-    }, 120000); // Increased from 30s to 2 minutes
+    }, 300000); // Increased from 2 min to 5 minutes for video performance
 
     return () => {
       clearInterval(speedCheckInterval);

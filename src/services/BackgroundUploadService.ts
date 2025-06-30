@@ -39,7 +39,7 @@ class BackgroundUploadService extends EventEmitter {
   private readonly STORAGE_KEY = 'backgroundUploads';
   private readonly MAX_CONCURRENT_UPLOADS = 1; // REDUCED: Only 1 concurrent upload to prevent memory issues
   private readonly MAX_QUEUE_SIZE = 20; // REDUCED: Lower queue size for better memory management
-  private readonly PROGRESS_THROTTLE_MS = 100; // FIXED: Reduced throttle for better UI responsiveness
+  private readonly PROGRESS_THROTTLE_MS = 500; // OPTIMIZED: Increased throttle for video performance
   private progressThrottleMap: Map<string, number> = new Map(); // ADDED: Track last progress emit time
 
   private constructor() {
@@ -440,16 +440,16 @@ class BackgroundUploadService extends EventEmitter {
     }
   }
 
-  // PERFORMANCE FIX: Throttled progress emissions with better UI responsiveness
+  // PERFORMANCE FIX: Throttled progress emissions optimized for video performance
   private emitProgressThrottled(uploadId: string, progress: number, stage: UploadProgress['stage']): void {
     const now = Date.now();
     const lastEmit = this.progressThrottleMap.get(uploadId) || 0;
     
-    // FIXED: More responsive progress updates - allow 5% increments or time-based throttling
+    // OPTIMIZED: Reduced progress updates for video performance - allow 10% increments or time-based throttling
     const progressDiff = Math.abs(progress - (this.uploadQueue.get(uploadId)?.progress || 0));
     const shouldEmit = (
       now - lastEmit >= this.PROGRESS_THROTTLE_MS || // Time-based throttling
-      progressDiff >= 0.05 || // 5% progress change
+      progressDiff >= 0.1 || // 10% progress change (was 5%) - reduced for video performance
       progress >= 1.0 || // Completion
       progress === 0 || // Start
       stage === 'completed' // Stage completion
