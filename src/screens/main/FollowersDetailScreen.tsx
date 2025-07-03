@@ -252,11 +252,12 @@ export const FollowersDetailScreen: React.FC = () => {
     queryKey: ['followers', userId],
     queryFn: () => fetchFollowersOptimized(userId),
     enabled: !!userId,
-    // 🚀 Extended cache times to reduce unnecessary refetches
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 15 * 60 * 1000, // 15 minutes
+    // 🚀 OPTIMIZED: Extended cache times for video performance
+    staleTime: 10 * 60 * 1000, // 10 minutes (was 5) - longer stale time for video performance
+    gcTime: 25 * 60 * 1000, // 25 minutes (was 15) - extended cache retention
     refetchOnWindowFocus: false, // Don't refetch on window focus
     refetchOnMount: false, // Use cached data if available
+    retry: 1, // 1 retry for faster failure recovery
   });
 
   const {
@@ -267,11 +268,12 @@ export const FollowersDetailScreen: React.FC = () => {
     queryKey: ['following', userId],
     queryFn: () => fetchFollowingOptimized(userId),
     enabled: !!userId,
-    // 🚀 Extended cache times to reduce unnecessary refetches
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 15 * 60 * 1000, // 15 minutes
+    // 🚀 OPTIMIZED: Extended cache times for video performance
+    staleTime: 10 * 60 * 1000, // 10 minutes (was 5) - longer stale time for video performance
+    gcTime: 25 * 60 * 1000, // 25 minutes (was 15) - extended cache retention
     refetchOnWindowFocus: false, // Don't refetch on window focus
     refetchOnMount: false, // Use cached data if available
+    retry: 1, // 1 retry for faster failure recovery
   });
 
   // Debug logging

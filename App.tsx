@@ -23,15 +23,15 @@ initializeSentry();
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Keep data fresh for 5 minutes by default
-      staleTime: 5 * 60 * 1000,
+      // 🚀 OPTIMIZED: Extended stale time for video performance - reduced background refetching
+      staleTime: 10 * 60 * 1000, // 10 minutes (was 5 minutes)
       // Cache data for 30 minutes
       gcTime: 30 * 60 * 1000,
-      // Global retry configuration - 3 retries with exponential backoff
-      retry: 3,
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-      // Use stale data while fetching new data
-      refetchOnMount: true,
+      // 🚀 OPTIMIZED: Reduced retries for video performance - faster failure recovery
+      retry: 2, // 2 retries (was 3) - reduces network congestion
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 15000), // Max 15s (was 30s)
+      // 🚀 OPTIMIZED: Disabled refetch on mount for video performance - use cached data
+      refetchOnMount: false, // Use cached data (was true)
       // Don't refetch on window focus by default (reduces unnecessary network calls)
       refetchOnWindowFocus: false,
     },

@@ -255,10 +255,45 @@ export default function PantryScanningScreen() {
           throw error;
         }
 
+        // 🎯 INTELLIGENT ACTIVITY LOGGING: Log successful scan activity
+        try {
+          console.log('[PantryScanningScreen] Logging successful scan activity...');
+          
+          const activityMetadata = {
+            items_count: itemsToUpsert.length,
+            item_names: itemsToUpsert.map(item => item.item_name).slice(0, 5), // Store first 5 items
+            scan_type: 'camera_scan',
+            scan_success: true,
+            total_quantity: itemsToUpsert.reduce((sum, item) => sum + (item.quantity || 0), 0),
+            scan_method: 'ai_recognition',
+          };
+
+          // Create activity log entry directly
+          const { error: activityError } = await supabase
+            .from('user_activity_log')
+            .insert({
+              user_id: user?.id,
+              activity_type: 'successful_scan',
+              metadata: activityMetadata,
+              created_at: new Date().toISOString(),
+            });
+
+          if (activityError) {
+            console.warn('[PantryScanningScreen] Activity logging failed:', activityError);
+            // Don't throw - scan succeeded
+          } else {
+            console.log('[PantryScanningScreen] ✅ Successful scan activity logged');
+          }
+        } catch (activityLogError) {
+          console.warn('[PantryScanningScreen] Activity logging error:', activityLogError);
+          // Don't throw - scan succeeded
+        }
+
         // Invalidate React Query cache to refresh all pantry-related data
         queryClient.invalidateQueries({ queryKey: ['stock'] });
         queryClient.invalidateQueries({ queryKey: ['pantryMatch'] });
         queryClient.invalidateQueries({ queryKey: ['feed'] });
+        queryClient.invalidateQueries({ queryKey: ['userActivityFeed'] }); // Refresh activity feed
 
         // Refresh feed pantry matches specifically
         refreshFeedPantryMatches(queryClient);

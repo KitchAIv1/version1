@@ -31,6 +31,7 @@ interface ManualAddModalProps {
   initialItem?: StockItem | null; // For editing
   unitOptions?: UnitOption[];
   isSaving: boolean; // To disable form while saving
+  onDelete?: (item: StockItem) => void; // Optional delete handler for edit mode
 }
 
 export const ManualAddModal: React.FC<ManualAddModalProps> = ({
@@ -40,6 +41,7 @@ export const ManualAddModal: React.FC<ManualAddModalProps> = ({
   initialItem,
   unitOptions = DEFAULT_UNIT_OPTIONS,
   isSaving,
+  onDelete,
 }) => {
   const [itemName, setItemName] = useState('');
   const [quantity, setQuantity] = useState('1');
@@ -50,6 +52,15 @@ export const ManualAddModal: React.FC<ManualAddModalProps> = ({
   >(undefined);
 
   const isEditMode = !!initialItem;
+  
+  // 🔍 DEBUG: Log modal state for troubleshooting
+  console.log('[ManualAddModal] Debug State:', {
+    isEditMode,
+    hasInitialItem: !!initialItem,
+    hasOnDelete: !!onDelete,
+    shouldShowDeleteButton: isEditMode && !!onDelete,
+    itemName: initialItem?.item_name || 'No item',
+  });
 
   useEffect(() => {
     if (initialItem && visible) {
@@ -93,6 +104,29 @@ export const ManualAddModal: React.FC<ManualAddModalProps> = ({
     await onSubmit(
       itemToSubmit,
       isEditMode ? originalItemNameForEdit : undefined,
+    );
+  };
+
+  const handleDelete = () => {
+    if (!initialItem || !onDelete) return;
+    
+    Alert.alert(
+      'Confirm Delete',
+      `Are you sure you want to delete "${initialItem.item_name}"? This action cannot be undone.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          onPress: () => {
+            onDelete(initialItem);
+            onClose(); // Close modal after delete
+          },
+          style: 'destructive',
+        },
+      ],
     );
   };
 
@@ -193,6 +227,20 @@ export const ManualAddModal: React.FC<ManualAddModalProps> = ({
                   editable={!isSaving}
                 />
               </View>
+
+              {/* Delete Button - Only show in edit mode when onDelete is provided */}
+              {isEditMode && onDelete && (
+                <TouchableOpacity
+                  style={[
+                    styles.deleteButton,
+                    isSaving && styles.deleteButtonDisabled,
+                  ]}
+                  onPress={handleDelete}
+                  disabled={isSaving}>
+                  <Icon name="delete-outline" size={20} color="#ef4444" />
+                  <Text style={styles.deleteButtonText}>Delete Item</Text>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 style={[
@@ -298,6 +346,28 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: '#FFF',
     fontSize: 17,
+    fontWeight: '600',
+  },
+  deleteButton: {
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  deleteButtonDisabled: {
+    backgroundColor: '#f9f9f9',
+    borderColor: '#e5e7eb',
+  },
+  deleteButtonText: {
+    color: '#ef4444',
+    fontSize: 16,
     fontWeight: '600',
   },
   pickerIcon: {

@@ -168,7 +168,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
       case 'manual_pantry_add':
         return 'cube';
       case 'successful_scan':
-        return 'scan';
+        return 'camera'; // Camera icon for scanning
       case 'pantry_update':
         return 'refresh';
       default:
@@ -184,7 +184,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
       case 'planned_meal':
         return COLORS.primary || '#10b981';
       case 'generated_recipe':
-        return '#f59e0b';
+        return '#f59e0b'; // Golden amber for AI generation
       case 'added_to_grocery':
         return COLORS.primary || '#10b981';
       case 'cooked_recipe':
@@ -216,7 +216,14 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
         }
         return description;
       case 'generated_recipe':
-        return `You generated a new recipe: ${metadata?.recipe_title || metadata?.recipe_name || 'AI Generated Recipe'}`;
+        const ingredientsUsed = metadata?.selected_ingredients?.length || metadata?.ingredients_count;
+        const confidence = metadata?.ai_confidence_score ? ` (${Math.round(metadata.ai_confidence_score * 100)}% confidence)` : '';
+        const recipeName = metadata?.recipe_title || metadata?.recipe_name || 'AI Generated Recipe';
+        
+        if (ingredientsUsed) {
+          return `You generated "${recipeName}" using ${ingredientsUsed} ingredients${confidence}`;
+        }
+        return `You generated a new AI recipe: ${recipeName}${confidence}`;
       case 'added_to_grocery':
         return `You added "${metadata?.grocery_item || metadata?.item_name || 'Unknown Item'}" to your grocery list`;
       case 'cooked_recipe':
@@ -243,6 +250,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
       case 'successful_scan':
         const itemsCount = metadata?.items_count;
         const scanType = metadata?.scan_type;
+        const scanMethod = metadata?.scan_method;
         const scannedItems = metadata?.scanned_items || metadata?.items;
         const groupedActivities = metadata?.grouped_activities;
         const totalItems = metadata?.total_items;
@@ -253,14 +261,28 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
           if (itemNames && itemNames.length > 0) {
             const displayNames = itemNames.slice(0, 3);
             if (totalItems <= 3) {
-              return `You added ${displayNames.join(', ')} to your pantry`;
+              return `You scanned and added ${displayNames.join(', ')} to your pantry`;
             }
-            return `You added ${displayNames.join(', ')} and ${totalItems - 3} more items to your pantry`;
+            return `You scanned and added ${displayNames.join(', ')} and ${totalItems - 3} more items to your pantry`;
           }
-          return `You added ${totalItems} items to your pantry`;
+          return `You scanned and added ${totalItems} items to your pantry`;
         }
 
-        // Handle single scanning activity (existing logic)
+        // Handle new enhanced single scan activity with intelligent descriptions
+        if (itemNames && Array.isArray(itemNames) && itemNames.length > 0) {
+          const displayNames = itemNames.slice(0, 3);
+          const scanMethodText = scanMethod === 'ai_recognition' ? ' using AI recognition' : '';
+          
+          if (itemsCount && itemsCount > 3) {
+            return `You scanned and added ${displayNames.join(', ')} and ${itemsCount - 3} more items${scanMethodText}`;
+          } else if (displayNames.length > 1) {
+            return `You scanned and added ${displayNames.join(', ')}${scanMethodText}`;
+          } else {
+            return `You scanned and added ${displayNames[0]}${scanMethodText}`;
+          }
+        }
+
+        // Handle legacy scanning activity format
         let scanDescription = '';
         if (
           scannedItems &&
@@ -286,8 +308,10 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
         }
 
         // Add scan type if available
-        if (scanType) {
+        if (scanType && !scanMethod) {
           scanDescription += ` via ${scanType}`;
+        } else if (scanMethod === 'ai_recognition') {
+          scanDescription += ` using AI recognition`;
         }
 
         return scanDescription;

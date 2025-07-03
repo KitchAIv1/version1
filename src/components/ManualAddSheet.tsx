@@ -188,6 +188,28 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
   },
+  deleteButton: {
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  deleteButtonDisabled: {
+    backgroundColor: '#f9f9f9',
+    borderColor: '#e5e7eb',
+  },
+  deleteButtonText: {
+    color: '#ef4444',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   pickerIcon: {
     marginRight: 10,
   },
@@ -251,6 +273,7 @@ interface ManualAddSheetProps {
   mode: 'add' | 'edit';
   initialItemData?: PantryItem | null;
   unitOptions: UnitOption[];
+  onDelete?: (item: PantryItem) => void; // Optional delete handler for edit mode
 }
 
 // Helper function to calculate aging information from PantryItem
@@ -285,6 +308,7 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
   mode,
   initialItemData,
   unitOptions,
+  onDelete,
 }) => {
   const { getDefaultLocation, savePreference } = useStorageLocationPreference();
   const { user } = useAuth();
@@ -409,6 +433,29 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleDelete = () => {
+    if (!freshItemData || !onDelete) return;
+    
+    Alert.alert(
+      'Confirm Delete',
+      `Are you sure you want to delete "${freshItemData.item_name}"? This action cannot be undone.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          onPress: () => {
+            onDelete(freshItemData);
+            onClose(); // Close sheet after delete
+          },
+          style: 'destructive',
+        },
+      ],
+    );
   };
 
   return (
@@ -691,6 +738,24 @@ const ManualAddSheet: React.FC<ManualAddSheetProps> = ({
                   autoCapitalize="sentences"
                 />
               </View>
+
+              {/* Delete Button - Only show in edit mode when onDelete is provided */}
+              {isEditMode && onDelete && freshItemData && (
+                <TouchableOpacity
+                  style={[
+                    styles.deleteButton,
+                    isSaving && styles.deleteButtonDisabled,
+                  ]}
+                  onPress={handleDelete}
+                  disabled={isSaving}
+                  accessibilityLabel={`Delete ${freshItemData.item_name}`}
+                  accessibilityHint="Permanently removes this item from your pantry">
+                  <Ionicons name="trash-outline" size={20} color="#ef4444" />
+                  <Text style={styles.deleteButtonText}>
+                    Delete Item
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 style={[

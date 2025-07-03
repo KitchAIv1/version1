@@ -298,11 +298,12 @@ export const useStockAging = (userId?: string) => {
       }
     },
     enabled: !!userId,
-    staleTime: 2 * 60 * 1000, // 2 minutes - shorter for aging data
-    gcTime: 5 * 60 * 1000, // 5 minutes cache retention
-    refetchOnWindowFocus: true, // Refetch on focus for aging updates
-    refetchOnMount: true, // Always refetch for aging updates
-    retry: 2,
+    // 🚀 OPTIMIZED: Reduced aging check frequency for video performance
+    staleTime: 5 * 60 * 1000, // 5 minutes (was 2) - less frequent aging checks during video playback
+    gcTime: 10 * 60 * 1000, // 10 minutes (was 5) - longer cache retention
+    refetchOnWindowFocus: false, // Disabled for video performance (was true)
+    refetchOnMount: false, // Use cached data for video performance (was true)
+    retry: 1, // 1 retry (was 2) - faster failure recovery
   });
 };
 

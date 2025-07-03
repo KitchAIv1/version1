@@ -589,7 +589,7 @@ export const prefetchRecipeDetails = async (
   await queryClient.prefetchQuery({
     queryKey: ['recipeDetails', recipeId, userId],
     queryFn: () => fetchRecipeDetails(recipeId, userId, queryClient), // Pass queryClient
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 15 * 60 * 1000, // 15 minutes - FIXED: Match main query stale time for TikTok performance
   });
 
   // NOTE: No longer need to prefetch pantry match separately as it's included in get_recipe_details
@@ -662,20 +662,24 @@ export const useRecipeDetails = (
         // Ensure query is enabled only when both recipeId and userId are available,
         // because the RPC get_recipe_details(p_recipe_id, p_user_id) expects both.
         enabled: !!recipeId && typeof userId !== 'undefined',
-        staleTime: 10 * 60 * 1000,
-        gcTime: 30 * 60 * 1000,
-        retry: 3, // Retry 3 times
-        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+        // 🚀 OPTIMIZED: Extended cache times for video detail performance
+        staleTime: 15 * 60 * 1000, // 15 minutes (was 10) - longer stale time for video details
+        gcTime: 45 * 60 * 1000, // 45 minutes (was 30) - extended cache retention
+        retry: 2, // 2 retries (was 3) - faster failure recovery for video performance
+        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 15000), // Max 15s (was 30s)
+        refetchOnMount: false, // Use cached data for faster video detail loading
       },
       // RESTORED: Keep separate pantry match query as fallback during transition
       {
         queryKey: ['pantryMatch', recipeId, userId],
         queryFn: () => fetchPantryMatch(recipeId!, userId!),
         enabled: !!recipeId && !!userId,
-        staleTime: 5 * 60 * 1000,
-        gcTime: 15 * 60 * 1000,
-        retry: 3, // Retry 3 times
-        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+        // 🚀 OPTIMIZED: Extended cache times for video performance
+        staleTime: 10 * 60 * 1000, // 10 minutes (was 5) - reduced pantry match refetching
+        gcTime: 25 * 60 * 1000, // 25 minutes (was 15) - longer pantry cache retention  
+        retry: 2, // 2 retries (was 3) - faster failure recovery
+        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 15000), // Max 15s (was 30s)
+        refetchOnMount: false, // Use cached pantry data for video performance
       },
     ],
   });

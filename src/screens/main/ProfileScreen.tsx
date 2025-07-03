@@ -49,13 +49,6 @@ import { PrismaticCelebration } from '../../components/PrismaticCelebration';
 // import { useCacheDebug } from '../../hooks/useCacheDebug'; // REMOVED - no longer needed
 
 // Import notification components
-import {
-  useNotifications,
-  useUnreadNotificationCount,
-  useNotificationsSubscription,
-} from '../../hooks/useNotifications';
-import { NotificationBell } from '../../components/NotificationBell';
-import { NotificationDrawer } from '../../components/NotificationDrawer';
 import { ToastNotification } from '../../components/ToastNotification';
 
 // Define types for profile and post data
@@ -186,12 +179,12 @@ const useProfile = (targetUserId?: string) => {
       return processedFrontendData;
     },
     enabled: !!userId,
-    // 🚀 PERFORMANCE OPTIMIZATION: Extended cache times
-    staleTime: isOwnProfile ? 2 * 60 * 1000 : 10 * 60 * 1000, // Own profile: 2min, Others: 10min
-    gcTime: isOwnProfile ? 5 * 60 * 1000 : 30 * 60 * 1000, // Own profile: 5min, Others: 30min
+    // 🚀 OPTIMIZED: Extended cache times for video performance
+    staleTime: isOwnProfile ? 5 * 60 * 1000 : 15 * 60 * 1000, // Own: 5min (was 2), Others: 15min (was 10)
+    gcTime: isOwnProfile ? 10 * 60 * 1000 : 45 * 60 * 1000, // Own: 10min (was 5), Others: 45min (was 30)
     refetchOnWindowFocus: false, // Disabled - causes unnecessary refetches
     refetchOnMount: false, // Disabled - rely on cache
-    retry: 2,
+    retry: 1, // 1 retry (was 2) - faster failure recovery for video performance
   });
 };
 
@@ -370,23 +363,9 @@ export const ProfileScreen: React.FC = () => {
   // Pull-to-refresh state and functionality
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // NEW: Notification state
-  const [showNotificationDrawer, setShowNotificationDrawer] = useState(false);
 
-  // 🚀 PERFORMANCE OPTIMIZATION: Only load notifications for own profile
-  const { data: notifications = [] } = useNotifications(isOwnProfile ? user?.id : undefined);
-  const unreadCount = useUnreadNotificationCount(notifications);
 
-  // 🚀 PERFORMANCE OPTIMIZATION: Only setup subscription for own profile
-  useNotificationsSubscription(isOwnProfile ? user?.id : undefined, notification => {
-    // Show toast for urgent notifications
-    if (
-      notification.priority === 'urgent' ||
-      notification.priority === 'high'
-    ) {
-      setToastNotification(notification);
-    }
-  });
+
 
   // 🎯 ROBUST SOLUTION: No focus effects needed
   // The robust profile state manager handles all updates properly
@@ -509,27 +488,7 @@ export const ProfileScreen: React.FC = () => {
   };
   // --- End Sign Out Handler ---
 
-  // NEW: Notification handlers
-  const handleNotificationBellPress = useCallback(() => {
-    setShowNotificationDrawer(true);
-  }, []);
 
-  const handleCloseNotificationDrawer = useCallback(() => {
-    setShowNotificationDrawer(false);
-  }, []);
-
-  const handleNotificationAction = useCallback(
-    (notification: any) => {
-      // Handle notification actions based on type
-      if (notification.metadata?.recipe_id) {
-        navigation.navigate('RecipeDetail', {
-          id: notification.metadata.recipe_id,
-        });
-      }
-      // Add more action handlers as needed
-    },
-    [navigation],
-  );
 
   const handleDismissToast = useCallback(() => {
     setToastNotification(null);
@@ -587,13 +546,7 @@ export const ProfileScreen: React.FC = () => {
         <View style={styles.headerSpacer} />
         <Text style={styles.scrollableHeaderTitle}>Kitch Hub</Text>
         <View style={styles.headerActions}>
-          <NotificationBell
-            unreadCount={unreadCount}
-            onPress={handleNotificationBellPress}
-            size={26}
-            color="#1f2937"
-            style={styles.iconBtn}
-          />
+
           <TouchableOpacity style={styles.iconBtn} onPress={handleSignOut}>
             <Icon name="menu" size={26} color="#1f2937" />
           </TouchableOpacity>
@@ -755,12 +708,6 @@ export const ProfileScreen: React.FC = () => {
             <MealPlannerV2Screen />
           </View>
         );
-      case 3: // Planner
-        return (
-          <View style={styles.tabContentContainer}>
-            <MealPlannerV2Screen />
-          </View>
-        );
       case 3: // Activity
         return (
           <View style={styles.tabContentContainer}>
@@ -911,13 +858,7 @@ export const ProfileScreen: React.FC = () => {
       )}
 
       {/* NEW: Notification Drawer */}
-      <NotificationDrawer
-        visible={showNotificationDrawer}
-        notifications={notifications}
-        onClose={handleCloseNotificationDrawer}
-        onNotificationAction={handleNotificationAction}
-        userId={user?.id}
-      />
+      
 
       {/* NEW: Toast Notification for urgent alerts */}
       {toastNotification && (
@@ -925,10 +866,7 @@ export const ProfileScreen: React.FC = () => {
           notification={toastNotification}
           visible={!!toastNotification}
           onDismiss={handleDismissToast}
-          onPress={() => {
-            handleNotificationAction(toastNotification);
-            handleDismissToast();
-          }}
+          onPress={handleDismissToast}
           position="top"
           duration={6000} // 6 seconds for urgent notifications
         />

@@ -101,11 +101,12 @@ export const usePantryData = (userId?: string) => {
       return data || [];
     },
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
-    gcTime: 10 * 60 * 1000, // 10 minutes - cache retention
+    // 🚀 OPTIMIZED: Extended cache times for video performance
+    staleTime: 10 * 60 * 1000, // 10 minutes (was 5) - longer stale time for video performance
+    gcTime: 20 * 60 * 1000, // 20 minutes (was 10) - extended cache retention
     refetchOnWindowFocus: false, // Don't refetch on window focus
     refetchOnMount: false, // Don't refetch on mount if data exists
-    retry: 2, // Retry failed requests 2 times
+    retry: 1, // 1 retry (was 2) - faster failure recovery for video performance
   });
 };
 

@@ -163,6 +163,7 @@ export const AuthProvider: React.FC<PropsWithChildren<object>> = ({
       setProfile(defaultProfile);
     } finally {
       setProfileLoading(false);
+      setLoading(false); // 🚨 CRITICAL FIX: Ensure main loading state is cleared when profile loading completes
     }
   };
 
@@ -235,6 +236,7 @@ export const AuthProvider: React.FC<PropsWithChildren<object>> = ({
         setSession(session);
         setUser(session.user);
 
+        // 🚨 CRITICAL FIX: Properly manage loading states to prevent white screen race condition
         try {
           await fetchProfileWithRPC(session.user.id);
         } catch (error: any) {
@@ -243,6 +245,7 @@ export const AuthProvider: React.FC<PropsWithChildren<object>> = ({
             error.message,
           );
         }
+        // 🚨 FIXED: setLoading(false) is now called in fetchProfileWithRPC's finally block
       } else {
         setSession(null);
         setUser(null);
@@ -255,9 +258,8 @@ export const AuthProvider: React.FC<PropsWithChildren<object>> = ({
           tier: null,
         });
         // Usage limits removed - Edge Function handles tracking
+        setLoading(false); // Only set loading false for logout case
       }
-
-      setLoading(false);
     });
 
     return () => subscription.unsubscribe();

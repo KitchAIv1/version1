@@ -102,13 +102,13 @@ function OnboardingStep1Screen() {
         `[OnboardingStep1] Attempting to set role for user ID: ${user.id} to: ${selectedRole}`,
       );
 
-      // Step 2.4: Update Frontend to Handle Missing Profiles (User's new logic)
+      // Step 2.4: Update Frontend to Handle Missing Profiles (Fixed field mismatch)
       // Fetch the existing profile to ensure it exists
-      console.log('Fetching profile for id:', user.id);
+      console.log('Fetching profile for user_id:', user.id);
       let { data: existingProfile, error: fetchError } = await supabase
         .from('profiles')
         .select('id')
-        .eq('id', user.id) // Using 'id' as per user's snippet
+        .eq('user_id', user.id) // 🚨 FIXED: Use 'user_id' not 'id' - profiles table uses user_id field
         .maybeSingle();
 
       if (fetchError) {
@@ -128,7 +128,7 @@ function OnboardingStep1Screen() {
         const { data: newProfile, error: createError } = await supabase
           .from('profiles')
           .insert({
-            id: user.id, // Assuming user.id is the UUID for profiles.id
+            user_id: user.id, // 🚨 FIXED: Use 'user_id' not 'id' - profiles table schema
             username: uniqueUsername,
             bio: 'Welcome to KitchHub!', // Default bio
             created_at: new Date().toISOString(),

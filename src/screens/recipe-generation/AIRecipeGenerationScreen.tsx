@@ -405,6 +405,46 @@ export default function AIRecipeGenerationScreen({
 
       console.log('[AIRecipeGeneration] Recipe saved successfully:', data);
 
+      // 🎯 INTELLIGENT ACTIVITY LOGGING: Log AI recipe generation activity
+      if (data?.recipe_id && user?.id) {
+        try {
+          console.log('[AIRecipeGeneration] Logging AI recipe generation activity...');
+          
+          // Use backend RPC to log activity with proper metadata
+          const activityMetadata = {
+            recipe_id: data.recipe_id,
+            recipe_title: currentRecipe.name,
+            recipe_thumbnail: data.thumbnail_url || null,
+            ingredients_count: selectedIngredients.length,
+            selected_ingredients: selectedIngredients.slice(0, 5), // Store first 5 ingredients
+            difficulty: currentRecipe.difficulty,
+            estimated_time: currentRecipe.estimated_time,
+            ai_confidence_score: currentRecipe.ai_confidence_score,
+            servings: currentRecipe.servings,
+          };
+
+          // Create activity log entry directly
+          const { error: activityError } = await supabase
+            .from('user_activity_log')
+            .insert({
+              user_id: user.id,
+              activity_type: 'generated_recipe',
+              metadata: activityMetadata,
+              created_at: new Date().toISOString(),
+            });
+
+          if (activityError) {
+            console.warn('[AIRecipeGeneration] Activity logging failed:', activityError);
+            // Don't throw - recipe creation succeeded
+          } else {
+            console.log('[AIRecipeGeneration] ✅ AI recipe generation activity logged');
+          }
+        } catch (activityLogError) {
+          console.warn('[AIRecipeGeneration] Activity logging error:', activityLogError);
+          // Don't throw - recipe creation succeeded
+        }
+      }
+
       // AUTO-SAVE: Automatically save AI recipes to user's saved collection
       if (data?.recipe_id && user?.id) {
         try {

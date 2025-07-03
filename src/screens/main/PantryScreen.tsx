@@ -940,6 +940,7 @@ export default function PantryScreen() {
             : null
         }
         unitOptions={UNIT_OPTIONS}
+        onDelete={handleDeleteItem}
       />
 
       {/* Scan Limit Reached Modal */}

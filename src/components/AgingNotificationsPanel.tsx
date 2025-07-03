@@ -83,6 +83,22 @@ const styles = StyleSheet.create({
     color: '#10b981',
     marginLeft: 4,
   },
+  dismissAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    gap: 4,
+  },
+  dismissAllText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ef4444',
+  },
   closeButton: {
     padding: 4,
   },
@@ -123,9 +139,26 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 6,
   },
+  metadataRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
   notificationMetadata: {
     fontSize: 12,
     color: '#9ca3af',
+    flex: 1,
+  },
+  urgencyBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  urgencyText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   notificationTime: {
     fontSize: 12,
@@ -137,11 +170,22 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButton: {
-    padding: 6,
-    borderRadius: 6,
+    padding: 8,
+    borderRadius: 8,
     backgroundColor: '#f9fafb',
     borderWidth: 1,
     borderColor: '#e5e7eb',
+    minWidth: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewButton: {
+    backgroundColor: '#f0fdf4',
+    borderColor: '#bbf7d0',
+  },
+  dismissButton: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
   },
   separator: {
     height: 1,
@@ -274,9 +318,16 @@ const NotificationItem = memo<NotificationItemProps>(
           <View style={styles.notificationContent}>
             <Text style={styles.notificationTitle}>{title}</Text>
             <Text style={styles.notificationMessage}>{message}</Text>
-            <Text style={styles.notificationMetadata}>
-              {item_name} • {days_old} days old • {ageConfig.label}
-            </Text>
+            <View style={styles.metadataRow}>
+              <Text style={styles.notificationMetadata}>
+                {item_name} • {days_old} days old
+              </Text>
+              <View style={[styles.urgencyBadge, { backgroundColor: ageConfig.backgroundColor, borderColor: ageConfig.color }]}>
+                <Text style={[styles.urgencyText, { color: ageConfig.textColor }]}>
+                  {ageConfig.label}
+                </Text>
+              </View>
+            </View>
             <Text style={styles.notificationTime}>
               {new Date(notification.created_at).toLocaleDateString()} at{' '}
               {new Date(notification.created_at).toLocaleTimeString([], {
@@ -289,17 +340,16 @@ const NotificationItem = memo<NotificationItemProps>(
           <View style={styles.notificationActions}>
             {stock_item_id && onViewItem && (
               <TouchableOpacity
-                style={styles.actionButton}
+                style={[styles.actionButton, styles.viewButton]}
                 onPress={handleViewItem}
-                accessibilityLabel={`View ${item_name}`}
+                accessibilityLabel={`Edit ${item_name}`}
                 accessibilityHint="Opens the pantry item for editing">
-                <Ionicons name="eye-outline" size={20} color="#6b7280" />
+                <Ionicons name="create-outline" size={20} color="#10b981" />
               </TouchableOpacity>
             )}
 
-            {/* Simplified actions since we don't have is_read field */}
             <TouchableOpacity
-              style={styles.actionButton}
+              style={[styles.actionButton, styles.dismissButton]}
               onPress={handleDismiss}
               accessibilityLabel="Dismiss notification"
               accessibilityHint="Removes this notification">
@@ -339,7 +389,15 @@ const AgingNotificationsPanel: React.FC<AgingNotificationsPanelProps> = ({
 
   const handleDismiss = useCallback(
     (notificationId: string) => {
-      dismissMutation.mutate(notificationId);
+      dismissMutation.mutate(notificationId, {
+        onSuccess: () => {
+          // Simple success feedback without affecting other components
+          console.log('[AgingNotificationsPanel] ✅ Alert dismissed successfully');
+        },
+        onError: (error) => {
+          console.error('[AgingNotificationsPanel] ❌ Failed to dismiss alert:', error);
+        }
+      });
     },
     [dismissMutation],
   );
@@ -389,6 +447,20 @@ const AgingNotificationsPanel: React.FC<AgingNotificationsPanelProps> = ({
           </View>
 
           <View style={styles.headerActions}>
+            {notifications.length > 0 && (
+              <TouchableOpacity
+                style={styles.dismissAllButton}
+                onPress={() => {
+                  // Simple batch dismiss - one at a time to avoid backend issues
+                  notifications.forEach(notification => {
+                    dismissMutation.mutate(notification.id);
+                  });
+                }}
+                accessibilityLabel="Dismiss all alerts">
+                <Ionicons name="trash-outline" size={20} color="#ef4444" />
+                <Text style={styles.dismissAllText}>Clear All</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={styles.closeButton}
               onPress={onClose}

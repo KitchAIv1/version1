@@ -203,9 +203,11 @@ export const useFeed = () => {
       return transformedData;
     },
     enabled: !!user?.id,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    // 🚀 OPTIMIZED: Extended cache times for video loading performance
+    staleTime: 8 * 60 * 1000, // 8 minutes (was 2 minutes) - reduces background fetching
+    gcTime: 20 * 60 * 1000, // 20 minutes (was 10 minutes) - longer cache retention
     refetchOnWindowFocus: false,
+    refetchOnMount: false, // Use cached data for faster video loading
   });
 
   return feedQuery;

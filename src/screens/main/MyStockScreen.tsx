@@ -103,6 +103,7 @@ export default function MyStockScreen() {
         initialItem={editingItem}
         isSaving={isSaving}
         unitOptions={unitOptions}
+        onDelete={handleDeleteWithConfirmation}
       />
     </SafeAreaView>
   );

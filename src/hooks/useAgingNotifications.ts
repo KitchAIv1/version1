@@ -269,7 +269,7 @@ export const useDismissNotification = () => {
       }
     },
     onSuccess: (_, notificationId) => {
-      // Remove from cache
+      // Remove from cache with intelligent cleanup
       queryClient.setQueryData(
         ['agingNotifications'],
         (old: AgingNotification[] = []) =>
