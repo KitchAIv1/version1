@@ -10,6 +10,26 @@ import {
  * Formats a timestamp for display in the pantry list
  * Shows relative time for recent items, absolute time for older items
  */
+/**
+ * Formats stock timestamps for user-friendly display
+ * 
+ * Converts database timestamps into readable relative time format optimized
+ * for pantry item display. Handles edge cases and provides fallbacks.
+ * 
+ * @param timestamp - ISO timestamp string from database
+ * @returns Formatted relative time string (e.g., "2 days ago", "Just now")
+ * 
+ * @example
+ * ```typescript
+ * const displayTime = formatStockTimestamp('2025-01-26T10:30:00Z');
+ * // Returns: "2 days ago"
+ * 
+ * const recentTime = formatStockTimestamp(new Date().toISOString());
+ * // Returns: "Just now"
+ * ```
+ * 
+ * @since 2.0.0
+ */
 export const formatStockTimestamp = (timestamp: string | undefined): string => {
   if (!timestamp) return '';
 

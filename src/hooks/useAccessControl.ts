@@ -7,6 +7,48 @@ import { supabase } from '../services/supabase';
 const FREEMIUM_SCAN_LIMIT = 3;
 const FREEMIUM_AI_RECIPE_LIMIT = 10;
 
+/**
+ * Access Control Hook - FREEMIUM/PREMIUM Tier Management
+ * 
+ * Manages user access control for tier-restricted features like pantry scanning
+ * and AI recipe generation. Enforces usage limits, tracks user activity, and
+ * provides seamless access control with clear upgrade prompts.
+ * 
+ * @returns {Object} Access control data and functions
+ * @returns {() => boolean} canPerformScan - Check if user can perform pantry scan
+ * @returns {() => boolean} canGenerateAIRecipe - Check if user can generate AI recipe
+ * @returns {Object} scanUsage - Scan usage statistics (used, limit, remaining, percentage)
+ * @returns {Object} aiRecipeUsage - AI recipe usage statistics
+ * @returns {(items: PantryItem[], scanStatus: ScanStatus) => Promise<boolean>} performPantryScan - Execute scan with tracking
+ * @returns {(recipeData: AIRecipeData) => Promise<any>} generateAIRecipe - Generate AI recipe with tracking
+ * @returns {() => UsageDisplayData} getUsageDisplay - Get formatted usage display data
+ * @returns {(feature: FeatureType) => string} getUpgradeMessage - Get upgrade message for feature
+ * 
+ * @example
+ * ```typescript
+ * const { 
+ *   canPerformScan, 
+ *   scanUsage, 
+ *   performPantryScan,
+ *   getUpgradeMessage 
+ * } = useAccessControl();
+ * 
+ * const handleScan = async () => {
+ *   if (!canPerformScan()) {
+ *     Alert.alert('Limit Reached', getUpgradeMessage('pantry_scan'));
+ *     return;
+ *   }
+ *   
+ *   const success = await performPantryScan(scannedItems, scanStatus);
+ *   if (success) {
+ *     console.log(`Remaining scans: ${scanUsage.remaining}`);
+ *   }
+ * };
+ * ```
+ * 
+ * @since 2.0.0 FREEMIUM system implementation
+ * @architectural_decision Enforces business model while maintaining great UX
+ */
 export const useAccessControl = () => {
   const {
     user,

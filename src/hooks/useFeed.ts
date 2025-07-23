@@ -60,8 +60,35 @@ type FeedQueryKey = ['feed'];
 const FEED_PAGE_LIMIT = 10; // Define a limit for the number of items to fetch
 
 /**
- * Hook to fetch feed data using infinite scrolling.
- * Now uses Enhanced Feed Algorithm V4 with NO AI recipes.
+ * Enhanced Feed V4 Hook - TikTok-Style Feed with Pantry Matching
+ * 
+ * Fetches community feed with advanced algorithms and real-time pantry matching.
+ * Implements sophisticated caching, error handling, and performance optimization
+ * for a seamless TikTok-style user experience.
+ * 
+ * @returns {Object} Feed data and state
+ * @returns {FeedItem[]} data - Array of feed items with pantry matching data
+ * @returns {boolean} isLoading - Loading state indicator
+ * @returns {Error | null} error - Error state if feed fetch fails
+ * @returns {() => Promise<void>} refetch - Function to manually refetch feed data
+ * 
+ * @example
+ * ```typescript
+ * const { data: feedData, isLoading, error, refetch } = useFeed();
+ * 
+ * if (isLoading) return <LoadingSpinner />;
+ * if (error) return <ErrorMessage error={error} />;
+ * 
+ * return (
+ *   <FlatList 
+ *     data={feedData} 
+ *     renderItem={({ item }) => <RecipeCard item={item} />}
+ *   />
+ * );
+ * ```
+ * 
+ * @since 4.0.0 Enhanced Feed V4 implementation
+ * @architectural_decision Uses TikTok-style feed algorithm for maximum engagement
  */
 export const useFeed = () => {
   const { user } = useAuth();
