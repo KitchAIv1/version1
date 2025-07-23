@@ -195,6 +195,11 @@ export default React.memo(function FeedScreen() {
       
       return () => clearInterval(monitorInterval);
     }
+    
+    // Return cleanup function for all paths
+    return () => {
+      // No cleanup needed in production mode
+    };
   }, [viewLogger]);
 
   useEffect(() => {
@@ -276,7 +281,7 @@ export default React.memo(function FeedScreen() {
           `[FeedScreen] 🔧 Syncing ${itemsNeedingSync.length} items with missing like data`,
         );
         // MEMORY OPTIMIZATION: Use refs to track timeouts for cleanup
-        const timeouts: NodeJS.Timeout[] = [];
+        const timeouts: ReturnType<typeof setTimeout>[] = [];
         itemsNeedingSync.forEach((item: FeedItem, index: number) => {
           const timeout = setTimeout(() => {
             cacheManager.updateLikeCount(item.id, user.id);
@@ -290,6 +295,11 @@ export default React.memo(function FeedScreen() {
         };
       }
     }
+    
+    // Return cleanup function for all paths
+    return () => {
+      // No cleanup needed when conditions aren't met
+    };
   }, [isFeedScreenFocused, feedData, currentIndex, user?.id, cacheManager]);
 
   // 🎯 OPTIMIZED FOCUS EFFECT: Only handle essential comment sync

@@ -443,7 +443,7 @@ export const FeedScreenOptimized = React.memo(() => {
 
   // Refs
   const flashListRef = useRef<FlashList<FeedItem>>(null);
-  const viewLogTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const viewLogTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Memoized values
   const itemsToRender = useMemo(() => feedData?.items || [], [feedData?.items]);

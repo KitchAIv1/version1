@@ -39,7 +39,7 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
     new Animated.Value(position === 'top' ? -200 : 200),
   ).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
-  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const iconName = getNotificationIcon(notification.type);
   const priorityColor = getNotificationColor(notification.priority);

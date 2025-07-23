@@ -102,6 +102,9 @@ export const useStockRealtime = (userId?: string) => {
       };
     } catch (error) {
       console.error('[useStockRealtime] Error setting up subscription:', error);
+      return () => {
+        // No cleanup needed if setup failed
+      };
     }
   }, [userId, queryClient]);
 
@@ -249,6 +252,9 @@ export const useStockRealtimeOptimistic = (userId?: string) => {
         '[useStockRealtimeOptimistic] Error setting up subscription:',
         error,
       );
+      return () => {
+        // No cleanup needed if setup failed
+      };
     }
   }, [userId, queryClient]);
 

@@ -652,6 +652,11 @@ export const useRecipeDetails = (
       const timer = setTimeout(logView, 1000);
       return () => clearTimeout(timer);
     }
+    
+    // Return cleanup function for all paths
+    return () => {
+      // No cleanup needed when recipeId or userId is missing
+    };
   }, [recipeId, userId, queryClient]);
 
   const results = useQueries({

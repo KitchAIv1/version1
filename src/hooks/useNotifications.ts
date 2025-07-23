@@ -393,6 +393,9 @@ export const useNotificationsSubscription = (
         '[useNotificationsSubscription] Error setting up subscription:',
         error,
       );
+      return () => {
+        // No cleanup needed if setup failed
+      };
     }
   }, [userId, queryClient, onNewNotification]);
 

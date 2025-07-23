@@ -57,7 +57,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
   }, [visible, permissionStatus]);
 
   useEffect(() => {
-    let messageInterval: NodeJS.Timeout | undefined; // Initialize to undefined
+    let messageInterval: ReturnType<typeof setInterval> | undefined; // Initialize to undefined
     if (isAnalyzing) {
       Animated.loop(
         Animated.timing(spinValue, {

@@ -164,6 +164,11 @@ export default function AIRecipeGenerationScreen({
 
       return () => clearInterval(stepInterval);
     }
+    
+    // Return cleanup function for all paths
+    return () => {
+      // No cleanup needed when not generating
+    };
   }, [isGenerating]);
 
   // Validation function to ensure recipes only use selected ingredients

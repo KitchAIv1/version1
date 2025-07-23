@@ -232,7 +232,7 @@ export const GlobalUploadIndicator: React.FC<GlobalUploadIndicatorProps> = ({ vi
     forceSync();
     
     // 🔧 PERFORMANCE FIX: Only run periodic sync when there are active uploads
-    let syncInterval: NodeJS.Timeout | null = null;
+    let syncInterval: ReturnType<typeof setInterval> | null = null;
     
     const startPeriodicSync = () => {
       if (!syncInterval) {
@@ -346,6 +346,11 @@ export const GlobalUploadIndicator: React.FC<GlobalUploadIndicatorProps> = ({ vi
         useNativeDriver: true,
       }).start();
     }
+    
+    // Return cleanup function for all paths
+    return () => {
+      // Cleanup any remaining animations
+    };
   }, [isVisible, fadeAnim, scaleAnim, rotateAnim, pulseAnim, uploads]);
 
   const handleIndicatorPress = useCallback(() => {

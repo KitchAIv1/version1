@@ -31,7 +31,7 @@ export function useStandardizedScreenPerformance(screenName: string): {
   logMemoryPeriodically: () => void;
 } {
   const { trackSearch } = usePerformanceTracking(screenName);
-  const memoryLogInterval = useRef<NodeJS.Timeout | null>(null);
+  const memoryLogInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Track video operations (play, pause, seek, load)
   const trackVideoOperation = useCallback(async (operation: string, asyncFn: () => Promise<void>) => {

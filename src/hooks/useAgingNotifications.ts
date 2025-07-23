@@ -203,6 +203,11 @@ export const useAgingNotifications = (userId?: string) => {
         subscription.unsubscribe();
       };
     }
+    
+    // Return cleanup function for all paths
+    return () => {
+      // No cleanup needed when userId is null
+    };
   }, [userId, fetchNotifications]);
 
   return { notifications, unreadCount };

@@ -27,7 +27,7 @@ export class MemoryMonitor {
   private static instance: MemoryMonitor;
   private stats: Map<string, MemoryStats> = new Map();
   private isMonitoring = false;
-  private monitoringInterval?: NodeJS.Timeout;
+  private monitoringInterval?: ReturnType<typeof setInterval>;
   
   static getInstance(): MemoryMonitor {
     if (!MemoryMonitor.instance) {

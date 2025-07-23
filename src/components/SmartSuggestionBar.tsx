@@ -77,21 +77,26 @@ const SmartSuggestionBar: React.FC<SmartSuggestionBarProps> = ({
         console.log('[SmartSuggestionBar] ⏰ Clearing auto-dismiss timer');
         clearTimeout(timer);
       };
+    } else {
+      // Slide up animation
+      Animated.parallel([
+        Animated.spring(slideAnim, {
+          toValue: -100,
+          useNativeDriver: true,
+          tension: 100,
+          friction: 8,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      
+      return () => {
+        // No cleanup needed for slide up animation
+      };
     }
-    // Slide up animation
-    Animated.parallel([
-      Animated.spring(slideAnim, {
-        toValue: -100,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
-      Animated.timing(opacityAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
   }, [isVisible, duplicateGroup, slideAnim, opacityAnim, onDismiss]);
 
   if (!duplicateGroup) return null;

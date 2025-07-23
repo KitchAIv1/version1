@@ -16,7 +16,7 @@ import { useAuth } from '../providers/AuthProvider';
 export const useProfileStateManager = () => {
   const { refreshProfile } = useAuth();
   const queryClient = useQueryClient();
-  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const updateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isUpdatingRef = useRef(false);
 
   /**

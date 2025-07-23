@@ -16,11 +16,11 @@ export const useCacheManager = () => {
 
   // Track pending comment count requests to prevent duplicates
   const pendingCommentRequests = useRef<Set<string>>(new Set());
-  const commentCountTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const commentCountTimeouts = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   // Track pending like count requests to prevent duplicates
   const pendingLikeRequests = useRef<Set<string>>(new Set());
-  const likeCountTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const likeCountTimeouts = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   // Update all caches simultaneously to prevent inconsistencies
   const updateAllCaches = useCallback(
