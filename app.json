@@ -1,92 +1,60 @@
 {
   "expo": {
-    "name": "KitchAI",
+    "name": "KitchAI v2",
     "slug": "kitchai-v2",
     "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "description": "AI-powered recipe discovery and meal planning app. Scan your pantry, get personalized recipes, and plan your meals with intelligent recommendations.",
-    "primaryColor": "#FF6B35",
-    "scheme": "kitchai",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "assetBundlePatterns": [
-      "**/*"
+      "assets/**/*",
+      "!**/*PRD*.md",
+      "!**/*CONFIDENTIAL*.md",
+      "!**/*INTERNAL*.md",
+      "!**/*STRATEGY*.md",
+      "!docs/prd-archive/**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.chieftitan.kitchai-v2",
-      "buildNumber": "2",
-      "associatedDomains": [
-        "applinks:kitchai.app",
-        "applinks:*.kitchai.app"
-      ],
-      "infoPlist": {
-        "NSCameraUsageDescription": "KitchAI uses your camera to scan pantry items and identify ingredients for personalized recipe recommendations.",
-        "NSPhotoLibraryUsageDescription": "KitchAI accesses your photo library to let you select images of ingredients for recipe suggestions.",
-        "CFBundleDisplayName": "KitchAI",
-        "CFBundleName": "KitchAI",
-        "CFBundleURLTypes": [
-          {
-            "CFBundleURLName": "com.chieftitan.kitchai-v2",
-            "CFBundleURLSchemes": ["kitchai"]
-          }
-        ]
-      },
-      "config": {
-        "usesNonExemptEncryption": false
-      }
+      "bundleIdentifier": "com.chieftitan.kitchaiv2",
+      "buildNumber": "1"
     },
     "android": {
-      "package": "com.chieftitan.kitchaiv2",
-      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
-      ],
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "autoVerify": true,
-          "data": [
-            {
-              "scheme": "https",
-              "host": "kitchai.app"
-            },
-            {
-              "scheme": "https", 
-              "host": "*.kitchai.app"
-            },
-            {
-              "scheme": "kitchai"
-            }
-          ],
-          "category": ["BROWSABLE", "DEFAULT"]
-        }
-      ]
+      "package": "com.chieftitan.kitchaiv2",
+      "versionCode": 1
     },
     "web": {
-      "favicon": "./assets/favicon.png",
-      "bundler": "metro"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "06cbb30c-9d18-474e-afbb-b93bed7e5b42"
-      }
+      "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-font",
-      "expo-video"
-    ]
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow KitchAI to access your camera to scan pantry items."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow KitchAI to access your photos to save and select recipe images.",
+          "savePhotosPermission": "Allow KitchAI to save photos to your device.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ]
+    ],
+    "scheme": "kitchai-v2",
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }

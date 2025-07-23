@@ -1,41 +1,84 @@
-node_modules
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
 
-# Environment variables
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Dependency directories
+node_modules/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# dotenv environment variables file
 .env
 .env.local
-.env.production
-.env.staging
-.env.development
+.env.development.local
+.env.test.local
+.env.production.local
 
-# Expo
+# expo
 .expo/
 dist/
 
-# Native
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
+# next.js build output
+.next
 
-# Metro
-.metro-health-check*
+# vscode
+.vscode/
 
-# Debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
+# xcode
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xcuserstate
+*.xcscmblueprint
 
-# macOS
-.DS_Store
-*.pem
+# Android
+*.keystore
 
-# local env files
-.env*.local
+# Temporary files
+*.tmp
+*.temp
 
-# Vercel
-.vercel
+# SECURITY: Confidential Documents
+# PRD files contain sensitive strategic information
+docs/prd-archive/*.md
+*PRD*.md
+*prd*.md
+KITCHAI_*_PRD_*.md
+*DASHBOARD_PRD*.md
+*SILICON_VALLEY_PRD*.md
 
-# Typescript
-*.tsbuildinfo
+# Additional sensitive patterns (excluding legitimate technical docs)
+*CONFIDENTIAL*.md
+*INTERNAL*.md
+*BUSINESS_PLAN*.md
+*COMPETITIVE_ANALYSIS*.md
+*MARKETING_STRATEGY*.md
+*PRODUCT_STRATEGY*.md
+
+# Exceptions for legitimate technical documentation
+!BACKUP_STRATEGY.md
+!*_TECHNICAL_STRATEGY.md
+!*_DEPLOYMENT_STRATEGY.md
+!*_CACHING_STRATEGY.md
+
+# TypeScript build info
+.tsbuildinfo
+
+# Cleanup backups
+*.bak
+.cleanup_backup/
