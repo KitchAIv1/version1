@@ -4,10 +4,12 @@ import React, {
   useEffect,
   useContext,
   PropsWithChildren,
+  useCallback,
 } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { ActivityIndicator, View } from 'react-native';
 import { supabase } from '../services/supabase';
+import { authLog, logBetaEvent, sanitizeLogData } from '../config/logger';
 
 // Define a type for the user profile data we want in the auth context
 type UserProfile = {
@@ -97,24 +99,24 @@ export const AuthProvider: React.FC<PropsWithChildren<object>> = ({
   const fetchProfileWithRPC = async (userId: string) => {
     try {
       setProfileLoading(true);
-      console.log('AuthProvider: Fetching profile via RPC get_profile_details for user', userId);
+      authLog.info('AuthProvider: Fetching profile via RPC get_profile_details for user', userId);
       
       const { data, error } = await supabase.rpc('get_profile_details', {
         p_user_id: userId,
       });
 
       if (error) {
-        console.error(
+        authLog.error(
           'AuthProvider: Error from get_profile_details RPC:',
           error,
         );
         throw new Error(error.message || 'Failed to fetch profile.');
       }
 
-      console.log('AuthProvider: Raw RPC response:', data);
+      authLog.info('AuthProvider: Raw RPC response:', data);
 
       if (!data || !data.profile) {
-        console.warn('AuthProvider: No profile data returned from RPC.');
+        authLog.warn('AuthProvider: No profile data returned from RPC.');
         
         // Set default profile structure for new users
         const defaultProfile: UserProfile = {
@@ -145,11 +147,11 @@ export const AuthProvider: React.FC<PropsWithChildren<object>> = ({
 
       setProfile(processedProfile);
       
-      console.log('AuthProvider: Processed Profile Object:', processedProfile);
-      console.log('AuthProvider: getEffectiveTier() will return:', getEffectiveTier());
+      authLog.info('AuthProvider: Processed Profile Object:', processedProfile);
+      authLog.info('AuthProvider: getEffectiveTier() will return:', getEffectiveTier());
       
     } catch (error) {
-      console.error('AuthProvider: Failed to fetch profile with RPC:', error);
+      authLog.error('AuthProvider: Failed to fetch profile with RPC:', error);
       
       // Set default profile structure on error
       const defaultProfile: UserProfile = {
@@ -174,7 +176,7 @@ export const AuthProvider: React.FC<PropsWithChildren<object>> = ({
     try {
       await fetchProfileWithRPC(userId);
     } catch (error: any) {
-      console.error('AuthProvider: Error refreshing profile:', error.message);
+      authLog.error('AuthProvider: Error refreshing profile:', error.message);
     }
   };
 
@@ -204,7 +206,7 @@ export const AuthProvider: React.FC<PropsWithChildren<object>> = ({
         // Usage limits removed - Edge Function handles tracking
       }
     } catch (error: any) {
-      console.error('AuthProvider: Error in processInitialSession:', error);
+      authLog.error('AuthProvider: Error in processInitialSession:', error);
       // Set safe defaults on error
       setSession(null);
       setUser(null);
@@ -230,9 +232,15 @@ export const AuthProvider: React.FC<PropsWithChildren<object>> = ({
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session ? 'Got session' : 'No session');
+              authLog.info('Auth state changed:', event, session ? 'Got session' : 'No session');
+        
+        // Log beta event for auth state changes
+        logBetaEvent('AuthProvider', `auth-${event}`, {
+          hasSession: !!session,
+          userId: session?.user?.id
+        });
 
-      if (session) {
+        if (session) {
         setSession(session);
         setUser(session.user);
 
@@ -240,7 +248,7 @@ export const AuthProvider: React.FC<PropsWithChildren<object>> = ({
         try {
           await fetchProfileWithRPC(session.user.id);
         } catch (error: any) {
-          console.error(
+          authLog.error(
             'AuthProvider: Error fetching profile on auth change:',
             error.message,
           );

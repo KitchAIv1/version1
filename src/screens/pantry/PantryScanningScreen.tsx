@@ -43,10 +43,8 @@ import {
 } from 'react-native';
 import {
   CameraView,
-  CameraCapturedPicture,
   useCameraPermissions,
 } from 'expo-camera';
-import * as ImageManipulator from 'expo-image-manipulator';
 import * as Haptics from 'expo-haptics';
 import { useNavigation } from '@react-navigation/native';
 import { Button } from 'react-native-paper';
@@ -70,6 +68,7 @@ import {
 } from '../../utils/pantryScanning';
 import { supabase } from '../../services/supabase';
 import { refreshFeedPantryMatches } from '../../hooks/useFeed';
+import { aiLog, pantryLog, logAIOperation } from '../../config/logger';
 
 export default function PantryScanningScreen() {
   // ---------- refs & state ----------
@@ -157,12 +156,16 @@ export default function PantryScanningScreen() {
         setAnalysisMessage(prev => {
           const currentIndex = analysisPhrases.indexOf(prev);
           const nextIndex = (currentIndex + 1) % analysisPhrases.length;
-          return analysisPhrases[nextIndex];
+          // Ensure safe array access with bounds checking
+          const nextMessage = analysisPhrases[nextIndex];
+          return nextMessage !== undefined ? nextMessage : analysisPhrases[0] || 'Analyzing...';
         });
       }, 2000);
 
       return () => clearInterval(messageInterval);
     }
+    // Return undefined when not analyzing - this is valid for useEffect
+    return undefined;
   }, [isAnalyzing]);
 
   // ---------- Enhanced camera capture with V1 logic ----------
@@ -192,6 +195,12 @@ export default function PantryScanningScreen() {
 
       // Process image with AI recognition
       const recognitionResult = await processImageWithAI(photo.base64!);
+      
+      // Log AI operation result
+      logAIOperation('pantry-scan', recognitionResult.items.length > 0, {
+        itemsFound: recognitionResult.items.length,
+        processingTime: Date.now() - analysisStartTime
+      });
 
       // Enforce minimum display time for better UX
       await enforceMinimumDisplayTime(analysisStartTime, 4000);
@@ -204,7 +213,7 @@ export default function PantryScanningScreen() {
         setIsAnalyzing(false);
       }
     } catch (error) {
-      console.error(
+      aiLog.error(
         '[PantryScanningScreen] Enhanced capture/analysis error:',
         error,
       );
@@ -232,7 +241,7 @@ export default function PantryScanningScreen() {
         
         // Handle limit reached case
         if (scanResult && typeof scanResult === 'object' && 'limitReached' in scanResult) {
-          console.log('[PantryScanningScreen] Scan limit reached');
+          aiLog.info('[PantryScanningScreen] Scan limit reached');
           setIsSaving(false);
           setShowLimitModal(true);
           return;
@@ -240,7 +249,7 @@ export default function PantryScanningScreen() {
 
         // If scan tracking failed, don't save items
         if (!scanResult) {
-          console.error('[PantryScanningScreen] Scan tracking failed');
+          aiLog.error('[PantryScanningScreen] Scan tracking failed');
           setIsSaving(false);
           return;
         }
@@ -251,13 +260,13 @@ export default function PantryScanningScreen() {
         });
 
         if (error) {
-          console.error('[PantryScanningScreen] Error saving items:', error);
+          aiLog.error('[PantryScanningScreen] Error saving items:', error);
           throw error;
         }
 
         // 🎯 INTELLIGENT ACTIVITY LOGGING: Log successful scan activity
         try {
-          console.log('[PantryScanningScreen] Logging successful scan activity...');
+          aiLog.info('[PantryScanningScreen] Logging successful scan activity...');
           
           const activityMetadata = {
             items_count: itemsToUpsert.length,
@@ -279,13 +288,13 @@ export default function PantryScanningScreen() {
             });
 
           if (activityError) {
-            console.warn('[PantryScanningScreen] Activity logging failed:', activityError);
+            aiLog.warn('[PantryScanningScreen] Activity logging failed:', activityError);
             // Don't throw - scan succeeded
           } else {
-            console.log('[PantryScanningScreen] ✅ Successful scan activity logged');
+            aiLog.info('[PantryScanningScreen] ✅ Successful scan activity logged');
           }
         } catch (activityLogError) {
-          console.warn('[PantryScanningScreen] Activity logging error:', activityLogError);
+          aiLog.warn('[PantryScanningScreen] Activity logging error:', activityLogError);
           // Don't throw - scan succeeded
         }
 
@@ -304,7 +313,7 @@ export default function PantryScanningScreen() {
         );
       }
     } catch (error) {
-      console.error(
+      aiLog.error(
         '[PantryScanningScreen] Error in handleConfirmItems:',
         error,
       );

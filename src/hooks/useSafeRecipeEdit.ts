@@ -114,7 +114,6 @@ export const useSafeRecipeEdit = (recipeId: string, userId?: string) => {
           ingredient: String(ing.ingredient || ing.name || ''),
           quantity: String(ing.quantity || ''),
           unit: String(ing.unit || ''),
-          original: JSON.stringify(ing),
         }));
         
         setParsedIngredients(parsed);
@@ -166,7 +165,6 @@ export const useSafeRecipeEdit = (recipeId: string, userId?: string) => {
       quantity: '',
       unit: '',
       ingredient: '',
-      original: '',
     };
 
     setParsedIngredients(prev => [...prev, newIngredient]);
@@ -296,7 +294,6 @@ export const useSafeRecipeEdit = (recipeId: string, userId?: string) => {
           quantity: String(ing.quantity || ''),
           unit: String(ing.unit || ''),
           ingredient: String(ing.name || ing.ingredient || ''),
-          original: JSON.stringify(ing),
         }));
         
         setParsedIngredients(syncedParsed);
@@ -314,7 +311,6 @@ export const useSafeRecipeEdit = (recipeId: string, userId?: string) => {
             quantity: String(displayIng.quantity || ''),
             unit: String(displayIng.unit || ''),
             ingredient: String(displayIng.name || displayIng.ingredient || ''),
-            original: JSON.stringify(displayIng),
           });
         }
         

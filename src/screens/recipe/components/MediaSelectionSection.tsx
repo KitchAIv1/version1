@@ -1,30 +1,33 @@
-import React, { useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  Dimensions,
-} from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Video, ResizeMode } from 'expo-av';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BRAND_PRIMARY = '#10B981';
 
+// Define interfaces with proper optional typing
+interface OptimizedVideoPreviewProps {
+  videoUri?: string | undefined;
+  onSelectVideo: () => void;
+}
+
+interface OptimizedThumbnailPreviewProps {
+  thumbnailUri?: string | undefined;
+  onSelectThumbnail: () => void;
+}
+
 interface MediaSelectionSectionProps {
-  videoUri?: string;
-  thumbnailUri?: string;
+  videoUri?: string | undefined;
+  thumbnailUri?: string | undefined;
   onSelectVideo: () => void;
   onSelectThumbnail: () => void;
 }
 
 // Optimized Video Preview Component
-const OptimizedVideoPreview = React.memo<{
-  videoUri?: string;
-  onSelectVideo: () => void;
-}>(({ videoUri, onSelectVideo }) => {
+const OptimizedVideoPreview: React.FC<OptimizedVideoPreviewProps> = ({
+  videoUri,
+  onSelectVideo
+}) => {
   const buttonStyle = useMemo(
     () => (videoUri ? styles.buttonOutline : styles.button),
     [videoUri],
@@ -37,22 +40,12 @@ const OptimizedVideoPreview = React.memo<{
 
   return (
     <View style={styles.mediaPreviewWrapper}>
-      {videoUri ? (
-        <Video
-          source={{ uri: videoUri }}
-          style={styles.videoPreview}
-          useNativeControls
-          resizeMode={ResizeMode.COVER}
-          isLooping
-        />
-      ) : (
-        <View style={[styles.videoPreview, styles.mediaPlaceholder]}>
-          <Feather name="video" size={40} color="#ccc" />
-          <Text style={styles.mediaPlaceholderText}>
-            Showcase your recipe in action
-          </Text>
-        </View>
-      )}
+      <View style={[styles.videoPreview, styles.mediaPlaceholder]}>
+        <Feather name="video" size={40} color="#ccc" />
+        <Text style={styles.mediaPlaceholderText}>
+          Showcase your recipe in action
+        </Text>
+      </View>
       <TouchableOpacity
         style={buttonStyle}
         onPress={onSelectVideo}
@@ -69,14 +62,13 @@ const OptimizedVideoPreview = React.memo<{
       </TouchableOpacity>
     </View>
   );
-});
-OptimizedVideoPreview.displayName = 'OptimizedVideoPreview';
+};
 
 // Optimized Thumbnail Preview Component
-const OptimizedThumbnailPreview = React.memo<{
-  thumbnailUri?: string;
-  onSelectThumbnail: () => void;
-}>(({ thumbnailUri, onSelectThumbnail }) => {
+const OptimizedThumbnailPreview: React.FC<OptimizedThumbnailPreviewProps> = ({
+  thumbnailUri,
+  onSelectThumbnail
+}) => {
   const buttonStyle = useMemo(
     () => (thumbnailUri ? styles.buttonOutline : styles.button),
     [thumbnailUri],
@@ -89,24 +81,12 @@ const OptimizedThumbnailPreview = React.memo<{
 
   return (
     <View style={styles.mediaPreviewWrapper}>
-      {thumbnailUri ? (
-        <View style={styles.thumbnailContainer}>
-          <Image
-            source={{ uri: thumbnailUri }}
-            style={styles.thumbnailPreview}
-          />
-          <View style={styles.thumbnailOverlay}>
-            <Text style={styles.thumbnailOverlayText}>Cover Image</Text>
-          </View>
-        </View>
-      ) : (
-        <View style={[styles.thumbnailPreview, styles.mediaPlaceholder]}>
-          <Feather name="image" size={40} color="#ccc" />
-          <Text style={styles.mediaPlaceholderText}>
-            Add an appetizing cover image
-          </Text>
-        </View>
-      )}
+      <View style={[styles.thumbnailPreview, styles.mediaPlaceholder]}>
+        <Feather name="image" size={40} color="#ccc" />
+        <Text style={styles.mediaPlaceholderText}>
+          Add an appetizing cover image
+        </Text>
+      </View>
       <TouchableOpacity
         style={buttonStyle}
         onPress={onSelectThumbnail}
@@ -123,28 +103,28 @@ const OptimizedThumbnailPreview = React.memo<{
       </TouchableOpacity>
     </View>
   );
-});
-OptimizedThumbnailPreview.displayName = 'OptimizedThumbnailPreview';
+};
 
 // Main MediaSelectionSection Component
-export const MediaSelectionSection = React.memo<MediaSelectionSectionProps>(
-  ({ videoUri, thumbnailUri, onSelectVideo, onSelectThumbnail }) => {
-    return (
-      <View style={styles.mediaSelectionContainer}>
-        <OptimizedVideoPreview
-          videoUri={videoUri}
-          onSelectVideo={onSelectVideo}
-        />
-        <OptimizedThumbnailPreview
-          thumbnailUri={thumbnailUri}
-          onSelectThumbnail={onSelectThumbnail}
-        />
-      </View>
-    );
-  },
-);
-
-MediaSelectionSection.displayName = 'MediaSelectionSection';
+const MediaSelectionSection: React.FC<MediaSelectionSectionProps> = ({
+  videoUri,
+  thumbnailUri,
+  onSelectVideo,
+  onSelectThumbnail,
+}) => {
+  return (
+    <View style={styles.mediaSelectionContainer}>
+      <OptimizedVideoPreview
+        videoUri={videoUri}
+        onSelectVideo={onSelectVideo}
+      />
+      <OptimizedThumbnailPreview
+        thumbnailUri={thumbnailUri}
+        onSelectThumbnail={onSelectThumbnail}
+      />
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   mediaSelectionContainer: {
@@ -165,27 +145,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
-  thumbnailContainer: {
-    position: 'relative',
-    marginBottom: 16,
-  },
-  thumbnailOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingVertical: 6,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-  },
-  thumbnailOverlayText: {
-    color: '#fff',
-    textAlign: 'center',
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
   thumbnailPreview: {
     width: SCREEN_WIDTH * 0.6,
     height: (SCREEN_WIDTH * 0.6) / (16 / 9),
@@ -194,6 +153,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#e5e7eb',
+    marginBottom: 16,
   },
   mediaPlaceholder: {
     justifyContent: 'center',

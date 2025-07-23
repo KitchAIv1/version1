@@ -53,7 +53,7 @@ const OptimizedCollapsibleCard = React.lazy(() =>
 );
 const MediaSelectionSection = React.lazy(() =>
   import('./components/MediaSelectionSection').then(module => ({
-    default: module.MediaSelectionSection,
+    default: module.default,
   })),
 );
 const RecipeDetailsSection = React.lazy(() =>

@@ -1,122 +1,111 @@
 /**
- * Safe Ingredient Parser Utility for KitchAI Recipe Edit Screen
- * This utility safely parses ingredient data without affecting other components
+ * Ingredient Parser Utilities
+ * Parses various ingredient string formats into structured objects
  */
 
 export interface ParsedIngredient {
   quantity: string;
   unit: string;
   ingredient: string;
-  original?: string; // Keep original for fallback
 }
 
 /**
- * Safely parse a single ingredient string
- * Returns original data if parsing fails
+ * Parses an ingredient string into quantity, unit, and ingredient name
+ * Handles various formats like "2 cups flour", "1 lb chicken", "salt", etc.
  */
-export const parseIngredientString = (
-  ingredientString: string,
-): ParsedIngredient => {
-  const fallback: ParsedIngredient = {
+export function parseIngredientString(ingredientStr: string): ParsedIngredient {
+  if (!ingredientStr || typeof ingredientStr !== 'string') {
+    return {
+      quantity: '',
+      unit: '',
+      ingredient: ingredientStr || '',
+    };
+  }
+
+  const cleaned = ingredientStr.trim();
+  
+  // Pattern 1: "1/2 cup flour" or "2.5 cups sugar"
+  const fractionOrDecimalPattern = /^(\d+(?:[\/\.]\d+)?)\s+(cup|cups|tbsp|tablespoons?|tsp|teaspoons?|oz|ounces?|lb|lbs|pounds?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|pint|pints|quart|quarts|gallon|gallons)\s+(.+)$/i;
+  
+  // Pattern 2: "2 large eggs" or "3 medium onions"
+  const countWithSizePattern = /^(\d+)\s+(small|medium|large|extra-large|jumbo|tiny|huge)\s+(.+)$/i;
+  
+  // Pattern 3: "6 chicken breasts" or "4 carrots"
+  const simpleCountPattern = /^(\d+)\s+(.+)$/;
+  
+  // Pattern 4: Just a number without unit "2 eggs" -> treat as count
+  const numberOnlyPattern = /^(\d+(?:[\/\.]\d+)?)\s+(.+)$/;
+
+  // Try fraction/decimal with unit pattern first
+  let match = cleaned.match(fractionOrDecimalPattern);
+  if (match && match[1] && match[2] && match[3]) {
+    return {
+      quantity: match[1].trim(),
+      unit: match[2].trim(),
+      ingredient: match[3].trim(),
+    };
+  }
+
+  // Try count with size pattern
+  match = cleaned.match(countWithSizePattern);
+  if (match && match[1] && match[2] && match[3]) {
+    return {
+      quantity: match[1].trim(),
+      unit: match[2].trim(),
+      ingredient: match[3].trim(),
+    };
+  }
+
+  // Generic number + unit pattern (MOVED AFTER SPECIFIC PATTERNS)
+  const genericUnitPattern = /^(\d+(?:[\/\.]\d+)?)\s+([a-zA-Z]+)\s+(.+)$/;
+  match = cleaned.match(genericUnitPattern);
+  if (match && match[1] && match[2] && match[3]) {
+    return {
+      quantity: match[1].trim(),
+      unit: match[2].trim(),
+      ingredient: match[3].trim(),
+    };
+  }
+
+  // Special handling for count-based ingredients (chicken, beef, etc.)
+  const countBasedIngredients = [
+    'chicken', 'egg', 'onion', 'carrot', 'potato', 'apple', 'banana', 
+    'tomato', 'lemon', 'lime', 'orange', 'garlic clove', 'bell pepper'
+  ];
+  
+  match = cleaned.match(simpleCountPattern);
+  if (match && match[1] && match[2]) {
+    const potentialIngredient = match[2].trim().toLowerCase();
+    const isCountBased = countBasedIngredients.some(ingredient => 
+      potentialIngredient.includes(ingredient)
+    );
+    
+    if (isCountBased) {
+      return {
+        quantity: match[1].trim(),
+        unit: 'units',
+        ingredient: match[2].trim(),
+      };
+    }
+  }
+
+  // Try simple number pattern as fallback
+  match = cleaned.match(numberOnlyPattern);
+  if (match && match[1] && match[2]) {
+    return {
+      quantity: match[1].trim(),
+      unit: 'units',
+      ingredient: match[2].trim(),
+    };
+  }
+
+  // If no pattern matches, return the original string as ingredient
+  return {
     quantity: '',
     unit: '',
-    ingredient: ingredientString || '',
-    original: ingredientString,
+    ingredient: cleaned,
   };
-
-  if (!ingredientString || typeof ingredientString !== 'string') {
-    return fallback;
-  }
-
-  try {
-    const trimmed = ingredientString.trim();
-
-    // Enhanced patterns to match the formats in the screenshot
-    const patterns = [
-      // "8 oz Spaghetti" -> quantity: 8, unit: oz, ingredient: Spaghetti
-      /^(\d+(?:\.\d+)?)\s+(oz|lb|lbs|g|kg|ml|l|cups?|cup|tbsp|tsp|tablespoons?|teaspoons?|tablespoon|teaspoon)\s+(.+)$/i,
-
-      // "1/4 cup Olive oil" -> quantity: 1/4, unit: cup, ingredient: Olive oil
-      /^(\d+\/\d+)\s+(oz|lb|lbs|g|kg|ml|l|cups?|cup|tbsp|tsp|tablespoons?|teaspoons?|tablespoon|teaspoon)\s+(.+)$/i,
-
-      // "2 1/2 cups flour" -> quantity: 2 1/2, unit: cups, ingredient: flour
-      /^(\d+\s+\d+\/\d+)\s+(oz|lb|lbs|g|kg|ml|l|cups?|cup|tbsp|tsp|tablespoons?|teaspoons?|tablespoon|teaspoon)\s+(.+)$/i,
-
-      // "1/2 tsp Salt" -> quantity: 1/2, unit: tsp, ingredient: Salt
-      /^(\d+\/\d+)\s+(tsp|tbsp|tablespoons?|teaspoons?|tablespoon|teaspoon)\s+(.+)$/i,
-
-      // "4 cloves Garlic" -> quantity: 4, unit: cloves, ingredient: Garlic
-      /^(\d+(?:\.\d+)?)\s+(cloves?|pieces?|slices?|whole|chopped|diced|minced)\s+(.+)$/i,
-
-      // "1 large egg" -> quantity: 1, unit: large, ingredient: egg
-      /^(\d+)\s+(large|medium|small|whole|chopped|diced|minced|fresh|dried)\s+(.+)$/i,
-
-      // NEW: "4 Chicken thighs" -> quantity: 4, unit: "", ingredient: Chicken thighs (for count-based ingredients)
-      /^(\d+(?:\.\d+)?)\s+(chicken|beef|pork|fish|salmon|turkey|duck|lamb|shrimp|scallops?|mussels?|clams?|oysters?)\s+(.+)$/i,
-
-      // NEW: "2 apples" -> quantity: 2, unit: "", ingredient: apples (for whole foods by count)
-      /^(\d+(?:\.\d+)?)\s+(apples?|oranges?|bananas?|lemons?|limes?|tomatoes?|onions?|potatoes?|carrots?|eggs?|avocados?)\s*$/i,
-
-      // Generic number + unit pattern (MOVED AFTER SPECIFIC PATTERNS)
-      /^(\d+(?:\.\d+)?(?:\s+\d+\/\d+)?)\s+([a-zA-Z]+)\s+(.+)$/,
-
-      // Just number + ingredient (no unit)
-      /^(\d+(?:\.\d+)?(?:\s+\d+\/\d+)?)\s+(.+)$/,
-    ];
-
-    for (const pattern of patterns) {
-      const match = trimmed.match(pattern);
-      if (match) {
-        // Special handling for count-based ingredients (chicken, beef, etc.)
-        if (
-          pattern.source.includes('chicken|beef|pork|fish') ||
-          pattern.source.includes('apples?|oranges?|bananas?')
-        ) {
-          if (match.length >= 3) {
-            const result = {
-              quantity: match[1].trim(),
-              unit: '', // Empty unit for count-based ingredients
-              ingredient: `${match[2]} ${match[3] || ''}`.trim(), // Combine the meat/food type with description
-              original: ingredientString,
-            };
-            return result;
-          }
-        }
-
-        // For patterns with 4 groups (quantity, unit, ingredient)
-        if (match.length >= 4) {
-          const result = {
-            quantity: match[1].trim(),
-            unit: match[2].trim(),
-            ingredient: match[3].trim(),
-            original: ingredientString,
-          };
-          return result;
-        }
-
-        // For patterns with 3 groups (quantity, ingredient - no unit)
-        if (match.length === 3) {
-          const result = {
-            quantity: match[1].trim(),
-            unit: '',
-            ingredient: match[2].trim(),
-            original: ingredientString,
-          };
-          return result;
-        }
-      }
-    }
-
-    return fallback;
-  } catch (error) {
-    console.warn(
-      '[IngredientParser] Error parsing ingredient:',
-      ingredientString,
-      error,
-    );
-    return fallback;
-  }
-};
+}
 
 /**
  * Safely parse ingredient data from various formats
@@ -159,7 +148,6 @@ export const parseIngredientsData = (
                 ingredient: String(
                   ingredient.ingredient || ingredient.name || '',
                 ),
-                original: JSON.stringify(ingredient),
               };
               return result;
             }
@@ -179,7 +167,6 @@ export const parseIngredientsData = (
             quantity: '',
             unit: '',
             ingredient: String(ingredient || ''),
-            original: String(ingredient),
           };
         } catch (error) {
           console.warn(
@@ -191,7 +178,6 @@ export const parseIngredientsData = (
             quantity: '',
             unit: '',
             ingredient: String(ingredient || ''),
-            original: String(ingredient),
           };
         }
       });
@@ -215,18 +201,17 @@ export const parseIngredientsData = (
         return [parseIngredientString(rawIngredients.name)];
       }
 
-      return [
-        {
-          quantity: String(
-            rawIngredients.quantity || rawIngredients.amount || '',
-          ),
-          unit: String(rawIngredients.unit || ''),
-          ingredient: String(
-            rawIngredients.ingredient || rawIngredients.name || '',
-          ),
-          original: JSON.stringify(rawIngredients),
-        },
-      ];
+              return [
+          {
+            quantity: String(
+              rawIngredients.quantity || rawIngredients.amount || '',
+            ),
+            unit: String(rawIngredients.unit || ''),
+            ingredient: String(
+              rawIngredients.ingredient || rawIngredients.name || '',
+            ),
+          },
+        ];
     }
 
     console.warn(

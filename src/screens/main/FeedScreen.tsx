@@ -47,6 +47,7 @@ import {
   useStandardizedScreenPerformance, 
   getStandardizedLoadingConfig 
 } from '../../utils/codeConsolidation';
+import { feedLog, performanceLog, logPerformanceMetric, logBetaEvent } from '../../config/logger';
 
 // Move styles to top to fix "styles used before defined" errors
 const styles = StyleSheet.create({
@@ -189,7 +190,7 @@ export default React.memo(function FeedScreen() {
     // Log current view logger size periodically in development
     if (__DEV__) {
       const monitorInterval = setInterval(() => {
-        console.log(`[FeedScreen] View logger size: ${viewLogger.getSize()} items`);
+        logPerformanceMetric('FeedScreen View Logger', viewLogger.getSize(), { metric: 'items_tracked' });
       }, 60000); // Check every minute
       
       return () => clearInterval(monitorInterval);
@@ -245,7 +246,7 @@ export default React.memo(function FeedScreen() {
     });
 
     return () => {
-      console.log('[FeedScreen] 🎧 Cleaning up real-time comment monitoring');
+      feedLog.info('[FeedScreen] 🎧 Cleaning up real-time comment monitoring');
       unsubscribe();
     };
   }, [queryClient, feedData, user?.id, syncSingleRecipe]);
@@ -295,7 +296,7 @@ export default React.memo(function FeedScreen() {
   useFocusEffect(
     useCallback(() => {
       if (feedData && feedData.length > 0 && user?.id) {
-        console.log('[FeedScreen] 🧠 Screen focused - running smart comment count sync');
+        logBetaEvent('FeedScreen', 'smart-sync-triggered', { feedItemCount: feedData?.length });
         
         const startIndex = Math.max(0, currentIndex);
         const endIndex = Math.min(feedData.length, startIndex + 3);
@@ -401,7 +402,7 @@ export default React.memo(function FeedScreen() {
 
   useEffect(() => {
     if (itemHeight > 0) {
-      console.log(`FeedScreen: itemHeight set from layout: ${itemHeight}`);
+      logPerformanceMetric('FeedScreen Layout', itemHeight, { metric: 'item_height' });
     }
   }, [itemHeight]);
 

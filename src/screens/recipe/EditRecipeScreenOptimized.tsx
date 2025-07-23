@@ -402,7 +402,6 @@ export const EditRecipeScreenOptimized: React.FC<EditRecipeScreenProps> = ({
           quantity: '',
           unit: '',
           ingredient: '',
-          original: '',
         });
       }
 
@@ -412,7 +411,6 @@ export const EditRecipeScreenOptimized: React.FC<EditRecipeScreenProps> = ({
           quantity: '',
           unit: '',
           ingredient: '',
-          original: '',
         };
       }
 

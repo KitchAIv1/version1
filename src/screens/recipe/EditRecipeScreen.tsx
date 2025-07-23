@@ -189,7 +189,6 @@ const EditRecipeScreen: React.FC<EditRecipeScreenProps> = ({
         quantity: '',
         unit: '',
         ingredient: '',
-        original: '',
       });
     }
 
@@ -199,7 +198,6 @@ const EditRecipeScreen: React.FC<EditRecipeScreenProps> = ({
         quantity: '',
         unit: '',
         ingredient: '',
-        original: '',
       };
     }
 
@@ -235,7 +233,6 @@ const EditRecipeScreen: React.FC<EditRecipeScreenProps> = ({
         quantity: '',
         unit: '',
         ingredient: '',
-        original: '',
       }]);
       return;
     }
