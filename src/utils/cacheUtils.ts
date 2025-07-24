@@ -204,7 +204,7 @@ export class CacheManager {
       );
 
       if (nonAuthKeys.length > 0) {
-        console.log('[CacheManager] Non-auth keys to clear:', nonAuthKeys.length, 'keys');
+        console.log('[CacheManager] Clearing non-auth cache data...');
         await AsyncStorage.multiRemove(nonAuthKeys);
       }
 
