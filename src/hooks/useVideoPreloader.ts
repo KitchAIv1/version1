@@ -56,8 +56,14 @@ export const useVideoPreloader = (
         return `${baseUrl}${separator}${qualityParams[quality]}`;
       }
 
-      if (baseUrl.includes('mux.com')) {
-        return baseUrl;
+      // Secure Mux URL validation - check for exact hostname match
+      try {
+        const url = new URL(baseUrl);
+        if (url.hostname === 'mux.com' || url.hostname.endsWith('.mux.com')) {
+          return baseUrl;
+        }
+      } catch (error) {
+        // Invalid URL, continue with default handling
       }
 
       return baseUrl;
