@@ -12,7 +12,7 @@
 ### **What Happened**
 A Supabase service role key was hardcoded in 21 database maintenance scripts and committed to the GitHub repository, creating a critical security vulnerability.
 
-**Exposed Key**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0cG1hcWZmZG14aHVndnliZ2ZuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NDE0NDk2MCwiZXhwIjoyMDU5NzIwOTYwfQ.l6xnToOXnDID-RRtwyy9qjL7`
+**Exposed Key**: `eyJhbGciOi[REDACTED-SERVICE-KEY-REGENERATED]`
 
 ### **Impact Assessment**
 - **Database Access**: Service key provides admin-level access to entire Supabase database

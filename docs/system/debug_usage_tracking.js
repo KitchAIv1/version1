@@ -1,8 +1,14 @@
 const { createClient } = require('@supabase/supabase-js');
 
-// Initialize Supabase client
-const supabaseUrl = 'https://btpmaqffdmxhugvybgfn.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0cG1hcWZmZG14aHVndnliZ2ZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjY2OTEzNzMsImV4cCI6MjA0MjI2NzM3M30.gF0A0qFWKfA9mOaHCnmKmn4u1fFjhJGAQKI_JEfqOzY';
+// Use environment variables instead of hardcoded keys
+const supabaseUrl = process.env.SUPABASE_URL || 'https://btpmaqffdmxhugvybgfn.supabase.co';
+const supabaseKey = process.env.SUPABASE_ANON_KEY; // Use environment variable
+
+if (!supabaseKey) {
+  console.error('❌ SUPABASE_ANON_KEY environment variable is required');
+  process.exit(1);
+}
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function debugUsageTracking() {
