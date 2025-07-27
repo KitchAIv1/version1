@@ -65,6 +65,12 @@ KITCHAI_*_PRD_*.md
 *DASHBOARD_PRD*.md
 *SILICON_VALLEY_PRD*.md
 
+# Security Implementation Documentation (contains sensitive PRD information)
+*SECURITY_IMPLEMENTATION_REPORT*.md
+*PROJECT_DOCUMENTATION*.md
+docs/system/SECURITY_IMPLEMENTATION_REPORT.md
+docs/system/PROJECT_DOCUMENTATION.md
+
 # Additional sensitive patterns (excluding legitimate technical docs)
 *CONFIDENTIAL*.md
 *INTERNAL*.md
